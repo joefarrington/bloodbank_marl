@@ -82,8 +82,8 @@ class GymnaxFitness(object):
         else:
             self.n_devices = n_devices
 
-        # Keep track of total steps executed in environment
-        self.total_env_steps = 0
+        # Keep track of total steps executed in environment - blank out, side effect when we JIT rollout
+        # self.total_env_steps = 0
 
         # Warmup and discounting parameters - newly added and to decide best way to track
         self.num_warmup_days = num_warmup_days
@@ -125,7 +125,7 @@ class GymnaxFitness(object):
         rng_pop = jax.random.split(rng_input, self.num_rollouts)
         scores, masks = jax.jit(self.rollout_map)(rng_pop, policy_params)
         # Update total step counter using only transitions before termination
-        self.total_env_steps += masks.sum()
+        # self.total_env_steps += masks.sum()
         return scores
 
     def rollout_ffw(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
@@ -237,4 +237,4 @@ class GymnaxFitness(object):
         cum_return = carry_out[
             -2
         ].squeeze()  # Discounted, just for replenishment for now; update rollout if we want to use it
-        return cum_reward, jnp.array(ep_mask)
+        return cum_return, jnp.array(ep_mask)
