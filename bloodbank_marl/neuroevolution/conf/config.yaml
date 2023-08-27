@@ -1,0 +1,81 @@
+wandb:
+  init:
+    project: "es_demoor_marl_tryout_from_script"
+
+evosax:
+  num_generations: 5
+  evaluate_every_k_gens: 1
+  seed: 10
+  
+  strategy:
+    _target_: evosax.OpenES
+    popsize: 200
+    opt_name: "adam"
+    lrate_init: 0.01
+
+  fitness_shaper:
+    _target_: evosax.FitnessShaper
+    maximize: True
+
+  logging:
+    _target_: evosax.utils.ESLog
+    num_generations: ${evosax.num_generations}
+    top_k: 5
+    maximize: ${evosax.fitness_shaper.maximize}
+
+  checkpoint_options:
+    _target_: orbax.checkpoint.CheckpointManagerOptions
+    max_to_keep: 1
+    create: True
+
+environment:
+  env_name: "DeMoorPerishable"
+  num_env_steps: 5000
+  num_rollouts: 50
+  env_kwargs:
+    max_useful_life: 2
+    lead_time: 1
+    max_order_quantity: 10
+  env_params: {}
+  num_warmup_days: 100
+  max_warmup_steps: 1500
+  gamma: 0.99
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${environment.num_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
+
+test_manager:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${environment.num_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: True
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
+
+
+policy:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  replenishment:
+    _target_: bloodbank_marl.policies.replenishment.RepMLP
+  issuing:
+    _target_: bloodbank_marl.policies.issuing.IssueMLP
+
+
+
+

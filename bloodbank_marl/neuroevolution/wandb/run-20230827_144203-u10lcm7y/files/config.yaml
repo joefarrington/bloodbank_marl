@@ -1,0 +1,109 @@
+wandb_version: 1
+
+wandb:
+  desc: null
+  value:
+    init:
+      project: es_demoor_marl_tryout_from_script
+evosax:
+  desc: null
+  value:
+    num_generations: 5
+    evaluate_every_k_gens: 1
+    seed: 10
+    strategy:
+      _target_: evosax.OpenES
+      popsize: 200
+      opt_name: adam
+      lrate_init: 0.01
+    fitness_shaper:
+      _target_: evosax.FitnessShaper
+      maximize: true
+    logging:
+      _target_: evosax.utils.ESLog
+      num_generations: 5
+      top_k: 5
+      maximize: true
+    checkpoint_options:
+      _target_: orbax.checkpoint.CheckpointManagerOptions
+      max_to_keep: 1
+      create: true
+environment:
+  desc: null
+  value:
+    env_name: DeMoorPerishable
+    num_env_steps: 5000
+    num_rollouts: 50
+    env_kwargs:
+      max_useful_life: 2
+      lead_time: 1
+      max_order_quantity: 10
+    env_params: null
+    num_warmup_days: 100
+    num_warmup_steps: 1500
+    gamma: 0.99
+train_evaluator:
+  desc: null
+  value:
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    env_name: DeMoorPerishable
+    num_env_steps: 5000
+    num_rollouts: 50
+    env_kwargs:
+      max_useful_life: 2
+      lead_time: 1
+      max_order_quantity: 10
+    env_params: null
+    test: false
+    n_devices: None
+    num_warmup_days: 100
+    num_warmup_steps: 1500
+    gamma: 0.99
+test_manager:
+  desc: null
+  value:
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    env_name: DeMoorPerishable
+    num_env_steps: 5000
+    num_rollouts: 50
+    env_kwargs:
+      max_useful_life: 2
+      lead_time: 1
+      max_order_quantity: 10
+    env_params: null
+    test: true
+    n_devices: None
+    num_warmup_days: 100
+    num_warmup_steps: 1500
+    gamma: 0.99
+policy:
+  desc: null
+  value:
+    policy_manager: null
+    checkpointing: null
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.12
+    cli_version: 0.15.8
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1693143723.777556
+    t:
+      1:
+      - 12
+      - 45
+      - 50
+      - 55
+      2:
+      - 12
+      - 45
+      - 50
+      - 55
+      3:
+      - 16
+      - 23
+      4: 3.10.12
+      5: 0.15.8
+      8:
+      - 5
