@@ -30,6 +30,7 @@ evosax:
 
 environment:
   env_name: "DeMoorPerishable"
+
   num_env_steps: 5000
   num_rollouts: 50
   env_kwargs:
@@ -69,9 +70,17 @@ test_manager:
 
 
 policies:
+  optimize:
+    - 0
+    #- 1
   policy_manager:
     _target_: bloodbank_marl.policies.policy_manager.PolicyManager
   replenishment:
+    #_target_: bloodbank_marl.policies.common.FixedPolicy
+    #policy_function:
+    #  _target_: hydra.utils.get_method
+    #  path: bloodbank_marl.policies.replenishment.order_up_to
+    #policy_params: 7
     _target_: bloodbank_marl.policies.replenishment.FlaxRepPolicy
     policy_class:
       _target_: hydra.utils.get_class
@@ -81,14 +90,19 @@ policies:
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
   issuing:
-    _target_: bloodbank_marl.policies.issuing.FlaxIssuePolicy
-    policy_class: 
-      _target_: hydra.utils.get_class
-      path: bloodbank_marl.policies.issuing.IssueMLP
-    policy_id: 1
-    env_name: ${environment.env_name}
+    _target_: bloodbank_marl.policies.common.FixedPolicy
+    policy_function:
+      _target_: hydra.utils.get_method
+      path: bloodbank_marl.policies.issuing.issue_fifo
+    policy_params: 12
+    #_target_: bloodbank_marl.policies.issuing.FlaxIssuePolicy
+    #policy_class: 
+    #  _target_: hydra.utils.get_class
+    #  path: bloodbank_marl.policies.issuing.IssueMLP
+    #policy_id: 1
+    #env_name: ${environment.env_name}
     env_kwargs: ${environment.env_kwargs}
-    env_params: ${environment.env_params}
+    #env_params: ${environment.env_params}
 
 
 

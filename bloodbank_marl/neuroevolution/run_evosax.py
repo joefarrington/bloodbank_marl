@@ -28,13 +28,20 @@ def main(cfg):
     rng = jax.random.PRNGKey(cfg.evosax.seed)
     rng, rng_rep, rng_issue = jax.random.split(rng, 3)
 
+    # TODO: Think about how best to flag up whether policy is to be optimized
+
+    policy_params = {}
+    # 0 is the id for replenishment
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
-    rep_params = policy_rep.get_params(rng_rep)
+    if 0 in cfg.policies.optimize:
+        rep_params = policy_rep.get_params(rng_rep)
+        policy_params[0] = rep_params
 
+    # 1 is the id for issuing policy
     policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
-    issue_params = policy_issue.get_params(rng_issue)
-
-    policy_params = {0: rep_params, 1: issue_params}
+    if 1 in cfg.policies.optimize:
+        issue_params = policy_issue.get_params(rng_issue)
+        policy_params[1] = issue_params
 
     policies = [policy_rep.apply, policy_issue.apply]
     policy_manager = hydra.utils.instantiate(

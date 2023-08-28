@@ -34,3 +34,38 @@ class IssueMLP(nn.Module):
         x = nn.Dense(self.n_actions)(x)
         s = jnp.argmax(x, axis=-1)
         return s
+
+
+def issue_fifo(policy_params, obs, rng, env_kwargs):
+    """Action is idx of oldest unit, plus one.
+    Zero if no units are present"""
+    stock = obs[
+        env_kwargs["lead_time"]
+        - 1 : env_kwargs["max_useful_life"]
+        + env_kwargs["lead_time"]
+        - 1
+    ]
+    return jax.lax.cond(
+        jnp.sum(stock) == 0,
+        lambda _: jnp.array(0),
+        lambda _: env_kwargs["max_useful_life"]
+        - jnp.flip(jnp.where(stock > 0, 1, 0)).argmax(),
+        None,
+    )
+
+
+def issue_lifo(policy_params, obs, rng, env_kwargs):
+    """Action is idx of youngest unit, plus one.
+    Zero if no units are present"""
+    stock = obs[
+        env_kwargs["lead_time"]
+        - 1 : env_kwargs["max_useful_life"]
+        + env_kwargs["lead_time"]
+        - 1
+    ]
+    return jax.lax.cond(
+        jnp.sum(stock) == 0,
+        lambda _: jnp.array(0),
+        lambda _: 1 + (jnp.where(stock > 0, 1, 0)).argmax(),
+        None,
+    )

@@ -34,3 +34,9 @@ class RepMLP(nn.Module):
         x = nn.Dense(self.n_actions)(x)
         s = jnp.argmax(x, axis=-1)
         return s
+
+
+def order_up_to(policy_params, obs, rng, env_kwargs):
+    return jnp.clip(
+        policy_params - jnp.sum(obs), a_min=0, a_max=env_kwargs["max_order_quantity"]
+    )
