@@ -29,6 +29,10 @@ def main(cfg):
     rng, rng_rep, rng_issue = jax.random.split(rng, 3)
 
     # TODO: Think about how best to flag up whether policy is to be optimized
+    # For now, raise an error if no policies are to be optimized
+    # THere's no point in running this script, we can direct to a pure eval script
+    if not cfg.policies.optimize:
+        raise ValueError("No policies to optimize")
 
     policy_params = {}
     # 0 is the id for replenishment
