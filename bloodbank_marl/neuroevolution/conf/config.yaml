@@ -68,13 +68,27 @@ test_manager:
   gamma: ${environment.gamma}
 
 
-policy:
+policies:
   policy_manager:
     _target_: bloodbank_marl.policies.policy_manager.PolicyManager
   replenishment:
-    _target_: bloodbank_marl.policies.replenishment.RepMLP
+    _target_: bloodbank_marl.policies.replenishment.FlaxRepPolicy
+    policy_class:
+      _target_: hydra.utils.get_class
+      path: bloodbank_marl.policies.replenishment.RepMLP
+    policy_id: 0
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
   issuing:
-    _target_: bloodbank_marl.policies.issuing.IssueMLP
+    _target_: bloodbank_marl.policies.issuing.FlaxIssuePolicy
+    policy_class: 
+      _target_: hydra.utils.get_class
+      path: bloodbank_marl.policies.issuing.IssueMLP
+    policy_id: 1
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
 
 
 

@@ -28,33 +28,17 @@ def main(cfg):
     rng = jax.random.PRNGKey(cfg.evosax.seed)
     rng, rng_rep, rng_issue = jax.random.split(rng, 3)
 
-    env_cfg = omegaconf.OmegaConf.to_container(cfg.environment, resolve=True)
-    env, default_env_params = make(env_cfg["env_name"], **env_cfg["env_kwargs"])
+    policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
+    rep_params = policy_rep.get_params(rng_rep)
 
-    rep_net = hydra.utils.instantiate(
-        cfg.policy.replenishment,
-        n_actions=env_cfg["env_kwargs"]["max_order_quantity"] + 1,
-    )
-    rep_obs = jnp.zeros(env.observation_space(env_cfg["env_params"], 0).shape)
-    rep_params = rep_net.init(rng_rep, rep_obs)
+    policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
+    issue_params = policy_issue.get_params(rng_issue)
 
-    issue_net = hydra.utils.instantiate(
-        cfg.policy.issuing, n_actions=env_cfg["env_kwargs"]["max_useful_life"] + 1
-    )
-    issue_obs = jnp.zeros(env.observation_space(env_cfg["env_params"], 1).shape)
-    issue_params = issue_net.init(rng_issue, issue_obs)
+    policy_params = {0: rep_params, 1: issue_params}
 
-    policy_params = {"rep": rep_params, "issue": issue_params}
-
-    def policy_rep(policy_params, obs, rng):
-        return rep_net.apply(policy_params["rep"], obs, rng)
-
-    def policy_issue(policy_params, obs, rng):
-        return issue_net.apply(policy_params["issue"], obs, rng)
-
-    policies = [policy_rep, policy_issue]
+    policies = [policy_rep.apply, policy_issue.apply]
     policy_manager = hydra.utils.instantiate(
-        cfg.policy.policy_manager, policies=policies
+        cfg.policies.policy_manager, policies=policies
     )
 
     param_reshaper = ParameterReshaper(policy_params)
