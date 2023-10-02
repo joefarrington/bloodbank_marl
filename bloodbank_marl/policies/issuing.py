@@ -7,13 +7,23 @@ from bloodbank_marl.utils.gymnax_fitness import make
 
 
 class FlaxIssuePolicy:
-    def __init__(self, policy_class, policy_id, env_name, env_kwargs={}, env_params={}):
+    def __init__(
+        self,
+        policy_class,
+        policy_kwargs,
+        policy_id,
+        env_name,
+        env_kwargs={},
+        env_params={},
+    ):
         self.policy_id = policy_id
         self.env_name = env_name
         self.env_kwargs = env_kwargs
         self.env_params = env_params
         env, default_env_params = make(self.env_name, **self.env_kwargs)
-        self.policy_net = policy_class(env.max_useful_life + 1)
+        self.policy_net = policy_class(
+            n_actions=env.max_useful_life + 1, **policy_kwargs
+        )
 
     def get_params(self, rng):
         env, default_env_params = make(self.env_name, **self.env_kwargs)
@@ -25,11 +35,12 @@ class FlaxIssuePolicy:
 
 
 class IssueMLP(nn.Module):
+    n_hidden: int
     n_actions: int
 
     @nn.compact
     def __call__(self, x, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
-        x = nn.Dense(128)(x)
+        x = nn.Dense(self.n_hidden)(x)
         x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
         s = jnp.argmax(x, axis=-1)
