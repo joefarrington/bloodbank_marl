@@ -3,8 +3,8 @@ wandb:
     project: "es_demoor_marl_tryout_from_script"
 
 evosax:
-  num_generations: 5
-  evaluate_every_k_gens: 1
+  num_generations: 20
+  evaluate_every_k_gens: 2
   seed: 10
   
   strategy:
@@ -30,9 +30,8 @@ evosax:
 
 environment:
   env_name: "DeMoorPerishable"
-
   num_env_steps: 5000
-  num_rollouts: 50
+  num_rollouts: 100
   env_kwargs:
     max_useful_life: 2
     lead_time: 1
@@ -55,11 +54,11 @@ train_evaluator:
   max_warmup_steps: ${environment.max_warmup_steps}
   gamma: ${environment.gamma}
 
-test_manager:
+test_evaluator:
   _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
   env_name: ${environment.env_name}
   num_env_steps: ${environment.num_env_steps}
-  num_rollouts: ${environment.num_rollouts}
+  num_rollouts: 1000
   env_kwargs: ${environment.env_kwargs}
   env_params: ${environment.env_params}
   test: True
@@ -80,11 +79,13 @@ policies:
     #policy_function:
     #  _target_: hydra.utils.get_method
     #  path: bloodbank_marl.policies.replenishment.order_up_to
-    #policy_params: 7
+    #policy_params: 10
     _target_: bloodbank_marl.policies.replenishment.FlaxRepPolicy
     policy_class:
       _target_: hydra.utils.get_class
       path: bloodbank_marl.policies.replenishment.RepMLP
+    policy_kwargs:
+      n_hidden: 128
     policy_id: 0
     env_name: ${environment.env_name}
     env_kwargs: ${environment.env_kwargs}
@@ -100,6 +101,8 @@ policies:
     #  _target_: hydra.utils.get_class
     #  path: bloodbank_marl.policies.issuing.IssueMLP
     #policy_id: 1
+    #policy_kwargs:
+    #  n_hidden: 128
     #env_name: ${environment.env_name}
     env_kwargs: ${environment.env_kwargs}
     #env_params: ${environment.env_params}

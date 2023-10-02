@@ -53,9 +53,13 @@ def main(cfg):
     )
 
     param_reshaper = ParameterReshaper(policy_params)
+    test_param_reshaper = ParameterReshaper(policy_params, n_devices=1)
 
     train_evaluator = hydra.utils.instantiate(cfg.train_evaluator)
     train_evaluator.set_apply_fn(policy_manager.apply)
+
+    test_evaluator = hydra.utils.instantiate(cfg.test_evaluator)
+    test_evaluator.set_apply_fn(policy_manager.apply)
 
     # Checkpointing for NN policies
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
@@ -79,24 +83,34 @@ def main(cfg):
     log = es_logging.initialize()
 
     for gen in range(cfg.evosax.num_generations):
-        rng, rng_init, rng_ask, rng_eval = jax.random.split(rng, 4)
+        rng, rng_init, rng_ask, rng_train, rng_eval = jax.random.split(rng, 5)
         x, state = strategy.ask(rng_ask, state)
         reshaped_params = param_reshaper.reshape(x)
-        fitness = train_evaluator.rollout(rng_eval, reshaped_params).mean(axis=-1)
+        fitness = train_evaluator.rollout(rng_train, reshaped_params).mean(axis=-1)
         fit_re = fitness_shaper.apply(x, fitness)
         state = strategy.tell(x, fit_re, state)
         log = es_logging.update(log, x, fitness)
         best_params = log["top_params"][0]
         mean_params = state.mean
 
-        wandb.log(
-            {
-                "Generation": gen,
-                "gen_1": log["log_gen_1"][gen],
-                "gen_mean": log["log_gen_mean"][gen],
-                "top_1": log["log_top_1"][gen],
-            }
-        )
+        log_to_wandb = {
+            "Generation": gen,
+            "gen_1": log["log_gen_1"][gen],
+            "gen_mean": log["log_gen_mean"][gen],
+            "top_1": log["log_top_1"][gen],
+        }
+
+        if gen % cfg.evosax.evaluate_every_k_gens == 0:
+            x_test = jnp.stack([best_params, mean_params], axis=0)
+            reshaped_test_params = test_param_reshaper.reshape(x_test)
+            test_fitness = test_evaluator.rollout(rng_eval, reshaped_test_params).mean(
+                axis=-1
+            )
+            log_to_wandb["top_1_test"] = test_fitness[0]
+            log_to_wandb["mean_params_test"] = test_fitness[1]
+
+        wandb.log(log_to_wandb)
+        # TODO Perhaps only update checkpoint when we're doing better on test fitness?
         ckpt = {
             "state": state,
             "best_params": param_reshaper.reshape(best_params.reshape(1, -1)),
