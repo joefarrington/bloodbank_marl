@@ -138,12 +138,13 @@ class EnvInfo:
         # 100% service level or 0% expriries for example to avoid issues with floating
         # point precision
         expiry_penalty = (
-            kpis["expiries_%"]
-            > params.max_expiry_target * -params.target_kpi_breach_penalty
+            jnp.where(kpis["expiries_%"] > params.max_expiry_target, 1, 0)
+            * -params.target_kpi_breach_penalty
         )
+
         service_level_penalty = (
-            kpis["service_level_%"]
-            < params.min_service_level_target * -params.target_kpi_breach_penalty
+            jnp.where(kpis["service_level_%"] < params.min_service_level_target, 1, 0)
+            * -params.target_kpi_breach_penalty
         )
         return expiry_penalty + service_level_penalty
 
