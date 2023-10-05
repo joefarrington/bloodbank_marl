@@ -20,13 +20,19 @@ from evosax.problems import GymnaxFitness
 import distrax
 import functools
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
+from bloodbank_marl.scenarios.meneses_perishable.jax_env import MenesesPerishableEnv
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
 
 # For now, monkey patch the gymnax.make function
 def make(env_name, **env_kwargs):
-    if env_name == "DeMoorPerishable":
+    if env_name == "MenesesPerishable":
+        return (
+            MenesesPerishableEnv(**env_kwargs),
+            MenesesPerishableEnv().default_params,
+        )
+    elif env_name == "DeMoorPerishable":
         return (
             DeMoorPerishableMAJAX(**env_kwargs),
             DeMoorPerishableMAJAX().default_params,
@@ -112,6 +118,7 @@ class GymnaxFitness(object):
         else:
             self.rollout_map = self.rollout_pop
 
+    # TODO Would need to adjust to account for infos
     def rollout_pmap(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Parallelize rollout across devices. Split keys/reshape correctly."""
         keys_pmap = jnp.tile(rng_input, (self.n_devices, 1, 1))
@@ -123,10 +130,12 @@ class GymnaxFitness(object):
     def rollout(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Placeholder fn call for rolling out a population for multi-evals."""
         rng_pop = jax.random.split(rng_input, self.num_rollouts)
-        scores, masks = jax.jit(self.rollout_map)(rng_pop, policy_params)
+        scores, cum_infos, kpis, masks = jax.jit(self.rollout_map)(
+            rng_pop, policy_params
+        )
         # Update total step counter using only transitions before termination
         # self.total_env_steps += masks.sum()
-        return scores
+        return scores, cum_infos, kpis
 
     def rollout_ffw(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Rollout an episode with lax.scan."""
@@ -161,6 +170,7 @@ class GymnaxFitness(object):
                 rng,
                 cum_reward,
                 cum_return,
+                cum_info,
                 valid_mask,
             ) = state_input
             rng, rng_step, rng_net = jax.random.split(rng, 3)
@@ -177,6 +187,11 @@ class GymnaxFitness(object):
                 * (next_o.agent_id == 0)
                 * valid_mask[next_o.agent_id]
             )  #
+            new_cum_info = jax.tree_map(
+                lambda x, y: jax.lax.select(valid_mask[next_o.agent_id] == 1, x, y),
+                cum_info.accumulate_infos_one_agent(next_o.agent_id, info),
+                cum_info,
+            )
             agent_done = jax.lax.bitwise_or(truncation, termination)
             new_valid_mask = valid_mask.at[next_o.agent_id].multiply(
                 1 - agent_done
@@ -188,6 +203,7 @@ class GymnaxFitness(object):
                 rng,
                 new_cum_reward,
                 new_cum_return,
+                new_cum_info,
                 new_valid_mask,
             ]
             y = [new_valid_mask]
@@ -224,6 +240,7 @@ class GymnaxFitness(object):
                     [0.0, 0.0]
                 ),  # cum_reward, TODO Need to be flexible depending on number of agents
                 0.0,  # cum_return, TODO Currently only for one agent
+                self.env.empty_infos,
                 jnp.array(
                     [1, 1]
                 ),  # valid_mask, TODO Need to be flexible depending on number of agents
@@ -233,8 +250,17 @@ class GymnaxFitness(object):
         )
         # Return the sum of rewards accumulated by agent in episode rollout
         ep_mask = scan_out
-        cum_reward = carry_out[-3].squeeze()  # Not discounted, one per agent
+        cum_reward = carry_out[-4].squeeze()  # Not discounted, one per agent
         cum_return = carry_out[
-            -2
+            -3
         ].squeeze()  # Discounted, just for replenishment for now; update rollout if we want to use it
-        return cum_return, jnp.array(ep_mask)
+        cum_infos = carry_out[-2]
+        kpis = cum_infos.calculate_kpis()
+        # This allows us to incorporate a penalty when KPIs are breached over the whole episode
+        # Aim to use it to enforce constraints on service level and wastage suggested by Meneses et al (2021)
+        # for example on expriries and service level
+        target_breached_penalty = cum_infos.calculate_target_kpi_penalty(
+            kpis, self.env_params
+        )
+        cum_return = cum_return + target_breached_penalty
+        return cum_return, cum_infos, kpis, jnp.array(ep_mask)
