@@ -79,6 +79,10 @@ class MarlEnvironment(object):
     def default_params(self) -> EnvParams:
         return EnvParams()
 
+    @property
+    def emptry_infos(self) -> EnvInfo:
+        return EnvInfo.create_empty_infos(self.n_agents)
+
     @partial(jax.jit, static_argnums=(0,))
     def step(
         self,
