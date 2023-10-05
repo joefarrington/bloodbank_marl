@@ -28,7 +28,7 @@ n_products = 8
 # TODO: Recheck all defaults
 @struct.dataclass
 class EnvParams:
-    poisson_demand_mean: float = 4
+    poisson_demand_mean: float = 49.8
     product_probabilities: chex.Array = jnp.array(
         [
             0.08614457,
@@ -42,14 +42,17 @@ class EnvParams:
         ]
     )
     age_on_arrival_distribution_probs: chex.Array = jnp.array([1] + [0] * (35 - 1))
-    fixed_order_costs: float = 160
-    variable_order_costs: chex.Array = jnp.array([0] * n_products)
+    fixed_order_costs: float = 0
+    variable_order_costs: chex.Array = jnp.array([160] * n_products)
     shortage_costs: chex.Array = jnp.array([1340] * n_products)
     wastage_costs: chex.Array = jnp.array([130] * n_products)
     holding_costs: chex.Array = jnp.array([1.1] * n_products)
     substitution_costs: chex.Array = jnp.ones((n_products, n_products)) - jnp.eye(
         n_products
     )
+    max_expiry_target: float = 1.0
+    min_service_level_target: float = 0.0
+    target_kpi_breach_penalty: float = 1e10
     max_days_in_episode: int = 365
     max_steps_in_episode: int = 1e10
     gamma: float = 1.0
@@ -67,13 +70,15 @@ class EnvInfo:
     day_counter: chex.Array
 
     @classmethod
-    def create_empty_infos(cls, n_agents: int, n_products: int):
+    def create_empty_infos(cls, n_agents: int, n_products: int, max_useful_life: int):
         return cls(
             demand=jnp.zeros((n_agents, n_products), dtype=jnp_int),
             shortages=jnp.zeros((n_agents, n_products), dtype=jnp_int),
             expiries=jnp.zeros((n_agents, n_products), dtype=jnp_int),
             holding=jnp.zeros((n_agents, n_products), dtype=jnp_int),
-            allocations=jnp.zeros((n_agents, n_products, n_products), dtype=jnp_int),
+            allocations=jnp.zeros(
+                (n_agents, n_products, n_products, max_useful_life), dtype=jnp_int
+            ),
             orders=jnp.zeros((n_agents, n_products), dtype=jnp_int),
             order_placed=jnp.zeros((n_agents,), dtype=jnp_int),
             day_counter=jnp.zeros((n_agents,), dtype=jnp_int),
@@ -107,24 +112,65 @@ class EnvInfo:
         """Calculate KPIs based on the info recorded by the replenishment agent, with id 0"""
         return {
             "mean_order_by_product": self.orders[0, :] / self.day_counter[0],
-            "service_level_%_by_product": (self.demand[0, :] - self.shortages[0, :])
+            "service_level_%_by_pt_blood_group": (
+                self.demand[0, :] - self.shortages[0, :]
+            )
             / self.demand[0, :],
             "expiries_%_by_product": (self.expiries[0, :]) / self.orders[0, :],
             "mean_holding_by_product": self.holding[0, :]
             / jnp.expand_dims(self.day_counter[0], -1),
-            "exact_match_%_per_product": self.allocations[0][
-                jnp.arange(self.allocations[0].shape[0]),
-                jnp.arange(self.allocations[0].shape[0]),
-            ]
-            / jnp.sum(self.allocations[0], axis=1),
+            "mean_age_at_transfusion_by_pt_blood_group": self._calculate_mean_age_at_transfusion_by_pt_blood_group(),
+            "exact_match_%_by_pt_blood_group": self._calculate_exact_match_pc_by_pt_blood_group(),
             "mean_total_order": jnp.sum(self.orders[0, :]) / self.day_counter[0],
             "service_level_%": jnp.sum(self.demand[0, :] - self.shortages[0, :])
             / jnp.sum(self.demand[0, :]),
             "expiries_%": jnp.sum(self.expiries[0, :]) / jnp.sum(self.orders[0, :]),
             "mean_holding": jnp.sum(self.holding[0, :]) / self.day_counter[0],
-            "exact_match_%": jnp.trace(self.allocations[0, :, :])
-            / jnp.sum(self.allocations[0, :, :]),
+            "exact_match_%": self._calculate_exact_match_pc(),
+            "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(),
         }
+
+    @classmethod
+    def calculate_target_kpi_penalty(
+        cls, kpis: Dict[str, Union[chex.Array, float]], params: EnvParams
+    ):
+        # TODO Might want to do some rounding here/use jnp.close etc when aiming for
+        # 100% service level or 0% expriries for example to avoid issues with floating
+        # point precision
+        expiry_penalty = (
+            kpis["expiries_%"]
+            > params.max_expiry_target * -params.target_kpi_breach_penalty
+        )
+        service_level_penalty = (
+            kpis["service_level_%"]
+            < params.min_service_level_target * -params.target_kpi_breach_penalty
+        )
+        return expiry_penalty + service_level_penalty
+
+    def _calculate_exact_match_pc_by_pt_blood_group(self):
+        exact_matches_by_request_type = self.allocations[0].sum(axis=-1)[
+            jnp.arange(self.allocations[0].shape[0]),
+            jnp.arange(self.allocations[0].shape[0]),
+        ]
+        total_allocated_by_request_type = self.allocations[0].sum(axis=(-2, -1))
+        return exact_matches_by_request_type / total_allocated_by_request_type
+
+    def _calculate_exact_match_pc(self):
+        exact_matches = jnp.trace(self.allocations[0].sum(axis=-1))
+        total_allocated = jnp.sum(self.allocations[0])
+        return exact_matches / total_allocated
+
+    def _calculate_mean_age_at_transfusion_by_pt_blood_group(self):
+        ages = jnp.arange(self.allocations[0].shape[2])
+        age_weighted_allocations = self.allocations[0] * ages[None, None, :]
+        total_age_per_request_type = age_weighted_allocations.sum(axis=(-2, -1))
+        total_allocated_per_request_type = jnp.sum(self.allocations[0], axis=(-2, -1))
+        return total_age_per_request_type / total_allocated_per_request_type
+
+    def _calculate_mean_age_at_transfusion(self):
+        ages = jnp.arange(self.allocations[0].shape[2])
+        age_weighted_allocations = self.allocations[0] * ages[None, None, :]
+        return jnp.sum(age_weighted_allocations) / jnp.sum(self.allocations[0])
 
 
 @struct.dataclass
@@ -188,6 +234,12 @@ class MenesesPerishableEnv(MarlEnvironment):
     @property
     def default_params(self) -> EnvParams:
         return EnvParams()
+
+    @property
+    def empty_infos(self) -> EnvInfo:
+        return EnvInfo.create_empty_infos(
+            self.n_agents, self.n_products, self.max_useful_life
+        )
 
     def live_step(
         self,
@@ -269,7 +321,7 @@ class MenesesPerishableEnv(MarlEnvironment):
             request_type=0,
             agent_id=0,
             cumulative_rewards=jnp.zeros((self.n_agents,)),
-            infos=EnvInfo.create_empty_infos(self.n_agents, self.n_products),
+            infos=self.empty_infos,
             truncations=jnp.array([False] * self.n_agents),
             terminations=jnp.array([False] * self.n_agents),
             live_agents=jnp.array([1] * self.n_agents),
@@ -508,8 +560,8 @@ class MenesesPerishableEnv(MarlEnvironment):
         infos = infos.replace(order_placed=infos.order_placed.at[:].add(order_placed))
 
         # Place the order
-        variable_order_cost = jnp.dot(orders, params.variable_order_costs)
-        fixed_order_cost = order_placed * params.fixed_order_costs
+        variable_order_cost = jnp.dot(orders, -params.variable_order_costs)
+        fixed_order_cost = order_placed * -params.fixed_order_costs
         cumulative_rewards = cumulative_rewards + variable_order_cost + fixed_order_cost
         # TODO: Handle case where lead_time == 0
         in_transit = in_transit.at[0:n_products, 0].set(orders)
@@ -550,13 +602,14 @@ class MenesesPerishableEnv(MarlEnvironment):
             shortages=infos.shortages.at[:, state.request_type].add(shortage)
         )
         shortage_cost = jnp.dot(
-            params.shortage_costs,
+            -params.shortage_costs,
             jnp.zeros(n_products).at[state.request_type].set(shortage),
         )
         cumulative_rewards = cumulative_rewards + shortage_cost
 
         # Issue the select unit FIFO if there isn't a shortage, otherwise do nothing
-        stock = jax.lax.cond(
+        stock_before_issue = stock
+        stock_after_issue = jax.lax.cond(
             shortage < 1,
             self._issue_one_unit,
             lambda stock, product_idx: stock,
@@ -565,20 +618,22 @@ class MenesesPerishableEnv(MarlEnvironment):
         )
 
         # If we've allocated a unit (no shortage), then record the allocation and calculate the substitution cost
+        issued = stock_before_issue - stock_after_issue
         allocations = jax.lax.select(
             shortage < 1,
-            infos.allocations.at[:, state.request_type, product_idx].add(1),
+            infos.allocations.at[:, state.request_type, :].add(issued),
             infos.allocations,
         )
         infos = infos.replace(allocations=allocations)
-        substitution_cost = (allocations * params.substitution_costs).sum()
+        # TODO: Works here because dealing with one demand at a time
+        substitution_cost = -params.substitution_costs[state.request_type, product_idx]
         cumulative_rewards = cumulative_rewards + substitution_cost
 
         # Sample the details of the next request
         request_interval, request_type = self._sample_next_request(key, state, params)
 
         state = state.replace(
-            stock=stock,
+            stock=stock_after_issue,
             infos=infos,
             cumulative_rewards=cumulative_rewards,
             request_time=state.time + request_interval,
@@ -614,7 +669,7 @@ class MenesesPerishableEnv(MarlEnvironment):
             concentration=1, rate=params.poisson_demand_mean
         ).sample(seed=interval_key)
         # Type of unit (e.g. blood group of patient who next request made for)
-        request_type = distrax.Categorical(params.product_probabilities).sample(
+        request_type = distrax.Categorical(probs=params.product_probabilities).sample(
             seed=product_key
         )
         return request_interval, request_type
