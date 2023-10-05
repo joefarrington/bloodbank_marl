@@ -14,6 +14,13 @@ from evosax.utils import ESLog
 from evosax.problems import GymnaxFitness
 import distrax
 import functools
+from bloodbank_marl.environments.environment import (
+    MarlEnvironment,
+    EnvParams,
+    EnvState,
+    EnvInfo,
+    EnvObs,
+)
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -66,13 +73,59 @@ class EnvParams:
 
 
 @struct.dataclass
+class EnvInfo:
+    demand: chex.Array
+    shortages: chex.Array
+    expiries: chex.Array
+    holding: chex.Array
+    orders: chex.Array
+    order_placed: chex.Array
+    day_counter: chex.Array
+
+    @classmethod
+    def create_empty_infos(cls, n_agents: int):
+        return cls(
+            demand=jnp.zeros(n_agents, dtype=jnp.int32),
+            shortages=jnp.zeros(n_agents, dtype=jnp.int32),
+            expiries=jnp.zeros(n_agents, dtype=jnp.int32),
+            holding=jnp.zeros(n_agents, dtype=jnp.int32),
+            orders=jnp.zeros(n_agents, dtype=jnp.int32),
+            order_placed=jnp.zeros(n_agents, dtype=jnp.int32),
+            day_counter=jnp.zeros(n_agents, dtype=jnp.int32),
+        )
+
+    def reset_infos_one_agent(self, agent_id: int):
+        """Reset the infos for a single agent"""
+        return self.replace(
+            demand=self.demand.at[agent_id].set(0),
+            shortages=self.shortages.at[agent_id].set(0),
+            expiries=self.expiries.at[agent_id].set(0),
+            holding=self.holding.at[agent_id].set(0),
+            orders=self.orders.at[agent_id].set(0),
+            order_placed=self.order_placed.at[agent_id].set(0),
+            day_counter=self.day_counter.at[agent_id].set(0),
+        )
+
+    def accumulate_infos_one_agent(self, agent_id: int, step_info: EnvInfo):
+        return self.replace(
+            demand=self.demand.at[agent_id].add(step_info.demand),
+            shortages=self.shortages.at[agent_id].add(step_info.shortages),
+            expiries=self.expiries.at[agent_id].add(step_info.expiries),
+            holding=self.holding.at[agent_id].add(step_info.holding),
+            orders=self.orders.at[agent_id].add(step_info.orders),
+            order_placed=self.order_placed.at[agent_id].add(step_info.order_placed),
+            day_counter=self.day_counter.at[agent_id].add(step_info.day_counter),
+        )
+
+
+@struct.dataclass
 class EnvState:
     stock: chex.Array
     in_transit: chex.Array
     remaining_demand: int
     agent_id: int  # Agent to act
     cumulative_rewards: chex.Array
-    infos: chex.Array
+    infos: EnvInfo
     truncations: chex.Array
     terminations: chex.Array
     live_agents: chex.Array
@@ -83,149 +136,36 @@ class EnvState:
 @struct.dataclass
 class EnvObs:
     agent_id: int  # Following Tianhou;
-    obs: chex.Array
+    in_transit: chex.Array
+    stock: chex.Array
     # mask: chex.Array # TODO: Action masking
 
+    @property
+    def obs(self):
+        return jnp.hstack([self.in_transit, self.stock])
 
-class DeMoorPerishableMAJAX(object):
+
+class DeMoorPerishableMAJAX(MarlEnvironment):
     """Jittable abstract base class for all gymnax-inspired Multi-Agent Environments."""
 
     def __init__(
-        self, max_useful_life: int = 2, lead_time: int = 1, max_order_quantity: int = 10
+        self,
+        agent_names=["replenishment", "issuing"],
+        max_useful_life: int = 2,
+        lead_time: int = 1,
+        max_order_quantity: int = 10,
     ):
         self.max_useful_life = max_useful_life
         self.lead_time = lead_time
         self.max_order_quantity = max_order_quantity
 
-        self.info_idxs = {
-            "holding": 0,
-            "wastage": 1,
-            "shortage": 2,
-            "demand": 3,
-            "order": 4,
-        }
-
-        self.agent_ids = {"replenishment": 0, "issuing": 1}
-
-        # self.possible_agents = ["replenishment", "issuing"]
+        self.possible_agents = agent_names
+        self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
+        self.n_agents = len(agent_names)
 
     @property
     def default_params(self) -> EnvParams:
         return EnvParams.create_env_params()
-
-    @partial(jax.jit, static_argnums=(0,))
-    def step(
-        self,
-        key: chex.PRNGKey,
-        state: EnvState,
-        action: Union[int, float],
-        params: Optional[EnvParams] = None,
-    ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
-        """Performs step transitions in the environment."""
-        # Use default env parameters if no others specified
-        if params is None:
-            params = self.default_params
-        key, key_reset = jax.random.split(key)
-        obs_st, state_st, reward, truncation, termination, info = self.step_env(
-            key, state, action, params
-        )
-        # We're now only done if there are no live agents
-        done = jax.lax.eq(state.live_agents.sum(), 0)
-        obs_re, state_re = self.reset_env(key_reset, params)
-        # Auto-reset environment based on termination
-        state = jax.tree_map(
-            lambda x, y: jax.lax.select(done, x, y), state_re, state_st
-        )
-        obs = jax.tree_map(lambda x, y: jax.lax.select(done, x, y), obs_re, obs_st)
-        return obs, state, reward, truncation, termination, info
-
-    @partial(jax.jit, static_argnums=(0,))
-    def reset(
-        self, key: chex.PRNGKey, params: Optional[EnvParams] = None
-    ) -> Tuple[chex.Array, EnvState]:
-        """Performs resetting of environment."""
-        # Use default env parameters if no others specified
-        if params is None:
-            params = self.default_params
-        obs, state = self.reset_env(key, params)
-        return obs, state
-
-    def step_env(
-        self,
-        key: chex.PRNGKey,
-        state: EnvState,
-        action: Union[int, float],
-        params: EnvParams,
-    ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
-        """Environment-specific step transition."""
-
-        # Get the current agent
-        agent_id = state.agent_id
-
-        # Zero the cumulative reward and reset the info for the agent that just stepped
-        cumulative_rewards = jnp.where(
-            jnp.arange(2) == state.agent_id, 0, state.cumulative_rewards
-        )
-        infos = state.infos.at[state.agent_id, :].set(0)
-        state = EnvState(
-            state.stock,
-            state.in_transit,
-            state.remaining_demand,
-            state.agent_id,
-            cumulative_rewards,
-            infos,
-            state.truncations,
-            state.terminations,
-            state.live_agents,
-            state.day,
-            state.step,
-        )
-
-        # TODO: Handle stepping an agent that is dead, as in PettingZoo
-        return jax.lax.cond(
-            jax.lax.bitwise_or(
-                state.truncations[agent_id], state.terminations[agent_id]
-            ),
-            self.dead_step,
-            self.live_step,
-            key,
-            state,
-            action,
-            params,
-        )
-
-    def dead_step(
-        self,
-        key: chex.PRNGKey,
-        state: EnvState,
-        action: Union[int, float],
-        params: EnvParams,
-    ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
-        live_agents = state.live_agents.at[state.agent_id].set(0)
-        next_agent_id = jax.lax.cond(
-            state.agent_id == 0, lambda: 1, lambda: 0
-        )  # Switch to the other agent
-        state = EnvState(
-            state.stock,
-            state.in_transit,
-            state.remaining_demand,
-            next_agent_id,
-            state.cumulative_rewards,
-            state.infos,
-            state.truncations,
-            state.terminations,
-            live_agents,
-            state.day,
-            state.step + 1,
-        )
-        return (
-            self.get_obs(state, next_agent_id),
-            state,
-            state.cumulative_rewards[next_agent_id],
-            state.truncations[next_agent_id],
-            state.terminations[next_agent_id],
-            self.get_info(state, next_agent_id),
-        )
 
     def live_step(
         self,
@@ -233,28 +173,17 @@ class DeMoorPerishableMAJAX(object):
         state: EnvState,
         action: Union[int, float],
         params: EnvParams,
-    ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
+    ) -> Tuple[EnvObs, EnvState, float, bool, bool, EnvInfo]:
         # Zero the cumulative reward and reset the info for the agent that just stepped
+        infos, cumulative_rewards = state.infos, state.cumulative_rewards
         cumulative_rewards = jnp.where(
             jnp.arange(2) == state.agent_id, 0, state.cumulative_rewards
         )
-        infos = state.infos.at[state.agent_id, :].set(0)
-        state = EnvState(
-            state.stock,
-            state.in_transit,
-            state.remaining_demand,
-            state.agent_id,
-            cumulative_rewards,
-            infos,
-            state.truncations,
-            state.terminations,
-            state.live_agents,
-            state.day,
-            state.step,
-        )
+        infos = infos.reset_infos_one_agent(state.agent_id)
+        state = state.replace(infos=infos, cumulative_rewards=cumulative_rewards)
 
         # TODO: Difference between truncation and termination
-        state, reward = jax.lax.switch(
+        state = jax.lax.switch(
             state.agent_id,
             [self._replenishment_step, self._issuing_step],
             key,
@@ -262,22 +191,24 @@ class DeMoorPerishableMAJAX(object):
             action,
             params,
         )
-        cumulative_rewards = cumulative_rewards + reward
-
         # Select the next agent
         # If no remainine demand, next agent is replenishment (agent_id 0)
         next_agent_id = jax.lax.cond(state.remaining_demand == 0, lambda: 0, lambda: 1)
 
         # If the next agent is replenishent, we need to age the stock, work out the holding cost, update the time
-        state, reward = jax.lax.cond(
+        state = jax.lax.cond(
             next_agent_id == 0,
             self._age_stock,
-            lambda state, params: (state, jnp.array([0.0, 0.0])),
+            lambda state, params: state,
             state,
             params,
         )
-        cumulative_rewards = cumulative_rewards + reward
         day_increment = jax.lax.cond(next_agent_id == 0, lambda: 1, lambda: 0)
+        state = state.replace(
+            infos=state.infos.replace(
+                day_counter=infos.day_counter.at[:].add(day_increment)
+            )
+        )
 
         # Check for termination - for now we don't make a distinction between truncation and termination
         # And either both or noen of the agents are done
@@ -296,24 +227,17 @@ class DeMoorPerishableMAJAX(object):
         live_agents = state.live_agents.at[state.agent_id].set(live)
 
         # Update the state
-        state = EnvState(
-            state.stock,
-            state.in_transit,
-            state.remaining_demand,
-            next_agent_id,
-            cumulative_rewards,
-            state.infos,
-            truncations,
-            state.terminations,
-            live_agents,
-            state.day + day_increment,
-            state.step + 1,
+        state = state.replace(
+            agent_id=next_agent_id,
+            truncations=truncations,
+            live_agents=live_agents,
+            day=state.day + day_increment,
+            step=state.step + 1,
         )
-
         return (
             self.get_obs(state, next_agent_id),
             state,
-            cumulative_rewards[next_agent_id],
+            state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
             state.terminations[next_agent_id],
             self.get_info(state, next_agent_id),
@@ -321,7 +245,7 @@ class DeMoorPerishableMAJAX(object):
 
     def reset_env(
         self, key: chex.PRNGKey, params: EnvParams
-    ) -> Tuple[chex.Array, EnvState]:
+    ) -> Tuple[EnvObs, EnvState]:
         """Environment-specific reset."""
         state = EnvState(
             stock=jnp.zeros(self.max_useful_life, dtype=jnp.int32),
@@ -329,9 +253,7 @@ class DeMoorPerishableMAJAX(object):
             remaining_demand=0,
             agent_id=0,
             cumulative_rewards=jnp.array([0.0, 0.0]),
-            infos=jnp.zeros(
-                (len(self.agent_ids), len(self.info_idxs)), dtype=jnp.int32
-            ),
+            infos=EnvInfo.create_empty_infos(self.n_agents),
             truncations=jnp.array([False] * len(self.agent_ids)),
             terminations=jnp.array([False] * len(self.agent_ids)),
             live_agents=jnp.array([1] * len(self.agent_ids)),
@@ -340,12 +262,11 @@ class DeMoorPerishableMAJAX(object):
         )
         return self.get_obs(state, state.agent_id), state
 
-    def get_obs(self, state: EnvState, agent_id: int) -> chex.Array:
+    def get_obs(self, state: EnvState, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
         # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
         return EnvObs(
-            state.agent_id,
-            jnp.hstack([state.in_transit[1 : self.lead_time + 1], state.stock]),
+            state.agent_id, state.in_transit[1 : self.lead_time + 1], state.stock
         )
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
@@ -359,10 +280,6 @@ class DeMoorPerishableMAJAX(object):
             lambda _: False,
             None,
         )
-
-    def discount(self, state: EnvState, params: EnvParams) -> float:
-        """Return a discount of zero if the episode has terminated."""
-        return jax.lax.select(self.is_terminal(state, params), 0.0, 1.0)
 
     @property
     def name(self) -> str:
@@ -381,8 +298,9 @@ class DeMoorPerishableMAJAX(object):
         issue_space = spaces.Discrete(self.max_useful_life + 1)
         return jax.lax.switch(agent_id, [lambda: rep_space, lambda: issue_space])
 
-    def observation_space(self, params: EnvParams, agent_id: int = 1):
+    def observation_space(self, params: EnvParams, agent_id: int = 1) -> spaces.Box:
         """Observation space of the agent with id `agent_id`. For now, both the same"""
+        # TODO: For not this is just the shape of the flat space, EnvObs.obs
         return spaces.Box(
             low=0,
             high=self.max_order_quantity,
@@ -390,8 +308,9 @@ class DeMoorPerishableMAJAX(object):
             dtype=jnp.int32,
         )
 
-    def state_space(self, params: EnvParams, agent_id: int):
+    def state_space(self, params: EnvParams, agent_id: int) -> spaces.Dict:
         """State space of the environment."""
+        # TODO: Infos is currently wrong
         return spaces.Dict(
             {
                 "stock": spaces.Box(
@@ -421,15 +340,19 @@ class DeMoorPerishableMAJAX(object):
             }
         )
 
-    def _age_stock(
-        self, state: EnvState, params: EnvParams
-    ) -> Tuple[EnvState, chex.Array]:
+    def _age_stock(self, state: EnvState, params: EnvParams) -> EnvState:
         """Ages stock by one time period and calculates expiry and holding cost."""
-        stock, in_transit, infos = state.stock, state.in_transit, state.infos
+        stock, in_transit, infos, cumulative_rewards = (
+            state.stock,
+            state.in_transit,
+            state.infos,
+            state.cumulative_rewards,
+        )
         # Age the stock by one day and calculate wastage cost
         expired = stock[self.max_useful_life - 1]
-        infos = infos.at[:, self.info_idxs["wastage"]].add(expired)
+        infos = infos.replace(expiries=infos.expiries.at[:].add(expired))
         wastage_cost = expired * -params.wastage_cost
+        cumulative_rewards = cumulative_rewards + wastage_cost
 
         # Age stock
         stock = jnp.roll(stock, shift=1)
@@ -437,43 +360,44 @@ class DeMoorPerishableMAJAX(object):
 
         # Calculate holding cost
         holding = stock.sum()
-        infos = infos.at[:, self.info_idxs["holding"]].add(holding)
+        infos = infos.replace(holding=infos.holding.at[:].add(holding))
         holding_cost = holding * -params.holding_cost
+        cumulative_rewards = cumulative_rewards + holding_cost
 
         # Receive the units ordered lead_time days ago
         stock = stock.at[0].set(in_transit[self.lead_time - 1])
         in_transit = jnp.roll(in_transit, shift=1)
         in_transit = in_transit.at[0].set(0)
 
-        state = EnvState(
-            stock,
-            in_transit,
-            state.remaining_demand,
-            state.agent_id,
-            state.cumulative_rewards,
-            infos,
-            state.truncations,
-            state.terminations,
-            state.live_agents,
-            state.day,
-            state.step,
+        state = state.replace(
+            stock=stock,
+            in_transit=in_transit,
+            infos=infos,
+            cumulative_rewards=cumulative_rewards,
         )
-        total_cost = wastage_cost + holding_cost
-        reward = jnp.array([total_cost, total_cost])
-        return state, reward
+        return state
 
     def _replenishment_step(
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
-    ) -> Tuple[EnvState, chex.Array]:
+    ) -> EnvState:
         """Replenishment action step."""
-        in_transit, infos = state.in_transit, state.infos
+        stock, in_transit, infos, cumulative_rewards = (
+            state.stock,
+            state.in_transit,
+            state.infos,
+            state.cumulative_rewards,
+        )
         order = jnp.clip(action, a_min=0, a_max=self.max_order_quantity)
-        infos = infos.at[self.agent_ids["replenishment"], self.info_idxs["order"]].add(
-            order
+        infos = infos.replace(
+            orders=infos.orders.at[:].add(order),
+            order_placed=infos.orders.at[:].add(
+                jax.lax.cond(order > 0, lambda: 1, lambda: 0)
+            ),
         )
 
         # Place the order
         variable_order_cost = order * -params.variable_order_cost
+        cumulative_rewards = cumulative_rewards + variable_order_cost
         in_transit = in_transit.at[0].set(order)
 
         # Sample demand from a truncated Gamma distribution
@@ -487,43 +411,35 @@ class DeMoorPerishableMAJAX(object):
             .clip(0, params.max_demand)  # Truncate at max demand
             .astype(jnp_int)  # Covert to integer
         )
-        infos = infos.at[self.agent_ids["replenishment"], self.info_idxs["demand"]].add(
-            remaining_demand
-        )
 
         # Create updated state to return
-        state = EnvState(
-            state.stock,
-            in_transit,
-            remaining_demand,
-            state.agent_id,
-            state.cumulative_rewards,
-            infos,
-            state.truncations,
-            state.terminations,
-            state.live_agents,
-            state.day,
-            state.step,
+        state = state.replace(
+            stock=stock,
+            in_transit=in_transit,
+            infos=infos,
+            cumulative_rewards=cumulative_rewards,
+            remaining_demand=remaining_demand,
         )
-        reward = jnp.array([variable_order_cost, variable_order_cost])
-        return state, reward
+        return state
 
     def _issuing_step(
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
-    ) -> Tuple[EnvState, chex.Array]:
-        stock, remaining_demand, infos = (
+    ) -> EnvState:
+        stock, remaining_demand, infos, cumulative_rewards = (
             state.stock,
             state.remaining_demand,
             state.infos,
+            state.cumulative_rewards,
         )
         # Meeting one unit of demand
         remaining_demand -= 1
-        infos = infos.at[self.agent_ids["issuing"], self.info_idxs["demand"]].add(1)
+        infos = infos.replace(demand=infos.demand.at[:].add(1))
         shortage = jnp.where(
             jax.lax.bitwise_or(stock[action - 1] == 0, action == 0), 1, 0
         )
-        infos = infos.at[:, self.info_idxs["shortage"]].add(shortage)
+        infos = infos.replace(shortages=infos.shortages.at[:].add(shortage))
         shortage_cost = shortage * -params.shortage_cost
+        cumulative_rewards = cumulative_rewards + shortage_cost
 
         # Idx action - 1 because action is 1-indexed; we use 0 to indicate no unit issued
         # Issue one unit if there's no shortage (which includes our choice not to issue from stock)
@@ -537,21 +453,13 @@ class DeMoorPerishableMAJAX(object):
         )
 
         # Create updated state to return
-        state = EnvState(
-            stock,
-            state.in_transit,
-            remaining_demand,
-            state.agent_id,
-            state.cumulative_rewards,
-            infos,
-            state.truncations,
-            state.terminations,
-            state.live_agents,
-            state.day,
-            state.step,
+        state = state.replace(
+            stock=stock,
+            infos=infos,
+            cumulative_rewards=cumulative_rewards,
+            remaining_demand=remaining_demand,
         )
-        reward = jnp.array([shortage_cost, shortage_cost])
-        return state, reward
+        return state
 
     def _issue_one_unit(self, stock: jnp.array, action: int) -> chex.Array:
         """Issue one unit of stock."""
@@ -563,21 +471,3 @@ class DeMoorPerishableMAJAX(object):
             axis=0,
         )
         return stock
-
-    def get_info(self, state: EnvState, agent_id: int) -> chex.Array:
-        """Returns info for the current agent"""
-        return {k: state.infos[agent_id][v] for k, v in self.info_idxs.items()}
-
-    ## These are methods from PettingZoo that we're not currently using
-    ## Useful to think about if doing some sort of PettingZoo wrapper
-    def last(self, state: EnvState, observe: bool = True) -> chex.Array:
-        """Returns observation, cumulative reward, terminated and info for the current agent"""
-        raise NotImplementedError  # Used in PettingZooEnv
-
-    def _clear_reward(self, state) -> EnvState:
-        """Clears all rewards from state."""
-        raise NotImplementedError
-
-    def _accumulate_rewards(self, state) -> EnvState:
-        """Adds rewards to cumulvative rewards, typically called near the end of .step()"""
-        raise NotImplementedError

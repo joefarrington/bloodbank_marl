@@ -22,8 +22,8 @@ class EnvInfo:
         """Reset the infos for a single agent"""
         raise NotImplementedError
 
-    def update_infos_one_agent(self, agent_id: int, info: dict):
-        """Update infos for a single agent"""
+    def accumulate_infos_one_agent(self, agent_id: int, step_info):
+        """Add step info to cumulative info for a single agent"""
         raise NotImplementedError
 
 
