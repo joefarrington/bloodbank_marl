@@ -91,7 +91,7 @@ class EnvInfo:
             day_counter=self.day_counter.at[agent_id].set(0),
         )
 
-    def update_infos_one_agent(self, agent_id: int, info: EnvInfo):
+    def accumulate_infos_one_agent(self, agent_id: int, info: EnvInfo):
         return self.replace(
             demand=self.demand.at[agent_id].add(info.demand),
             shortages=self.shortages.at[agent_id].add(info.shortages),
@@ -102,6 +102,29 @@ class EnvInfo:
             order_placed=self.order_placed.at[agent_id].add(info.order_placed),
             day_counter=self.day_counter.at[agent_id].add(info.day_counter),
         )
+
+    def calculate_kpis(self):
+        """Calculate KPIs based on the info recorded by the replenishment agent, with id 0"""
+        return {
+            "mean_order_by_product": self.orders[0, :] / self.day_counter[0],
+            "service_level_%_by_product": (self.demand[0, :] - self.shortages[0, :])
+            / self.demand[0, :],
+            "expiries_%_by_product": (self.expiries[0, :]) / self.orders[0, :],
+            "mean_holding_by_product": self.holding[0, :]
+            / jnp.expand_dims(self.day_counter[0], -1),
+            "exact_match_%_per_product": self.allocations[0][
+                jnp.arange(self.allocations[0].shape[0]),
+                jnp.arange(self.allocations[0].shape[0]),
+            ]
+            / jnp.sum(self.allocations[0], axis=1),
+            "mean_total_order": jnp.sum(self.orders[0, :]) / self.day_counter[0],
+            "service_level_%": jnp.sum(self.demand[0, :] - self.shortages[0, :])
+            / jnp.sum(self.demand[0, :]),
+            "expiries_%": jnp.sum(self.expiries[0, :]) / jnp.sum(self.orders[0, :]),
+            "mean_holding": jnp.sum(self.holding[0, :]) / self.day_counter[0],
+            "exact_match_%": jnp.trace(self.allocations[0, :, :])
+            / jnp.sum(self.allocations[0, :, :]),
+        }
 
 
 @struct.dataclass
