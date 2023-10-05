@@ -1,6 +1,6 @@
 import jax
 import chex
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, Dict
 from functools import partial
 from flax import struct
 import jax.numpy as jnp
@@ -116,6 +116,15 @@ class EnvInfo:
             order_placed=self.order_placed.at[agent_id].add(step_info.order_placed),
             day_counter=self.day_counter.at[agent_id].add(step_info.day_counter),
         )
+
+    def calculate_kpis(self) -> Dict[str, int]:
+        """Calculate KPIs from cumulative info for the replenishment agent"""
+
+        return {
+            "service_level_%": (self.demand[0] - self.shortages[0]) / self.demand[0],
+            "wastage_%": self.expiries[0] / self.orders[0],
+            "holding": self.holding[0] / self.day_counter[0],
+        }
 
 
 @struct.dataclass

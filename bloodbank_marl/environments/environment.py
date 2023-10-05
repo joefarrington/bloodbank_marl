@@ -26,6 +26,9 @@ class EnvInfo:
         """Add step info to cumulative info for a single agent"""
         raise NotImplementedError
 
+    def calculate_kpis(self) -> Dict[str, int]:
+        """Calculate KPIs from cumulative info"""
+
 
 # We're using state to track both the state of the environment in MDP terms and also
 # additional information that in, say, PettingZoo would be stored as attributes of the
