@@ -176,6 +176,10 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
     def default_params(self) -> EnvParams:
         return EnvParams.create_env_params()
 
+    @property
+    def empty_infos(self) -> EnvInfo:
+        return EnvInfo.create_empty_infos(self.n_agents)
+
     def live_step(
         self,
         key: chex.PRNGKey,
@@ -261,8 +265,8 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
             in_transit=jnp.zeros(self.lead_time, dtype=jnp.int32),
             remaining_demand=0,
             agent_id=0,
-            cumulative_rewards=jnp.array([0.0, 0.0]),
-            infos=EnvInfo.create_empty_infos(self.n_agents),
+            cumulative_rewards=jnp.array([0.0] * len(self.agent_ids)),
+            infos=self.empty_infos,
             truncations=jnp.array([False] * len(self.agent_ids)),
             terminations=jnp.array([False] * len(self.agent_ids)),
             live_agents=jnp.array([1] * len(self.agent_ids)),
