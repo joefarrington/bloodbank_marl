@@ -5,8 +5,14 @@ from flax import struct
 import jax.numpy as jnp
 from gymnax.environments import spaces
 import numpy as np
-from bloodbank_marl.environments.environment import MarlEnvironment
 import distrax
+from bloodbank_marl.environments.environment import (
+    MarlEnvironment,
+    EnvParams,
+    EnvState,
+    EnvInfo,
+    EnvObs,
+)
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -61,7 +67,7 @@ class EnvInfo:
     day_counter: chex.Array
 
     @classmethod
-    def create_empty_infos(cls, n_agents: int, n_products: int, max_useful_life: int):
+    def create_empty_infos(cls, n_agents: int, n_products: int):
         return cls(
             demand=jnp.zeros((n_agents, n_products), dtype=jnp_int),
             shortages=jnp.zeros((n_agents, n_products), dtype=jnp_int),
@@ -240,9 +246,7 @@ class MenesesPerishableEnv(MarlEnvironment):
             request_type=0,
             agent_id=0,
             cumulative_rewards=jnp.zeros((self.n_agents,)),
-            infos=EnvInfo.create_empty_infos(
-                self.n_agents, self.n_products, self.max_useful_life
-            ),
+            infos=EnvInfo.create_empty_infos(self.n_agents, self.n_products),
             truncations=jnp.array([False] * self.n_agents),
             terminations=jnp.array([False] * self.n_agents),
             live_agents=jnp.array([1] * self.n_agents),
@@ -415,7 +419,7 @@ class MenesesPerishableEnv(MarlEnvironment):
 
     def _age_stock(
         self, key: chex.PRNGKey, state: EnvState, params: EnvParams
-    ) -> Tuple[EnvState, chex.Array]:
+    ) -> EnvState:
         """Ages stock by one time period and calculates expiry and holding cost."""
         stock, in_transit, infos, cumulative_rewards = (
             state.stock,
@@ -467,7 +471,7 @@ class MenesesPerishableEnv(MarlEnvironment):
 
     def _replenishment_step(
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
-    ) -> Tuple[EnvState, chex.Array]:
+    ) -> EnvState:
         """Replenishment action step."""
         stock, in_transit, infos, cumulative_rewards = (
             state.stock,
@@ -498,7 +502,7 @@ class MenesesPerishableEnv(MarlEnvironment):
 
     def _issuing_step(
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
-    ) -> Tuple[EnvState, chex.Array]:
+    ) -> EnvState:
         stock, infos, cumulative_rewards = (
             state.stock,
             state.infos,
