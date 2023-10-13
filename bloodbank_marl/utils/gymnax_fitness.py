@@ -228,6 +228,11 @@ class GymnaxFitness(object):
         _, state_reset = self.env.reset(rng_reset, self.env_params)
         state = state_reset.replace(stock=state.stock, in_transit=state.in_transit)
 
+        cum_reward = jnp.zeros(self.env.num_agents)
+        cum_return = 0.0
+        cum_info = self.env.empty_infos
+        valid_mask = jnp.ones(self.env.num_agents, dtype=jnp_int)
+
         # Scan over episode step loop
         carry_out, scan_out = jax.lax.scan(
             policy_step,
@@ -236,14 +241,10 @@ class GymnaxFitness(object):
                 state,
                 policy_params,
                 rng_episode,
-                jnp.array(
-                    [0.0, 0.0]
-                ),  # cum_reward, TODO Need to be flexible depending on number of agents
-                0.0,  # cum_return, TODO Currently only for one agent
-                self.env.empty_infos,
-                jnp.array(
-                    [1, 1]
-                ),  # valid_mask, TODO Need to be flexible depending on number of agents
+                cum_reward,
+                cum_return,
+                cum_info,
+                valid_mask,
             ],
             (),
             self.num_env_steps,
