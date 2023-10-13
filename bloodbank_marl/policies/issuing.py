@@ -92,7 +92,7 @@ def issue_lifo(policy_params, obs, rng, env_kwargs):
 # If the action vector is all 0s, then no products are issued
 
 
-def issue_exact_match(policy_params, obs, rng):
+def issue_exact_match(policy_params, obs, rng, env_kwargs):
     """Issue the requested type if available, otherwise nothing.
     Use OUFO for units of the matching type.
     policy_params is not used for this policy"""
@@ -106,7 +106,7 @@ def issue_exact_match(policy_params, obs, rng):
     return action
 
 
-def issue_priority_order(policy_params, obs, rng):
+def issue_priority_order(policy_params, obs, rng, env_kwargs):
     """Issue the highest priority available unit, or nothing if no compatible units are available.
     For best available matching type, use OUFO.
     policy_params is an (n_products, n_products) matrix of priorities.

@@ -236,7 +236,7 @@ def simopt_other_sampler(
         log.info(f"Round {i}: Simulating rollouts")
         scores, cum_infos, kpis = train_evaluator.rollout(rng_eval, policy_params)
         log.info(f"Round {i}: Processing results")
-        objectives = scores.mean(axis=(-2, -1))
+        objectives = scores.mean(axis=(-1))
 
         for idx in range(cfg.optuna.max_parallel_trials):
             study.tell(trials[idx], objectives[idx])

@@ -1,0 +1,11 @@
+env_name: "MenesesPerishable"
+num_env_steps: 20000
+num_rollouts: ${optuna.num_rollouts}
+env_kwargs:
+  n_products: 8
+  max_useful_life: 35
+  lead_time: 1
+env_params: {}
+num_warmup_days: 100
+max_warmup_steps: 5000
+gamma: 1.0

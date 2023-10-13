@@ -72,7 +72,7 @@ def main(cfg):
     best_trial_idx = study.best_trial.number
     trials_df = study.trials_dataframe()
     wandb_trials_table = wandb.Table(dataframe=trials_df)
-    run.log({"optuna_trials": wandb_trials_table})
+    wandb.log({"optuna_trials": wandb_trials_table})
 
     best_params = np.array([v for v in study.best_params.values()]).reshape(
         policy_rep.params_shape
@@ -85,12 +85,13 @@ def main(cfg):
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
     policy_params = jnp.array([best_params])
     scores, cum_info, kpis = test_evaluator.rollout(rng_eval, policy_params)
-    log.info(f"Mean return on evaluation rollouts: {scores.mean()}")
 
     # Log the return, the KPIs and the best parameters to W&B
     wandb.log({"eval_mean_return": scores.mean()})
     wandb.log({k: v.mean() for k, v in kpis.items()})
     wandb.log(study.best_params)
+
+    log.info(f"Mean return on evaluation rollouts: {scores.mean()}")
 
 
 if __name__ == "__main__":

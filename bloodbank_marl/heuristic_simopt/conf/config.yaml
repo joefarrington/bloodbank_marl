@@ -1,8 +1,8 @@
 defaults:
+  - environment: demoor_m2
   - policies/replenishment: s_policy
   - policies/issuing: fifo
   - _self_
-
 
 wandb:
   init:
@@ -23,19 +23,6 @@ optuna:
     all_params:
       low: 0
       high: 20
-
-environment:
-  env_name: "DeMoorPerishable"
-  num_env_steps: 5000
-  num_rollouts: ${optuna.num_rollouts}
-  env_kwargs:
-    max_useful_life: 2
-    lead_time: 1
-    max_order_quantity: 10
-  env_params: {}
-  num_warmup_days: 100
-  max_warmup_steps: 1500
-  gamma: 0.99
 
 train_evaluator:
   _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
