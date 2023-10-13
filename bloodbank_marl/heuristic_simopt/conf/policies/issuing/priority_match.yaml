@@ -1,7 +1,7 @@
 _target_: bloodbank_marl.policies.common.FixedPolicy
 policy_function:
   _target_: hydra.utils.get_method
-  path: bloodbank_marl.policies.issuing.issue_priority_order
+  path: bloodbank_marl.policies.issuing.issue_priority_match
 policy_params:
   _target_: jax.numpy.array
   object:
