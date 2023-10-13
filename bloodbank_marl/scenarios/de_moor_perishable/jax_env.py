@@ -126,6 +126,12 @@ class EnvInfo:
             "holding": self.holding[0] / self.day_counter[0],
         }
 
+    @classmethod
+    def calculate_target_kpi_penalty(
+        cls, kpis: Dict[str, Union[chex.Array, float]], params: EnvParams
+    ):
+        return 0.0
+
 
 @struct.dataclass
 class EnvState:

@@ -29,6 +29,12 @@ class EnvInfo:
     def calculate_kpis(self) -> Dict[str, int]:
         """Calculate KPIs from cumulative info"""
 
+    @classmethod
+    def calculate_target_kpi_penalty(
+        cls, kpis: Dict[str, Union[chex.Array, float]], params
+    ):
+        raise NotImplementedError
+
 
 # We're using state to track both the state of the environment in MDP terms and also
 # additional information that in, say, PettingZoo would be stored as attributes of the

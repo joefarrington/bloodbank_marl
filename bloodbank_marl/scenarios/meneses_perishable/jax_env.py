@@ -132,7 +132,7 @@ class EnvInfo:
 
     @classmethod
     def calculate_target_kpi_penalty(
-        cls, kpis: Dict[str, Union[chex.Array, float]], params: EnvParams
+        cls, kpis: Dict[str, Union[chex.Array, float]], params
     ):
         # TODO Might want to do some rounding here/use jnp.close etc when aiming for
         # 100% service level or 0% expriries for example to avoid issues with floating
