@@ -1,3 +1,9 @@
+defaults:
+  - policies/replenishment: s_policy
+  - policies/issuing: fifo
+  - _self_
+
+
 wandb:
   init:
     project: "simopt_demoor_marl_tryout_from_script"
@@ -63,18 +69,6 @@ policies:
     - 0
   policy_manager:
     _target_: bloodbank_marl.policies.policy_manager.PolicyManager
-  replenishment:
-    _target_: bloodbank_marl.policies.replenishment.SPolicy
-    env_name: ${environment.env_name}
-    env_params: ${environment.env_params}
-    env_kwargs: ${environment.env_kwargs}
-  issuing:
-    _target_: bloodbank_marl.policies.common.FixedPolicy
-    policy_function:
-      _target_: hydra.utils.get_method
-      path: bloodbank_marl.policies.issuing.issue_fifo
-    policy_params: 12
-    env_kwargs: ${environment.env_kwargs}
 
 evaluation:
   seed: 123
