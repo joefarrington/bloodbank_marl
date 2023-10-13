@@ -15,10 +15,11 @@ import wandb
 import hydra
 import omegaconf
 
+# TODO We could subclass the logger or find another way to log the KPIs (especially for the best current params)
+
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg):
-
     wandb_config = omegaconf.OmegaConf.to_container(
         cfg, resolve=True, throw_on_missing=True
     )
