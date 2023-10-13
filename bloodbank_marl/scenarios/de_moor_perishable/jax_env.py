@@ -83,15 +83,15 @@ class EnvInfo:
     day_counter: chex.Array
 
     @classmethod
-    def create_empty_infos(cls, n_agents: int):
+    def create_empty_infos(cls, num_agents: int):
         return cls(
-            demand=jnp.zeros(n_agents, dtype=jnp.int32),
-            shortages=jnp.zeros(n_agents, dtype=jnp.int32),
-            expiries=jnp.zeros(n_agents, dtype=jnp.int32),
-            holding=jnp.zeros(n_agents, dtype=jnp.int32),
-            orders=jnp.zeros(n_agents, dtype=jnp.int32),
-            order_placed=jnp.zeros(n_agents, dtype=jnp.int32),
-            day_counter=jnp.zeros(n_agents, dtype=jnp.int32),
+            demand=jnp.zeros(num_agents, dtype=jnp.int32),
+            shortages=jnp.zeros(num_agents, dtype=jnp.int32),
+            expiries=jnp.zeros(num_agents, dtype=jnp.int32),
+            holding=jnp.zeros(num_agents, dtype=jnp.int32),
+            orders=jnp.zeros(num_agents, dtype=jnp.int32),
+            order_placed=jnp.zeros(num_agents, dtype=jnp.int32),
+            day_counter=jnp.zeros(num_agents, dtype=jnp.int32),
         )
 
     def reset_infos_one_agent(self, agent_id: int):
@@ -176,7 +176,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
 
         self.possible_agents = agent_names
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
-        self.n_agents = len(agent_names)
+        self.num_agents = len(agent_names)
 
     @property
     def default_params(self) -> EnvParams:
@@ -184,7 +184,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
 
     @property
     def empty_infos(self) -> EnvInfo:
-        return EnvInfo.create_empty_infos(self.n_agents)
+        return EnvInfo.create_empty_infos(self.num_agents)
 
     def live_step(
         self,

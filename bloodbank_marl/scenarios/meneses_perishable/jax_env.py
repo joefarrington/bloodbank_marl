@@ -70,18 +70,18 @@ class EnvInfo:
     day_counter: chex.Array
 
     @classmethod
-    def create_empty_infos(cls, n_agents: int, n_products: int, max_useful_life: int):
+    def create_empty_infos(cls, num_agents: int, n_products: int, max_useful_life: int):
         return cls(
-            demand=jnp.zeros((n_agents, n_products), dtype=jnp_int),
-            shortages=jnp.zeros((n_agents, n_products), dtype=jnp_int),
-            expiries=jnp.zeros((n_agents, n_products), dtype=jnp_int),
-            holding=jnp.zeros((n_agents, n_products), dtype=jnp_int),
+            demand=jnp.zeros((num_agents, n_products), dtype=jnp_int),
+            shortages=jnp.zeros((num_agents, n_products), dtype=jnp_int),
+            expiries=jnp.zeros((num_agents, n_products), dtype=jnp_int),
+            holding=jnp.zeros((num_agents, n_products), dtype=jnp_int),
             allocations=jnp.zeros(
-                (n_agents, n_products, n_products, max_useful_life), dtype=jnp_int
+                (num_agents, n_products, n_products, max_useful_life), dtype=jnp_int
             ),
-            orders=jnp.zeros((n_agents, n_products), dtype=jnp_int),
-            order_placed=jnp.zeros((n_agents,), dtype=jnp_int),
-            day_counter=jnp.zeros((n_agents,), dtype=jnp_int),
+            orders=jnp.zeros((num_agents, n_products), dtype=jnp_int),
+            order_placed=jnp.zeros((num_agents,), dtype=jnp_int),
+            day_counter=jnp.zeros((num_agents,), dtype=jnp_int),
         )
 
     def reset_infos_one_agent(self, agent_id: int):
@@ -228,7 +228,7 @@ class MenesesPerishableEnv(MarlEnvironment):
 
         self.possible_agents = agent_names
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
-        self.n_agents = len(agent_names)
+        self.num_agents = len(agent_names)
 
     # TODO: We can remove unless we want to add a function
     # because we're customizing them etc
@@ -239,7 +239,7 @@ class MenesesPerishableEnv(MarlEnvironment):
     @property
     def empty_infos(self) -> EnvInfo:
         return EnvInfo.create_empty_infos(
-            self.n_agents, self.n_products, self.max_useful_life
+            self.num_agents, self.n_products, self.max_useful_life
         )
 
     def live_step(
@@ -321,11 +321,11 @@ class MenesesPerishableEnv(MarlEnvironment):
             request_time=0,
             request_type=0,
             agent_id=0,
-            cumulative_rewards=jnp.zeros((self.n_agents,)),
+            cumulative_rewards=jnp.zeros((self.num_agents,)),
             infos=self.empty_infos,
-            truncations=jnp.array([False] * self.n_agents),
-            terminations=jnp.array([False] * self.n_agents),
-            live_agents=jnp.array([1] * self.n_agents),
+            truncations=jnp.array([False] * self.num_agents),
+            terminations=jnp.array([False] * self.num_agents),
+            live_agents=jnp.array([1] * self.num_agents),
             day=0,
             time=0.0,
             step=0,
@@ -431,61 +431,61 @@ class MenesesPerishableEnv(MarlEnvironment):
                     low=0, high=1e10, shape=(1,), dtype=jnp.float32
                 ),
                 "request_type": spaces.Discete(self.n_products),
-                "agent_id": spaces.Discete(self.n_agents),
+                "agent_id": spaces.Discete(self.num_agents),
                 "cumulative_rewards": spaces.Box(
-                    low=0, high=1e10, shape=(self.n_agents,), dtype=jnp.int32
+                    low=0, high=1e10, shape=(self.num_agents,), dtype=jnp.int32
                 ),
                 "infos": spaces.Dict(
                     {
                         "demand": spaces.Box(
                             low=0,
                             high=1e10,
-                            shape=(self.n_agents, self.n_products),
+                            shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "shortages": spaces.Box(
                             low=0,
                             high=1e10,
-                            shape=(self.n_agents, self.n_products),
+                            shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "expiries": spaces.Box(
                             low=0,
                             high=1e10,
-                            shape=(self.n_agents, self.n_products),
+                            shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "holding": spaces.Box(
                             low=0,
                             high=1e10,
-                            shape=(self.n_agents, self.n_products),
+                            shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "allocations": spaces.Box(
                             low=0,
                             high=1e10,
-                            shape=(self.n_agents, self.n_products, self.n_products),
+                            shape=(self.num_agents, self.n_products, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "orders": spaces.Box(
                             low=0,
                             high=1e10,
-                            shape=(self.n_agents, self.n_products),
+                            shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "order_placed": spaces.Box(
-                            low=0, high=1e10, shape=(self.n_agents,), dtype=jnp.int32
+                            low=0, high=1e10, shape=(self.num_agents,), dtype=jnp.int32
                         ),  # Expect to be binary as expect more than one request per day
                     }
                 ),
                 "truncations": spaces.Box(
-                    low=0, high=1, shape=(self.n_agents,), dtype=jnp.bool
+                    low=0, high=1, shape=(self.num_agents,), dtype=jnp.bool
                 ),  # TODO: is this okay?
                 "terminations": spaces.Box(
-                    low=0, high=1, shape=(self.n_agents,), dtype=jnp.bool
+                    low=0, high=1, shape=(self.num_agents,), dtype=jnp.bool
                 ),  # TODO: is this okay?
                 "live_agents": spaces.Box(
-                    low=0, high=1, shape=(self.n_agents,), dtype=jnp.bool
+                    low=0, high=1, shape=(self.num_agents,), dtype=jnp.bool
                 ),  # TODO: is this okay?
                 "day": spaces.Box(low=0, high=1e10, shape=(1,), dtype=jnp.int32),
                 "time": spaces.Box(low=0, high=1e10, shape=(1,), dtype=jnp.float32),
@@ -506,7 +506,9 @@ class MenesesPerishableEnv(MarlEnvironment):
         # Age the stock by one day and calculate wastage cost
         expired = stock[: self.n_products, self.max_useful_life - 1]
         infos = infos.replace(
-            expiries=infos.expiries.at[: self.n_agents, : self.n_products].add(expired)
+            expiries=infos.expiries.at[: self.num_agents, : self.n_products].add(
+                expired
+            )
         )
         wastage_cost = jnp.dot(expired, -params.wastage_costs)
         cumulative_rewards = cumulative_rewards + wastage_cost
@@ -518,7 +520,7 @@ class MenesesPerishableEnv(MarlEnvironment):
         # Calculate holding cost
         holding = stock.sum(axis=-1)
         infos = infos.replace(
-            holding=infos.holding.at[: self.n_agents, : self.n_products].add(holding)
+            holding=infos.holding.at[: self.num_agents, : self.n_products].add(holding)
         )
         holding_cost = jnp.dot(holding, -params.holding_costs)
         cumulative_rewards = cumulative_rewards + holding_cost

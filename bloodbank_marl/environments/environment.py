@@ -79,7 +79,7 @@ class MarlEnvironment(object):
         """Initializes the environment."""
         self.possible_agents = agent_names
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
-        self.n_agents = len(agent_names)
+        self.num_agents = len(agent_names)
 
     @property
     def default_params(self) -> EnvParams:
@@ -87,7 +87,7 @@ class MarlEnvironment(object):
 
     @property
     def emptry_infos(self) -> EnvInfo:
-        return EnvInfo.create_empty_infos(self.n_agents)
+        return EnvInfo.create_empty_infos(self.num_agents)
 
     @partial(jax.jit, static_argnums=(0,))
     def step(
