@@ -126,6 +126,12 @@ class MarlEnvironment(object):
         obs, state = self.reset_env(key, params)
         return obs, state
 
+    def end_of_warmup_reset(
+        self, key: chex.PRNGKey, state: EnvState, params: EnvParams
+    ):
+        """Run at end of warmup period to partially reset State"""
+        raise NotImplementedError
+
     def step_env(
         self,
         key: chex.PRNGKey,

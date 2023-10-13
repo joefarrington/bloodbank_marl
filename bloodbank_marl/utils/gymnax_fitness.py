@@ -161,8 +161,6 @@ class GymnaxFitness(object):
 
         def policy_step(state_input, tmp):
             """lax.scan compatible step transition in jax env."""
-            # TODO: Add in option to get info/KPIs?
-            # TODO: This
             (
                 obs,
                 state,
@@ -180,7 +178,7 @@ class GymnaxFitness(object):
             )
             new_cum_reward = cum_reward.at[next_o.agent_id].add(
                 reward * valid_mask[next_o.agent_id]
-            )  # jax.lax.dynamic_update_index_in_dim(cum_reward, cum_reward[next_o.agent_id] + reward * valid_mask[next_o.agent_id], next_o.agent_id, axis=-1)
+            )
             new_cum_return = cum_return + (
                 reward
                 * self.gamma ** jnp.clip((next_s.day - 1), a_min=0)
@@ -193,9 +191,7 @@ class GymnaxFitness(object):
                 cum_info,
             )
             agent_done = jax.lax.bitwise_or(truncation, termination)
-            new_valid_mask = valid_mask.at[next_o.agent_id].multiply(
-                1 - agent_done
-            )  # jax.lax.dynamic_update_index_in_dim(valid_mask, valid_mask[next_o.agent_id] * (1 - done), next_o.agent_id, axis=-1)
+            new_valid_mask = valid_mask.at[next_o.agent_id].multiply(1 - agent_done)
             carry = [
                 next_o,
                 next_s,
@@ -225,8 +221,7 @@ class GymnaxFitness(object):
         # TODO Create a method in the env so that this does not need to include elements from env (e.g. in stock/in-transit)
         obs, state, rng_episode = carry_out
         rng_reset, rng_episode = jax.random.split(rng_input)
-        _, state_reset = self.env.reset(rng_reset, self.env_params)
-        state = state_reset.replace(stock=state.stock, in_transit=state.in_transit)
+        state = self.env.end_of_warmup_reset(rng_reset, state, self.env_params)
 
         cum_reward = jnp.zeros(self.env.num_agents)
         cum_return = 0.0

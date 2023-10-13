@@ -281,6 +281,14 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         )
         return self.get_obs(state, state.agent_id), state
 
+    def end_of_warmup_reset(
+        self, key: chex.PRNGKey, state: EnvState, params: EnvParams
+    ):
+        """Run at end of warmup period to partially reset State"""
+        _, state_reset = self.reset(key, params)
+        # We want to keep the stock on hand and in transit, but reset everything else
+        return state_reset.replace(stock=state.stock, in_transit=state.in_transit)
+
     def get_obs(self, state: EnvState, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
         # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
