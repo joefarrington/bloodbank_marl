@@ -106,7 +106,7 @@ def issue_exact_match(policy_params, obs, rng, env_kwargs):
     return action
 
 
-def issue_priority_order(policy_params, obs, rng, env_kwargs):
+def issue_priority_match(policy_params, obs, rng, env_kwargs):
     """Issue the highest priority available unit, or nothing if no compatible units are available.
     For best available matching type, use OUFO.
     policy_params is an (n_products, n_products) matrix of priorities.
