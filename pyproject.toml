@@ -21,10 +21,10 @@ scipy = "^1.11.2"
 evosax = "^0.1.4"
 gymnasium = "^0.29.1"
 pettingzoo = "^1.24.0"
-wandb = "^0.15.8"
 seaborn = "^0.12.2"
 numpyro = "^0.13.0"
 optuna = "^3.3.0"
+wandb = "^0.15.12"
 
 [tool.poetry.group.jax.dependencies]
 jax = {extras = ["cuda12_pip"], version = "^0.4.14", source = "jax"}
