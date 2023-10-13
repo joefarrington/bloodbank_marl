@@ -217,8 +217,6 @@ class GymnaxFitness(object):
             self.max_warmup_steps,
         )
 
-        # Use the state and obs from end of warm-up period but reset other stuff in the state (reward, info etc).
-        # TODO Create a method in the env so that this does not need to include elements from env (e.g. in stock/in-transit)
         obs, state, rng_episode = carry_out
         rng_reset, rng_episode = jax.random.split(rng_input)
         state = self.env.end_of_warmup_reset(rng_reset, state, self.env_params)
