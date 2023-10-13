@@ -31,7 +31,7 @@ class FlaxIssuePolicy:
         return self.policy_net.init(rng, obs)
 
     def apply(self, policy_params, obs, rng):
-        return self.policy_net.apply(policy_params[self.policy_id], obs, rng)
+        return self.policy_net.apply(policy_params[self.policy_id], obs.obs, rng)
 
 
 class IssueMLP(nn.Module):
@@ -50,6 +50,7 @@ class IssueMLP(nn.Module):
 def issue_fifo(policy_params, obs, rng, env_kwargs):
     """Action is idx of oldest unit, plus one.
     Zero if no units are present"""
+    obs = obs.obs
     stock = obs[
         env_kwargs["lead_time"]
         - 1 : env_kwargs["max_useful_life"]
@@ -68,6 +69,7 @@ def issue_fifo(policy_params, obs, rng, env_kwargs):
 def issue_lifo(policy_params, obs, rng, env_kwargs):
     """Action is idx of youngest unit, plus one.
     Zero if no units are present"""
+    obs = obs.obs
     stock = obs[
         env_kwargs["lead_time"]
         - 1 : env_kwargs["max_useful_life"]
