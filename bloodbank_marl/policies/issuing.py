@@ -82,3 +82,46 @@ def issue_lifo(policy_params, obs, rng, env_kwargs):
         lambda _: 1 + (jnp.where(stock > 0, 1, 0)).argmax(),
         None,
     )
+
+
+# Policies for the Meneses Perishable Env
+# These are designed to be used with the FixedPolicy class, we do not
+# envisage optimizing the parameters.
+
+# In these policies, the action has the same dimensions as the number of products
+# If the action vector is all 0s, then no products are issued
+
+
+def issue_exact_match(policy_params, obs, rng):
+    """Issue the requested type if available, otherwise nothing.
+    Use OUFO for units of the matching type.
+    policy_params is not used for this policy"""
+    total_stock_by_product = obs.stock.sum(axis=-1)
+    action = jnp.zeros_like(total_stock_by_product)
+    action = jax.lax.select(
+        total_stock_by_product[obs.request_type] > 0,
+        action.at[obs.request_type].set(1),
+        action,
+    )
+    return action
+
+
+def issue_priority_order(policy_params, obs, rng):
+    """Issue the highest priority available unit, or nothing if no compatible units are available.
+    For best available matching type, use OUFO.
+    policy_params is an (n_products, n_products) matrix of priorities.
+    Each row indicates a product type. Within a row, idx of the best match is in first col, next best in second col, etc.
+    Use -1 to pad where only some types are compatible
+    """
+    total_stock_by_product = obs.stock.sum(axis=1)
+    action = jnp.zeros_like(total_stock_by_product)
+    rt = obs.request_type
+    in_stock_and_compatible = total_stock_by_product[policy_params[rt]] > 0 * jnp.where(
+        policy_params[rt] >= 0, 1, 0
+    )
+    action = jax.lax.select(
+        in_stock_and_compatible.any(),
+        action.at[policy_params[rt][in_stock_and_compatible.argmax()]].set(1),
+        action,
+    )
+    return action
