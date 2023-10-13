@@ -47,8 +47,60 @@ class EnvParams:
     shortage_costs: chex.Array = jnp.array([1340] * n_products)
     wastage_costs: chex.Array = jnp.array([130] * n_products)
     holding_costs: chex.Array = jnp.array([1.1] * n_products)
-    substitution_costs: chex.Array = jnp.ones((n_products, n_products)) - jnp.eye(
-        n_products
+    # For now, we assume that subsitution cost increases by 1/8
+    # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
+    # then it is the wost and so should be 7/8)
+    substitution_costs: chex.Array = (
+        jnp.array(
+            [
+                # Unit O-, O+, A-, A+, B-, B+, AB-, AB+
+                [
+                    0,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                ],  # O- pt
+                [
+                    1 / 8,
+                    0,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                ],  # O+ pt
+                [
+                    1 / 8,
+                    jnp.inf,
+                    0,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                ],  # A- pt
+                [3 / 8, 2 / 8, 1 / 8, 0, jnp.inf, jnp.inf, jnp.inf, jnp.inf],  # A+ pt
+                [
+                    1 / 8,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                    0,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                ],  # B- pt
+                [3 / 8, 2 / 8, jnp.inf, jnp.inf, 1 / 8, 0, jnp.inf, jnp.inf],  # B+ pt
+                [3 / 8, jnp.inf, 2 / 8, jnp.inf, 1 / 8, jnp.inf, 0, jnp.inf],  # AB- pt
+                [7 / 8, 6 / 8, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 1 / 8, 0],  # AB+ pt
+            ]
+        )
+        * 1340
     )
     max_expiry_target: float = 1.0
     min_service_level_target: float = 0.0
@@ -180,6 +232,9 @@ class EnvState:
     in_transit: chex.Array
     request_time: float  # time of next request
     request_type: int  # type of next request
+    request_intervals: chex.Array
+    request_types: chex.Array
+    request_idx: int
     agent_id: int  # Agent to act
     cumulative_rewards: chex.Array
     infos: EnvInfo
@@ -220,11 +275,13 @@ class MenesesPerishableEnv(MarlEnvironment):
         max_useful_life: int = 35,
         lead_time: int = 1,
         max_order_quantities: list = [100] * 8,
+        max_demand=100,
     ):
         self.n_products = n_products
         self.max_useful_life = max_useful_life
         self.lead_time = lead_time
         self.max_order_quantities = jnp.array(max_order_quantities)
+        self.max_demand = max_demand
 
         self.possible_agents = agent_names
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
@@ -315,11 +372,15 @@ class MenesesPerishableEnv(MarlEnvironment):
         self, key: chex.PRNGKey, params: EnvParams
     ) -> Tuple[EnvObs, EnvState]:
         """Environment-specific reset."""
+
         state = EnvState(
             stock=jnp.zeros((self.n_products, self.max_useful_life), dtype=jnp_int),
             in_transit=jnp.zeros((self.n_products, self.lead_time), dtype=jnp.int32),
-            request_time=0,
+            request_time=0.0,
             request_type=0,
+            request_intervals=jnp.zeros((self.max_demand,), dtype=jnp.float32),
+            request_types=jnp.zeros((self.max_demand,), dtype=jnp_int),
+            request_idx=0,
             agent_id=0,
             cumulative_rewards=jnp.zeros((self.num_agents,)),
             infos=self.empty_infos,
@@ -333,10 +394,10 @@ class MenesesPerishableEnv(MarlEnvironment):
         # Sample the first request and update the state with it
         # In some cases (e.g. if we have a weekday) demand would depend on state so need to create
         # a state first, then sample, then update state based on result of sample
-        request_interval, request_type = self._sample_next_request(key, state, params)
-        state = state.replace(
-            request_time=state.time + request_interval, request_type=request_type
-        )
+        # request_interval, request_type = self._sample_next_request(key, state, params)
+        # state = state.replace(
+        #    request_time=state.time + request_interval, request_type=request_type
+        # )
 
         return self.get_obs(state, state.agent_id), state
 
@@ -559,6 +620,8 @@ class MenesesPerishableEnv(MarlEnvironment):
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
     ) -> EnvState:
         """Replenishment action step."""
+        interval_key, type_key = jax.random.split(key)
+
         stock, in_transit, infos, cumulative_rewards = (
             state.stock,
             state.in_transit,
@@ -577,10 +640,21 @@ class MenesesPerishableEnv(MarlEnvironment):
         # TODO: Handle case where lead_time == 0
         in_transit = in_transit.at[0:n_products, 0].set(orders)
 
+        # Sample the demand for the coming day
+        request_intervals = distrax.Gamma(
+            concentration=1, rate=params.poisson_demand_mean
+        ).sample(seed=interval_key, sample_shape=(self.max_demand,))
+        request_types = distrax.Categorical(probs=params.product_probabilities).sample(
+            seed=type_key, sample_shape=(self.max_demand,)
+        )
+
         state = state.replace(
             stock=stock,
             in_transit=in_transit,
             infos=infos,
+            request_intervals=request_intervals,
+            request_types=request_types,
+            request_idx=0,
             cumulative_rewards=cumulative_rewards,
         )
 
@@ -640,8 +714,8 @@ class MenesesPerishableEnv(MarlEnvironment):
         substitution_cost = -params.substitution_costs[state.request_type, product_idx]
         cumulative_rewards = cumulative_rewards + substitution_cost
 
-        # Sample the details of the next request
-        request_interval, request_type = self._sample_next_request(key, state, params)
+        # Get the details of the next request
+        request_interval, request_type = self._get_next_request(state)
 
         state = state.replace(
             stock=stock_after_issue,
@@ -649,6 +723,7 @@ class MenesesPerishableEnv(MarlEnvironment):
             cumulative_rewards=cumulative_rewards,
             request_time=state.time + request_interval,
             request_type=request_type,
+            request_idx=state.request_idx + 1,
         )
         return state
 
@@ -670,6 +745,7 @@ class MenesesPerishableEnv(MarlEnvironment):
         remaining_demand = (remaining_demand - stock_element).clip(0)
         return remaining_demand, remaining_stock
 
+    """
     def _sample_next_request(
         self, key: chex.PRNGKey, state: EnvState, params: EnvParams
     ) -> Tuple[int, int]:
@@ -683,6 +759,12 @@ class MenesesPerishableEnv(MarlEnvironment):
         request_type = distrax.Categorical(probs=params.product_probabilities).sample(
             seed=product_key
         )
+        return request_interval, request_type
+    """
+
+    def _get_next_request(self, state: EnvState):
+        request_interval = state.request_intervals[state.request_idx]
+        request_type = state.request_types[state.request_idx]
         return request_interval, request_type
 
     def _sample_ages_on_arrival(
