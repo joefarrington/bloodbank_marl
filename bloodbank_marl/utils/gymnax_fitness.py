@@ -20,13 +20,19 @@ from evosax.problems import GymnaxFitness
 import distrax
 import functools
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
+from bloodbank_marl.scenarios.meneses_perishable.jax_env import MenesesPerishableEnv
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
 
 # For now, monkey patch the gymnax.make function
 def make(env_name, **env_kwargs):
-    if env_name == "DeMoorPerishable":
+    if env_name == "MenesesPerishable":
+        return (
+            MenesesPerishableEnv(**env_kwargs),
+            MenesesPerishableEnv().default_params,
+        )
+    elif env_name == "DeMoorPerishable":
         return (
             DeMoorPerishableMAJAX(**env_kwargs),
             DeMoorPerishableMAJAX().default_params,
@@ -65,7 +71,7 @@ class GymnaxFitness(object):
 
         # Define the RL environment & replace default parameters if desired
         self.env, self.env_params = gymnax.make(env_name, **env_kwargs)
-        self.env_params.replace(**env_params)
+        self.env_params = self.env_params.replace(**env_params)
 
         if num_env_steps is None:
             self.num_env_steps = self.env_params.max_steps_in_episode
@@ -112,6 +118,7 @@ class GymnaxFitness(object):
         else:
             self.rollout_map = self.rollout_pop
 
+    # TODO Would need to adjust to account for infos
     def rollout_pmap(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Parallelize rollout across devices. Split keys/reshape correctly."""
         keys_pmap = jnp.tile(rng_input, (self.n_devices, 1, 1))
@@ -123,10 +130,12 @@ class GymnaxFitness(object):
     def rollout(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Placeholder fn call for rolling out a population for multi-evals."""
         rng_pop = jax.random.split(rng_input, self.num_rollouts)
-        scores, masks = jax.jit(self.rollout_map)(rng_pop, policy_params)
+        scores, cum_infos, kpis, masks = jax.jit(self.rollout_map)(
+            rng_pop, policy_params
+        )
         # Update total step counter using only transitions before termination
         # self.total_env_steps += masks.sum()
-        return scores
+        return scores, cum_infos, kpis
 
     def rollout_ffw(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Rollout an episode with lax.scan."""
@@ -152,8 +161,6 @@ class GymnaxFitness(object):
 
         def policy_step(state_input, tmp):
             """lax.scan compatible step transition in jax env."""
-            # TODO: Add in option to get info/KPIs?
-            # TODO: This
             (
                 obs,
                 state,
@@ -161,6 +168,7 @@ class GymnaxFitness(object):
                 rng,
                 cum_reward,
                 cum_return,
+                cum_info,
                 valid_mask,
             ) = state_input
             rng, rng_step, rng_net = jax.random.split(rng, 3)
@@ -170,17 +178,20 @@ class GymnaxFitness(object):
             )
             new_cum_reward = cum_reward.at[next_o.agent_id].add(
                 reward * valid_mask[next_o.agent_id]
-            )  # jax.lax.dynamic_update_index_in_dim(cum_reward, cum_reward[next_o.agent_id] + reward * valid_mask[next_o.agent_id], next_o.agent_id, axis=-1)
+            )
             new_cum_return = cum_return + (
                 reward
                 * self.gamma ** jnp.clip((next_s.day - 1), a_min=0)
                 * (next_o.agent_id == 0)
                 * valid_mask[next_o.agent_id]
             )  #
+            new_cum_info = jax.tree_map(
+                lambda x, y: jax.lax.select(valid_mask[next_o.agent_id] == 1, x, y),
+                cum_info.accumulate_infos_one_agent(next_o.agent_id, info),
+                cum_info,
+            )
             agent_done = jax.lax.bitwise_or(truncation, termination)
-            new_valid_mask = valid_mask.at[next_o.agent_id].multiply(
-                1 - agent_done
-            )  # jax.lax.dynamic_update_index_in_dim(valid_mask, valid_mask[next_o.agent_id] * (1 - done), next_o.agent_id, axis=-1)
+            new_valid_mask = valid_mask.at[next_o.agent_id].multiply(1 - agent_done)
             carry = [
                 next_o,
                 next_s,
@@ -188,6 +199,7 @@ class GymnaxFitness(object):
                 rng,
                 new_cum_reward,
                 new_cum_return,
+                new_cum_info,
                 new_valid_mask,
             ]
             y = [new_valid_mask]
@@ -205,12 +217,14 @@ class GymnaxFitness(object):
             self.max_warmup_steps,
         )
 
-        # Use the state and obs from end of warm-up period but reset other stuff in the state (reward, info etc).
-        # TODO Create a method in the env so that this does not need to include elements from env (e.g. in stock/in-transit)
         obs, state, rng_episode = carry_out
         rng_reset, rng_episode = jax.random.split(rng_input)
-        _, state_reset = self.env.reset(rng_reset, self.env_params)
-        state = state_reset.replace(stock=state.stock, in_transit=state.in_transit)
+        state = self.env.end_of_warmup_reset(rng_reset, state, self.env_params)
+
+        cum_reward = jnp.zeros(self.env.num_agents)
+        cum_return = 0.0
+        cum_info = self.env.empty_infos
+        valid_mask = jnp.ones(self.env.num_agents, dtype=jnp_int)
 
         # Scan over episode step loop
         carry_out, scan_out = jax.lax.scan(
@@ -220,21 +234,27 @@ class GymnaxFitness(object):
                 state,
                 policy_params,
                 rng_episode,
-                jnp.array(
-                    [0.0, 0.0]
-                ),  # cum_reward, TODO Need to be flexible depending on number of agents
-                0.0,  # cum_return, TODO Currently only for one agent
-                jnp.array(
-                    [1, 1]
-                ),  # valid_mask, TODO Need to be flexible depending on number of agents
+                cum_reward,
+                cum_return,
+                cum_info,
+                valid_mask,
             ],
             (),
             self.num_env_steps,
         )
         # Return the sum of rewards accumulated by agent in episode rollout
         ep_mask = scan_out
-        cum_reward = carry_out[-3].squeeze()  # Not discounted, one per agent
+        cum_reward = carry_out[-4].squeeze()  # Not discounted, one per agent
         cum_return = carry_out[
-            -2
+            -3
         ].squeeze()  # Discounted, just for replenishment for now; update rollout if we want to use it
-        return cum_return, jnp.array(ep_mask)
+        cum_infos = carry_out[-2]
+        kpis = cum_infos.calculate_kpis()
+        # This allows us to incorporate a penalty when KPIs are breached over the whole episode
+        # Aim to use it to enforce constraints on service level and wastage suggested by Meneses et al (2021)
+        # for example on expriries and service level
+        target_breached_penalty = cum_infos.calculate_target_kpi_penalty(
+            kpis, self.env_params
+        )
+        cum_return = cum_return + target_breached_penalty
+        return cum_return, cum_infos, kpis, jnp.array(ep_mask)

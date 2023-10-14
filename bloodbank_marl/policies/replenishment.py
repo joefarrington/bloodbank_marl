@@ -2,8 +2,18 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 import chex
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.yaml import from_yaml, to_yaml
+from bloodbank_marl.environments.environment import MarlEnvironment
+from bloodbank_marl.scenarios.meneses_perishable.jax_env import (
+    MenesesPerishableEnv,
+    EnvObs,
+    EnvParams,
+    EnvInfo,
+    EnvState,
+)
+import numpy as np
 import pandas as pd
 
 
@@ -32,7 +42,7 @@ class FlaxRepPolicy:
         return self.policy_net.init(rng, obs)
 
     def apply(self, policy_params, obs, rng):
-        return self.policy_net.apply(policy_params[self.policy_id], obs, rng)
+        return self.policy_net.apply(policy_params[self.policy_id], obs.obs, rng)
 
 
 class RepMLP(nn.Module):
@@ -50,6 +60,7 @@ class RepMLP(nn.Module):
 
 # Order up to policy function for use with FixedPolicy
 def order_up_to(policy_params, obs, rng, env_kwargs):
+    obs = obs.obs
     return jnp.clip(
         policy_params - jnp.sum(obs), a_min=0, a_max=env_kwargs["max_order_quantity"]
     )
@@ -94,7 +105,7 @@ class VIPolicy(object):
             self.policy_params = self._policy_params_df_to_array(policy_params_df)
 
     def apply(self, policy_params, obs, rng, env_kwargs):
-        order = policy_params[tuple(obs)]
+        order = policy_params[tuple(obs.obs)]
         return order
 
     def get_params(self, rng=None):
@@ -109,3 +120,123 @@ class VIPolicy(object):
             policy_params_df.values.reshape(self.obs_space_shape)
         ).squeeze()
         return policy_params
+
+
+class HeuristicPolicy:
+    def __init__(
+        self,
+        env_name: str,
+        env_kwargs: Optional[Dict[str, Any]] = {},
+        env_params: Optional[Dict[str, Any]] = {},
+        policy_params_filepath: Optional[str] = None,
+    ):
+        # As in utils/rollout.py env_kwargs and env_params arguments are dicts to
+        # override the defaults for an environment.
+
+        # Instantiate an internal envinronment we'll use to access env kwargs/params
+        # These are not stored, just used to set up param_col_names, param_row_names and forward
+        # TODO: Update make statement
+        self.env_name = env_name
+        env, default_env_params = make(self.env_name, **env_kwargs)
+        all_env_params = default_env_params.replace(**env_params)
+
+        self.param_col_names = self._get_param_col_names(env_name, env, all_env_params)
+        self.param_row_names = self._get_param_row_names(env_name, env, all_env_params)
+        self.apply = self._get_apply_method(env_name, env, all_env_params)
+
+        if self.param_row_names != []:
+            self.param_names = np.array(
+                [
+                    [f"{p}_{r}" for p in self.param_col_names]
+                    for r in self.param_row_names
+                ]
+            )
+        else:
+            self.param_names = np.array([self.param_col_names])
+
+        self.params_shape = self.param_names.shape
+
+        if policy_params_filepath:
+            self.policy_params = self.load_policy_params(policy_params_filepath)
+
+    def _get_param_col_names(
+        self, env_name: str, env: MarlEnvironment, env_params: Dict[str, Any]
+    ) -> List[str]:
+        """Get the column names for the policy parameters - these are the different types
+        of parameters e.g. target stock level or reorder point"""
+        raise NotImplementedError
+
+    def _get_param_row_names(
+        self, env_name: str, env: MarlEnvironment, env_params: Dict[str, Any]
+    ) -> List[str]:
+        """Get the row names for the policy parameters - these are the names of the different levels of a
+        given paramter, e.g. for different days of the week or different products"""
+        raise NotImplementedError
+
+    def _get_apply_method(
+        self, env_name: str, env: MarlEnvironment, env_params: Dict[str, Any]
+    ) -> callable:
+        """Get the forward method for the policy - this is the function that returns the action"""
+        raise NotImplementedError
+
+    def load_policy_params(self, filepath: str) -> chex.Array:
+        """Load policy parameters from a yaml file"""
+        params_dict = from_yaml(filepath)["policy_params"]
+        if self.param_row_names is None:
+            params_df = pd.DataFrame(params_dict, index=[0])
+        else:
+            params_df = pd.DataFrame(params_dict)
+        policy_params = jnp.array(params_df.values)
+        assert (
+            policy_params.shape == self.params_shape
+        ), f"Parameters in file do not match expected shape: found {policy_params.shape} and expected {self.params_shape}"
+        return policy_params
+
+
+class SPolicy(HeuristicPolicy):
+    def _get_param_col_names(
+        self, env_name: str, env: MarlEnvironment, env_params: EnvParams
+    ) -> List[str]:
+        """Get the column names for the policy parameters - these are the different types
+        of parameters e.g. target stock level or reorder point"""
+        return ["S"]
+
+    def _get_param_row_names(
+        self, env_name: str, env: MarlEnvironment, env_params: EnvParams
+    ) -> List[str]:
+        """Get the row names for the policy parameters - these are the names of the different levels of a
+        given paramter, e.g. for different days of the week or different products"""
+        if env_name == "MenesesPerishable":
+            return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
+        else:
+            return []
+
+    def _get_apply_method(
+        self, env_name: str, env: MarlEnvironment, env_params: EnvParams
+    ) -> callable:
+        """Get the forward method for the policy - this is the function that returns the action"""
+        if env_name == "DeMoorPerishable":
+            return de_moor_perishable_S_policy
+        elif env_name == "MenesesPerishable":
+            return meneses_perishable_S_policy
+        else:
+            raise NotImplementedError(
+                f"No (S) policy defined for Environment ID {env_name}"
+            )
+
+
+def meneses_perishable_S_policy(policy_params, obs, rng):
+    """S policy for scenario based on Meneses et al 2021"""
+    stock_on_hand_and_in_transit = obs.stock.sum(
+        axis=-1, keepdims=True
+    ) + obs.stock.sum(axis=-1, keepdims=True)
+    # Clip because we can#t have a negative order
+    # Squeeze because action should be a 1D array
+    return jnp.clip((policy_params - stock_on_hand_and_in_transit), a_min=0).squeeze()
+
+
+def de_moor_perishable_S_policy(policy_params, obs, rng):
+    """(S) policy for DeMoorPerishable environment"""
+    # policy_params = [[S]]
+    stock_on_hand_and_in_transit = obs.stock.sum() + obs.in_transit.sum()
+    return jnp.clip((policy_params[0, 0] - stock_on_hand_and_in_transit), a_min=0)

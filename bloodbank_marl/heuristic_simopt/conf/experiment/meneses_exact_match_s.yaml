@@ -1,0 +1,22 @@
+# @package _global_
+
+defaults:
+    - override /policies/issuing: exact_match
+    - override /environment: meneses
+
+wandb:
+  init:
+    project: "simopt_meneses_marl_tryout_from_script"
+
+optuna:
+  sampler:
+    _target_: optuna.samplers.NSGAIISampler
+    population_size: 50
+  max_parallel_trials: 50
+  early_stopping_rounds: 5 
+  max_iterations: 100
+  num_rollouts: 50
+  search_bounds:
+    all_params:
+      low: 0
+      high: 100

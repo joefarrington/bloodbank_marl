@@ -1,0 +1,61 @@
+defaults:
+  - environment: demoor_m2
+  - policies/replenishment: s_policy
+  - policies/issuing: fifo
+  - _self_
+
+wandb:
+  init:
+    project: "simopt_demoor_marl_tryout_from_script"
+
+hydra:
+  job:
+    chdir: True
+
+optuna: 
+  sampler: 
+    _target_: optuna.samplers.GridSampler
+  max_parallel_trials: 50
+  max_iterations: 100
+  num_rollouts: 500
+  seed: 10
+  search_bounds:
+    all_params:
+      low: 0
+      high: 20
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${environment.num_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
+
+test_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: 1000
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: True
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
+
+
+policies:
+  optimize:
+    - 0
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+
+evaluation:
+  seed: 123
