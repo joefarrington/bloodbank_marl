@@ -113,14 +113,14 @@ def issue_priority_match(policy_params, obs, rng, env_kwargs):
     Each row indicates a product type. Within a row, idx of the best match is in first col, next best in second col, etc.
     Use -1 to pad where only some types are compatible
     """
-    total_stock_by_product = obs.stock.sum(axis=1)
+    total_stock_by_product = obs.stock.sum(axis=-1)
     action = jnp.zeros_like(total_stock_by_product)
     rt = obs.request_type
-    in_stock_and_compatible = total_stock_by_product[policy_params[rt]] > 0 * jnp.where(
-        policy_params[rt] >= 0, 1, 0
-    )
+    in_stock_and_compatible = jnp.where(
+        total_stock_by_product[policy_params[rt]] > 0, 1, 0
+    ) * jnp.where(policy_params[rt] >= 0, 1, 0)
     action = jax.lax.select(
-        in_stock_and_compatible.any(),
+        jnp.any(in_stock_and_compatible),
         action.at[policy_params[rt][in_stock_and_compatible.argmax()]].set(1),
         action,
     )

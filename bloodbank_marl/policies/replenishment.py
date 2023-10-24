@@ -206,7 +206,7 @@ class SPolicy(HeuristicPolicy):
     ) -> List[str]:
         """Get the row names for the policy parameters - these are the names of the different levels of a
         given paramter, e.g. for different days of the week or different products"""
-        if env_name == "MenesesPerishable":
+        if env_name == "MenesesPerishable" or "MenesesPerishableGymnax":
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
         else:
             return []
@@ -217,7 +217,7 @@ class SPolicy(HeuristicPolicy):
         """Get the forward method for the policy - this is the function that returns the action"""
         if env_name == "DeMoorPerishable":
             return de_moor_perishable_S_policy
-        elif env_name == "MenesesPerishable":
+        elif env_name == "MenesesPerishable" or "MenesesPerishableGymnax":
             return meneses_perishable_S_policy
         else:
             raise NotImplementedError(
@@ -229,7 +229,7 @@ def meneses_perishable_S_policy(policy_params, obs, rng):
     """S policy for scenario based on Meneses et al 2021"""
     stock_on_hand_and_in_transit = obs.stock.sum(
         axis=-1, keepdims=True
-    ) + obs.stock.sum(axis=-1, keepdims=True)
+    ) + obs.in_transit.sum(axis=-1, keepdims=True)
     # Clip because we can#t have a negative order
     # Squeeze because action should be a 1D array
     return jnp.clip((policy_params - stock_on_hand_and_in_transit), a_min=0).squeeze()
