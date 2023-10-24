@@ -5,6 +5,7 @@ import functools
 import jax
 import jax.numpy as jnp
 import distrax
+from functools import partial
 
 
 # NOTE: This will work as long as L >= 1, which is true for the cases considered in DeMoor.
@@ -150,6 +151,7 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         """
         self.agent_selection = "replenishment"
 
+    @partial(jax.profiler.annotate_function, name="step")
     def step(self, action):
         """
         step(action) takes in an action for the current agent (specified by
@@ -217,6 +219,7 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         # Adds .rewards to ._cumulative_rewards
         self._accumulate_rewards()
 
+    @partial(jax.profiler.annotate_function, name="rep_step")
     def _replenishment_step(self, action):
         # Clip order to between 0 and maximum order
         order = np.clip(action, 0, self.max_order_quantity)
@@ -238,6 +241,7 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         )
         self.infos["replenishment"]["demand"] += self.remaining_demand
 
+    @partial(jax.profiler.annotate_function, name="issue_step")
     def _issuing_step(self, action):
         # Update the remaining demand
         self.remaining_demand -= 1
@@ -251,6 +255,7 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         else:
             self.stock[action - 1] -= 1
 
+    @partial(jax.profiler.annotate_function, name="age_stock")
     def _age_stock(self):
         # Age the stock by one day and apply expiry cost
         expired = self.stock[-1]

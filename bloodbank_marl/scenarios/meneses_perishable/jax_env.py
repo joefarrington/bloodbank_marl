@@ -1,6 +1,6 @@
 import jax
 import chex
-from typing import Tuple, Union, Optional, Dict
+from typing import Tuple, Union, Optional, Dict, List
 from flax import struct
 import jax.numpy as jnp
 from gymnax.environments import spaces
@@ -13,6 +13,7 @@ from bloodbank_marl.environments.environment import (
     EnvInfo,
     EnvObs,
 )
+from jax import lax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -28,9 +29,30 @@ n_products = 8
 # TODO: Recheck all defaults
 @struct.dataclass
 class EnvParams:
-    poisson_demand_mean: float = 49.8
-    product_probabilities: chex.Array = jnp.array(
-        [
+    poisson_demand_mean: float
+    product_probabilities: chex.Array
+    age_on_arrival_distribution_probs: chex.Array
+    fixed_order_costs: float
+    variable_order_costs: chex.Array
+    shortage_costs: chex.Array
+    wastage_costs: chex.Array
+    holding_costs: chex.Array
+    # For now, we assume that subsitution cost increases by 1/8
+    # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
+    # then it is the wost and so should be 7/8)
+    substitution_costs: chex.Array
+    max_expiry_target: float
+    min_service_level_target: float
+    target_kpi_breach_penalty: float
+    max_days_in_episode: int
+    max_steps_in_episode: int
+    gamma: float
+
+    @classmethod
+    def create_env_params(
+        cls,
+        poisson_demand_mean: float = 49.8,
+        product_probabilities: List[float] = [
             0.08614457,
             0.36024097,
             0.08192771,
@@ -39,75 +61,85 @@ class EnvParams:
             0.0684739,
             0.00522088,
             0.02048193,
-        ]
-    )
-    age_on_arrival_distribution_probs: chex.Array = jnp.array([1] + [0] * (35 - 1))
-    fixed_order_costs: float = 0
-    variable_order_costs: chex.Array = jnp.array([160] * n_products)
-    shortage_costs: chex.Array = jnp.array([1340] * n_products)
-    wastage_costs: chex.Array = jnp.array([130] * n_products)
-    holding_costs: chex.Array = jnp.array([1.1] * n_products)
-    # For now, we assume that subsitution cost increases by 1/8
-    # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
-    # then it is the wost and so should be 7/8)
-    substitution_costs: chex.Array = (
-        jnp.array(
+        ],
+        age_on_arrival_distribution_probs: List[float] = [1] + [0] * (35 - 1),
+        fixed_order_costs: float = 0,
+        variable_order_costs: List[float] = [160] * n_products,
+        shortage_costs: List[float] = [1340] * n_products,
+        wastage_costs: List[float] = [130] * n_products,
+        holding_costs: List[float] = [1.1] * n_products,
+        substitution_cost_ratios: List[List[float]] = [
+            # Unit O-, O+, A-, A+, B-, B+, AB-, AB+
             [
-                # Unit O-, O+, A-, A+, B-, B+, AB-, AB+
-                [
-                    0,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                ],  # O- pt
-                [
-                    1 / 8,
-                    0,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                ],  # O+ pt
-                [
-                    1 / 8,
-                    jnp.inf,
-                    0,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                ],  # A- pt
-                [3 / 8, 2 / 8, 1 / 8, 0, jnp.inf, jnp.inf, jnp.inf, jnp.inf],  # A+ pt
-                [
-                    1 / 8,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                    0,
-                    jnp.inf,
-                    jnp.inf,
-                    jnp.inf,
-                ],  # B- pt
-                [3 / 8, 2 / 8, jnp.inf, jnp.inf, 1 / 8, 0, jnp.inf, jnp.inf],  # B+ pt
-                [3 / 8, jnp.inf, 2 / 8, jnp.inf, 1 / 8, jnp.inf, 0, jnp.inf],  # AB- pt
-                [7 / 8, 6 / 8, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 1 / 8, 0],  # AB+ pt
-            ]
+                0,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+            ],  # O- pt
+            [
+                1 / 8,
+                0,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+            ],  # O+ pt
+            [
+                1 / 8,
+                jnp.inf,
+                0,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+            ],  # A- pt
+            [3 / 8, 2 / 8, 1 / 8, 0, jnp.inf, jnp.inf, jnp.inf, jnp.inf],  # A+ pt
+            [
+                1 / 8,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+                0,
+                jnp.inf,
+                jnp.inf,
+                jnp.inf,
+            ],  # B- pt
+            [3 / 8, 2 / 8, jnp.inf, jnp.inf, 1 / 8, 0, jnp.inf, jnp.inf],  # B+ pt
+            [3 / 8, jnp.inf, 2 / 8, jnp.inf, 1 / 8, jnp.inf, 0, jnp.inf],  # AB- pt
+            [7 / 8, 6 / 8, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 1 / 8, 0],  # AB+ pt
+        ],
+        max_substitution_cost: float = 1340,
+        max_expiry_target: float = 1.0,
+        min_service_level_target: float = 0.0,
+        target_kpi_breach_penalty: float = 1e10,
+        max_days_in_episode: int = 365,
+        max_steps_in_episode: int = 1e10,
+        gamma: float = 1.0,
+    ):
+        return cls(
+            poisson_demand_mean,
+            jnp.array(product_probabilities),
+            jnp.array(age_on_arrival_distribution_probs),
+            fixed_order_costs,
+            jnp.array(variable_order_costs),
+            jnp.array(shortage_costs),
+            jnp.array(wastage_costs),
+            jnp.array(holding_costs),
+            jnp.array(substitution_cost_ratios) * max_substitution_cost,
+            max_expiry_target,
+            min_service_level_target,
+            target_kpi_breach_penalty,
+            max_days_in_episode,
+            max_steps_in_episode,
+            gamma,
         )
-        * 1340
-    )
-    max_expiry_target: float = 1.0
-    min_service_level_target: float = 0.0
-    target_kpi_breach_penalty: float = 1e10
-    max_days_in_episode: int = 365
-    max_steps_in_episode: int = 1e10
-    gamma: float = 1.0
 
 
 @struct.dataclass
@@ -291,7 +323,7 @@ class MenesesPerishableEnv(MarlEnvironment):
     # because we're customizing them etc
     @property
     def default_params(self) -> EnvParams:
-        return EnvParams()
+        return EnvParams.create_env_params()
 
     @property
     def empty_infos(self) -> EnvInfo:
@@ -360,8 +392,8 @@ class MenesesPerishableEnv(MarlEnvironment):
         )
 
         return (
-            self.get_obs(state, next_agent_id),
-            state,
+            lax.stop_gradient(self.get_obs(state, next_agent_id)),
+            lax.stop_gradient(state),
             state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
             state.terminations[next_agent_id],
@@ -574,11 +606,6 @@ class MenesesPerishableEnv(MarlEnvironment):
         )
         # Age the stock by one day and calculate wastage cost
         expired = stock[: self.n_products, self.max_useful_life - 1]
-        infos = infos.replace(
-            expiries=infos.expiries.at[: self.num_agents, : self.n_products].add(
-                expired
-            )
-        )
         wastage_cost = jnp.dot(expired, -params.wastage_costs)
         cumulative_rewards = cumulative_rewards + wastage_cost
 
@@ -588,9 +615,6 @@ class MenesesPerishableEnv(MarlEnvironment):
 
         # Calculate holding cost
         holding = stock.sum(axis=-1)
-        infos = infos.replace(
-            holding=infos.holding.at[: self.num_agents, : self.n_products].add(holding)
-        )
         holding_cost = jnp.dot(holding, -params.holding_costs)
         cumulative_rewards = cumulative_rewards + holding_cost
 
@@ -598,13 +622,21 @@ class MenesesPerishableEnv(MarlEnvironment):
         # TODO If lead_time ==0, we wouldn't want to do this
         # Instead, we'd do a similar procedure immediately after order placed. Would be good to account for this.
         stock_received = self._sample_ages_on_arrival(
-            key, params.age_on_arrival_distribution_probs, in_transit[:n_products, -1]
+            key,
+            params.age_on_arrival_distribution_probs,
+            in_transit[: self.n_products, -1],
         )
         stock = stock + stock_received
         in_transit = jnp.roll(in_transit, axis=1, shift=1)
         in_transit = in_transit.at[:n_products, 0].set(0)
 
-        infos = infos.replace(day_counter=infos.day_counter.at[:].add(1))
+        infos = infos.replace(
+            expiries=infos.expiries.at[: self.num_agents, : self.n_products].add(
+                expired
+            ),
+            day_counter=infos.day_counter.at[:].add(1),
+            holding=infos.holding.at[: self.num_agents, : self.n_products].add(holding),
+        )
         state = state.replace(
             stock=stock,
             in_transit=in_transit,
@@ -629,16 +661,14 @@ class MenesesPerishableEnv(MarlEnvironment):
             state.cumulative_rewards,
         )
         orders = jnp.clip(action, a_min=0, a_max=self.max_order_quantities)
-        infos = infos.replace(orders=infos.orders.at[:].add(orders))
         order_placed = jax.lax.cond(jnp.sum(orders) > 0, lambda: 1, lambda: 0)
-        infos = infos.replace(order_placed=infos.order_placed.at[:].add(order_placed))
 
         # Place the order
         variable_order_cost = jnp.dot(orders, -params.variable_order_costs)
         fixed_order_cost = order_placed * -params.fixed_order_costs
         cumulative_rewards = cumulative_rewards + variable_order_cost + fixed_order_cost
         # TODO: Handle case where lead_time == 0
-        in_transit = in_transit.at[0:n_products, 0].set(orders)
+        in_transit = in_transit.at[0 : self.n_products, 0].set(orders)
 
         # Sample the demand for the coming day
         request_intervals = distrax.Gamma(
@@ -646,6 +676,12 @@ class MenesesPerishableEnv(MarlEnvironment):
         ).sample(seed=interval_key, sample_shape=(self.max_demand,))
         request_types = distrax.Categorical(probs=params.product_probabilities).sample(
             seed=type_key, sample_shape=(self.max_demand,)
+        )
+
+        # Update infos
+        infos = infos.replace(
+            orders=infos.orders.at[:].add(orders),
+            order_placed=infos.order_placed.at[:].add(order_placed),
         )
 
         state = state.replace(
@@ -671,9 +707,6 @@ class MenesesPerishableEnv(MarlEnvironment):
         # Raw action is one-hot encoded so both agents have same shape of action
         product_idx = jnp.argmax(action, axis=-1)
 
-        # Log the demand for the type of unit
-        infos = infos.replace(demand=infos.demand.at[:, state.request_type].add(1))
-
         # Record if there was a shortage; either we have selected action 0 or no stock of the allocated type
         shortage = jax.lax.select(
             jax.lax.bitwise_or(
@@ -682,9 +715,6 @@ class MenesesPerishableEnv(MarlEnvironment):
             ),
             1,
             0,
-        )
-        infos = infos.replace(
-            shortages=infos.shortages.at[:, state.request_type].add(shortage)
         )
         shortage_cost = jnp.dot(
             -params.shortage_costs,
@@ -709,7 +739,6 @@ class MenesesPerishableEnv(MarlEnvironment):
             infos.allocations.at[:, state.request_type, :].add(issued),
             infos.allocations,
         )
-        infos = infos.replace(allocations=allocations)
         # TODO: Works here because dealing with one demand at a time
         substitution_cost = -params.substitution_costs[state.request_type, product_idx]
         cumulative_rewards = cumulative_rewards + substitution_cost
@@ -717,6 +746,12 @@ class MenesesPerishableEnv(MarlEnvironment):
         # Get the details of the next request
         request_interval, request_type = self._get_next_request(state)
 
+        # Update infos
+        infos = infos.replace(
+            demand=infos.demand.at[:, state.request_type].add(1),
+            shortages=infos.shortages.at[:, state.request_type].add(shortage),
+            allocations=allocations,
+        )
         state = state.replace(
             stock=stock_after_issue,
             infos=infos,
@@ -728,22 +763,12 @@ class MenesesPerishableEnv(MarlEnvironment):
         return state
 
     def _issue_one_unit(self, stock: chex.Array, product_idx: int) -> chex.Array:
-        return stock.at[product_idx].set(self._issue_fifo(stock[product_idx], 1))
+        return stock.at[product_idx].set(self._issue_fifo(stock[product_idx]))
 
-    def _issue_fifo(self, opening_stock: chex.Array, demand: int) -> chex.Array:
+    def _issue_fifo(self, stock: chex.Array) -> chex.Array:
         """Issue stock using FIFO policy"""
-        _, remaining_stock = jax.lax.scan(
-            self._issue_one_step, demand, opening_stock, reverse=True
-        )
-        return remaining_stock
-
-    def _issue_one_step(
-        self, remaining_demand: int, stock_element: int
-    ) -> Tuple[int, int]:
-        """Fill demand with stock of one age, representing one element in the state"""
-        remaining_stock = (stock_element - remaining_demand).clip(0)
-        remaining_demand = (remaining_demand - stock_element).clip(0)
-        return remaining_demand, remaining_stock
+        age_idx = (self.max_useful_life - 1) - (stock[::-1] > 0).argmax()
+        return jnp.clip(stock.at[age_idx].add(-1), a_min=0)
 
     """
     def _sample_next_request(

@@ -21,6 +21,7 @@ from bloodbank_marl.environments.environment import (
     EnvInfo,
     EnvObs,
 )
+from jax import lax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -254,8 +255,8 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
             step=state.step + 1,
         )
         return (
-            self.get_obs(state, next_agent_id),
-            state,
+            lax.stop_gradient(self.get_obs(state, next_agent_id)),
+            lax.stop_gradient(state),
             state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
             state.terminations[next_agent_id],
