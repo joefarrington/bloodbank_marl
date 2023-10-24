@@ -1,0 +1,4 @@
+env_name: MenesesPerishableGymnax
+env_params: {}
+env_kwargs:
+  issuing_policy: ${policies.issuing}

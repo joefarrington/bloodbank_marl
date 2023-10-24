@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment_policy_params: Ap
+  - override /policies/issuing: priority_match
+
+exp_name: Ap_warmup
+
+rollout_wrapper:
+  num_burnin_steps: 100

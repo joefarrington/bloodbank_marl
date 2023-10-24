@@ -1,0 +1,66 @@
+defaults:
+  #- policies/replenishment: s_policy
+  #- policies/replenishment_policy_params: Cp # Let's say we'll start with the current policy
+  - policies/issuing: priority_match
+  - environment: meneses_gymnax
+  - _self_
+
+wandb:
+  init:
+    project: "meneses_single_agent_neuro"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    # Search paths assume that run_optuna_simopt.py will be run from simopt/
+    - file://../conf
+
+evosax:
+  num_generations: 200
+  num_train_rollouts: 100
+  num_test_rollouts: 100
+  evaluate_every_k_gens: 10
+  seed: 10
+  
+  strategy:
+    _target_: evosax.OpenES
+    popsize: 50
+    opt_name: "adam"
+    lrate_init: 0.05
+
+  fitness_shaper:
+    _target_: evosax.FitnessShaper
+    maximize: True
+
+  logging:
+    _target_: evosax.utils.ESLog
+    num_generations: ${evosax.num_generations}
+    top_k: 5
+    maximize: ${evosax.fitness_shaper.maximize}
+
+  checkpoint_options:
+    _target_: orbax.checkpoint.CheckpointManagerOptions
+    max_to_keep: 1
+    create: True
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.single_agent_rollout_manager.RolloutWrapper
+  env_id: ${environment.env_name}
+  num_env_steps: 365
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  num_burnin_steps: 100
+  return_info: False
+
+test_evaluator:
+  _target_: bloodbank_marl.utils.single_agent_rollout_manager.RolloutWrapper
+  env_id: ${environment.env_name}
+  num_env_steps: 365
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  num_burnin_steps: 100
+  return_info: True
+
+
+

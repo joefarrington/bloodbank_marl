@@ -1,0 +1,27 @@
+defaults:
+  - policies/replenishment: s_policy
+  - policies/replenishment_policy_params: Ap
+  - policies/issuing: exact_match
+  - environment: meneses_gymnax
+  - _self_
+
+wandb:
+  init:
+    project: "meneses_single_agent_eval"
+
+hydra:
+  job:
+    chdir: True
+
+rollout_wrapper:
+  _target_: bloodbank_marl.utils.single_agent_rollout_manager.RolloutWrapper
+  env_id: ${environment.env_name}
+  num_env_steps: 365
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  num_burnin_steps: 0
+  return_info: True
+
+evaluation:
+  seed: 123
+  num_rollouts: 1000

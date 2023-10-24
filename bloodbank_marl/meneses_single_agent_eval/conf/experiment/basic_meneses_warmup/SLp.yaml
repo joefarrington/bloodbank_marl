@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment_policy_params: SLp
+  - override /policies/issuing: priority_match
+
+exp_name: SLp_warmup
+
+rollout_wrapper:
+  num_burnin_steps: 100
