@@ -1,11 +1,12 @@
 env_name: "DeMoorPerishable"
-num_env_steps: 5000
+num_env_steps: 4000
 num_rollouts: ${optuna.num_rollouts}
 env_kwargs:
   max_useful_life: 2
   lead_time: 1
   max_order_quantity: 10
-env_params: {}
+env_params:
+  max_days_in_episode: 365
 num_warmup_days: 100
-max_warmup_steps: 1500
+max_warmup_steps: 1000
 gamma: 0.99
