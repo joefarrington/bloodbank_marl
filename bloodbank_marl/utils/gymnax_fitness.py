@@ -21,6 +21,9 @@ import distrax
 import functools
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.scenarios.meneses_perishable.jax_env import MenesesPerishableEnv
+from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import (
+    MenesesPerishableGymnax,
+)
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -31,6 +34,11 @@ def make(env_name, **env_kwargs):
         return (
             MenesesPerishableEnv(**env_kwargs),
             MenesesPerishableEnv().default_params,
+        )
+    if env_name == "MenesesPerishableGymnax":
+        return (
+            MenesesPerishableGymnax(**env_kwargs),
+            MenesesPerishableGymnax().default_params,
         )
     elif env_name == "DeMoorPerishable":
         return (
@@ -70,7 +78,7 @@ class GymnaxFitness(object):
             )
 
         # Define the RL environment & replace default parameters if desired
-        self.env, self.env_params = gymnax.make(env_name, **env_kwargs)
+        self.env, self.env_params = make(env_name, **env_kwargs)
         self.env_params = self.env_params.replace(**env_params)
 
         if num_env_steps is None:

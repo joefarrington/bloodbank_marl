@@ -13,12 +13,30 @@ import distrax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
+from bloodbank_marl.scenarios.meneses_perishable.jax_env import MenesesPerishableEnv
+
+
+# For now, monkey patch the gymnax.make function
+def make(env_name, **env_kwargs):
+    if env_name == "MenesesPerishable":
+        return (
+            MenesesPerishableEnv(**env_kwargs),
+            MenesesPerishableEnv().default_params,
+        )
+    elif env_name == "DeMoorPerishable":
+        return (
+            DeMoorPerishableMAJAX(**env_kwargs),
+            DeMoorPerishableMAJAX().default_params,
+        )
+    else:
+        raise ValueError(f"Unknown environment '{env_name}'")
 
 
 class RolloutManager(object):
     def __init__(
         self,
         policy_manager,
+        env_name,
         env_kwargs={},
         env_params={},
         num_warmup_days=0,
@@ -26,23 +44,31 @@ class RolloutManager(object):
         gamma=0.99,
     ):
         self.policy_manager = policy_manager
+        self.get_action = jax.vmap(self.policy_manager.apply, in_axes=(None, 0, 0))
 
         # Setup functionalities for vectorized batch rollout
         # TODO: Some sort of make function
         # TODO: Warm up period
-        self.env = DeMoorPerishableMAJAX(**env_kwargs)
+        # self.env = DeMoorPerishableMAJAX(**env_kwargs)
+
+        # Define the RL environment & replace default parameters if desired
+        self.env, self.env_params = make(env_name, **env_kwargs)
+        self.env_params = self.env_params.replace(**env_params)
 
         self.num_warmup_days = num_warmup_days
         self.max_warmup_steps = max_warmup_steps
 
         self.gamma = gamma
 
-        default_env_params = self.env.default_params
-        self.env_params = default_env_params.replace(**env_params)
-
     @partial(jax.jit, static_argnums=0)
     def batch_reset(self, keys):
         return jax.vmap(self.env.reset, in_axes=(0, None))(keys, self.env_params)
+
+    @partial(jax.jit, static_argnums=0)
+    def batch_end_of_warmup_reset(self, keys, states):
+        return jax.vmap(self.env.end_of_warmup_reset, in_axes=(0, 0, None))(
+            keys, states, self.env_params
+        )
 
     @partial(jax.jit, static_argnums=0)
     def batch_step(self, keys, state, action):
@@ -64,12 +90,27 @@ class RolloutManager(object):
         rng_reset, rng_episode = jax.random.split(rng_input)
         obs, state = self.batch_reset(jax.random.split(rng_reset, num_envs))
 
+        @jax.vmap
+        def create_empty_infos(_):
+            """Dummy function to allow us to create empty infos for multiple envs"""
+            return self.env.empty_infos
+
+        @jax.vmap
+        def accumulate_info(agent_id, valid_mask, step_info, cum_info):
+            return jax.tree_map(
+                lambda x, y: jax.lax.select(valid_mask[agent_id] == 1, x, y),
+                cum_info.accumulate_infos_one_agent(agent_id, step_info),
+                cum_info,
+            )
+
         def warmup_step(state_input, _):
             """lax.scan compatible warm-upstep transition in jax env."""
             obs, state, rng = state_input
             rng, rng_step, rng_net = jax.random.split(rng, 3)
 
-            action = self.policy_manager(obs, policy_params)
+            action = self.get_action(
+                policy_params, obs, jax.random.split(rng_net, num_envs)
+            )
             next_o, next_s, reward, truncation, termination, info = self.batch_step(
                 jax.random.split(rng_step, num_envs),
                 state,
@@ -81,19 +122,21 @@ class RolloutManager(object):
             state, obs = self.batch_warmup_state_update(
                 state, obs, next_o, next_s, warmup_done
             )
-            carry, y = [
+            carry = [
                 obs,
                 state,
                 rng,
-            ], [next_s, state]
-            return carry, y
+            ]
+            return carry, None
 
         def policy_step(state_input, _):
             """lax.scan compatible step transition in jax env."""
             obs, state, rng, cum_reward, cum_return, cum_info, valid_mask = state_input
             rng, rng_step, rng_net = jax.random.split(rng, 3)
 
-            action = self.policy_manager(obs, policy_params)
+            action = self.get_action(
+                policy_params, obs, jax.random.split(rng_net, num_envs)
+            )
             next_o, next_s, reward, truncation, termination, info = self.batch_step(
                 jax.random.split(rng_step, num_envs),
                 state,
@@ -102,10 +145,7 @@ class RolloutManager(object):
             new_cum_reward = cum_reward.at[jnp.arange(num_envs), next_o.agent_id].add(
                 reward * valid_mask[jnp.arange(num_envs), next_o.agent_id]
             )
-            new_cum_info = cum_info.at[jnp.arange(num_envs), next_o.agent_id, :].add(
-                next_s.infos[jnp.arange(num_envs), next_o.agent_id, :]
-                * jnp.expand_dims(valid_mask[jnp.arange(num_envs), next_o.agent_id], -1)
-            )
+            new_cum_info = accumulate_info(next_o.agent_id, valid_mask, info, cum_info)
             new_cum_return = cum_return.at[jnp.arange(num_envs)].add(
                 (reward * (self.gamma ** jnp.clip((next_s.day - 1), a_min=0)))
                 * (next_o.agent_id == 0)
@@ -115,7 +155,7 @@ class RolloutManager(object):
             new_valid_mask = valid_mask.at[
                 jnp.arange(num_envs), next_o.agent_id
             ].multiply(1 - agent_done)
-            carry, y = [
+            carry = [
                 next_o,
                 next_s,
                 rng,
@@ -123,17 +163,12 @@ class RolloutManager(object):
                 new_cum_return,
                 new_cum_info,
                 new_valid_mask,
-            ], [
-                valid_mask,
-                jnp.zeros((num_envs, 2))
-                .at[jnp.arange(num_envs), next_o.agent_id]
-                .add(reward),
             ]  # [new_valid_mask]
 
-            return carry, y
+            return carry, None
 
         # Run the warmup period
-        carry_out, scan_out_wu = jax.lax.scan(
+        carry_out, _ = jax.lax.scan(
             warmup_step,
             [
                 obs,
@@ -145,34 +180,25 @@ class RolloutManager(object):
         )
 
         # Use the state and obs from end of warm-up period but reset other stuff in the state (reward, info etc).
-        # TODO Create a method in the env so that this does not need to include elements from env (e.g. in stock/in-transit)
         obs, state, rng_episode = carry_out
         rng_reset, rng_episode = jax.random.split(rng_input)
-        _, state_reset = self.batch_reset(jax.random.split(rng_reset, num_envs))
-        state = state_reset.replace(stock=state.stock, in_transit=state.in_transit)
+        state = self.batch_end_of_warmup_reset(
+            jax.random.split(rng_reset, num_envs), state
+        )
+
+        cum_reward = jnp.zeros((num_envs, self.env.num_agents))
+        cum_return = jnp.zeros(num_envs)
+        cum_info = create_empty_infos(jnp.zeros(num_envs))
+        valid_mask = jnp.ones((num_envs, self.env.num_agents), dtype=jnp_int)
 
         # Scan over episode step loop
-        carry_out, scan_out = jax.lax.scan(
+        carry_out, _ = jax.lax.scan(
             policy_step,
-            [
-                obs,
-                state,
-                rng_episode,
-                jnp.zeros(
-                    (num_envs, 2)
-                ),  # * [[0.0] * 2]), # TODO Make dynamic based on number of agents
-                jnp.zeros(num_envs),
-                jnp.zeros(
-                    (num_envs, 2, 5)
-                ),  # TODO Make dynamic based on number of agents, size of info
-                jnp.ones(
-                    (num_envs, 2), dtype=jnp_int
-                ),  # * [[1] * 2]), # TODO Make dynamic based on number of agents
-            ],
+            [obs, state, rng_episode, cum_reward, cum_return, cum_info, valid_mask],
             (),
             self.env_params.max_steps_in_episode,
         )
-        cum_info = carry_out[-2].squeeze()
+        cum_info = carry_out[-2]
         cum_return = carry_out[-3].squeeze()
         cum_reward = carry_out[-4].squeeze()
         return cum_reward, cum_return, cum_info
