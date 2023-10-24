@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "bloodbank_marl"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<3.12"
 orbax-checkpoint = "^0.3.5"
 orbax-export = "^0.0.3"
 hydra-core = "^1.3.2"
@@ -33,6 +33,8 @@ jaxlib = {version = "^0.4.14", source = "jaxlib"}
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.0.0"
 black = "^22.12.0"
+tensorboard-plugin-profile = "^2.14.0"
+tensorflow-cpu = "^2.14.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.1.3"
