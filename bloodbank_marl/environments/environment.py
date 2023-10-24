@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from gymnax.environments import spaces
 import numpy as np
 import gymnax
+from jax import lax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -183,8 +184,8 @@ class MarlEnvironment(object):
             agent_id=next_agent_id, live_agents=live_agents, step=state.step + 1
         )
         return (
-            self.get_obs(state, next_agent_id),
-            state,
+            lax.stop_gradient(self.get_obs(state, next_agent_id)),
+            lax.stop_gradient(state),
             state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
             state.terminations[next_agent_id],
