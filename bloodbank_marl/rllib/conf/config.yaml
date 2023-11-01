@@ -1,0 +1,59 @@
+wandb:
+  project: "demoor_rllib_example"
+
+
+env:
+  _target_: bloodbank_marl.scenarios.de_moor_perishable.pettingzoo_env.DeMoorPerishableMA
+
+env_name: "demoor"
+
+algorithm_base_config:
+  _target_: ray.rllib.algorithms.ppo.PPOConfig
+
+algorithm_additional_config:
+  training: {}
+  callbacks:
+    _target_: hydra.utils.get_class
+    path: bloodbank_marl.rllib.callbacks.kpi_callbacks.DeMoorKpiCallback
+  debugging: {}
+  environment: 
+    env: ${env_name}
+    disable_env_checking: True
+  evaluation:
+    evaluation_interval: 5
+    evaluation_duration: 10
+    evaluation_duration_unit: "episodes"
+    evaluation_num_workers: 5
+  experimental: {}
+  fault_tolerance: {}
+  framework: torch
+  multi_agent:
+    policies:
+      replenishment:
+        config:
+          _target_: ray.rllib.algorithms.ppo.PPOConfig.overrides
+          model:
+            custom_model: "TorchActionMaskModel"
+      issuing:
+        config:
+          _target_: ray.rllib.algorithms.ppo.PPOConfig.overrides
+          model:
+            custom_model: "TorchActionMaskModel"
+    policies_to_train: ["replenishment", "issuing"]
+  offline_data: {}
+  python_environment: {}
+  reporting: {}
+  resources:
+    num_cpus_per_worker: 1
+  rl_module: {}
+  rollouts:
+    num_rollout_workers: 5
+
+tune:
+  algorithm_name: "PPO"
+  run_config:
+    _target_ : ray.air.RunConfig
+    verbose: 1
+    stop:
+      training_iteration: 10
+

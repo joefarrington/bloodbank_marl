@@ -33,6 +33,8 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         holding_cost=1.0,
         max_days=365,
     ):
+        super().__init__()
+
         self.max_useful_life = max_useful_life
         self.lead_time = lead_time
         self.max_order_quantity = max_order_quantity
@@ -48,33 +50,75 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
 
         self.max_days = max_days
 
-        self.possible_agents = ["replenishment", "issuing"]
+        self.agents = ["replenishment", "issuing"]
+        self.possible_agents = self.agents[:]
+        self.observation_spaces = {
+            "replenishment": gymnasium.spaces.Dict(
+                {
+                    "action_mask": gymnasium.spaces.Box(
+                        low=0, high=1, shape=(self.max_order_quantity + 1,)
+                    ),
+                    "in_transit": gymnasium.spaces.Box(
+                        low=0, high=self.max_order_quantity, shape=(self.lead_time - 1,)
+                    ),
+                    "stock": gymnasium.spaces.Box(
+                        low=0,
+                        high=self.max_order_quantity,
+                        shape=(self.max_useful_life,),
+                    ),  # Check this; should obs actually not have the whole of max useful life?
+                    "observations": gymnasium.spaces.Box(
+                        low=0,
+                        high=self.max_order_quantity,
+                        shape=(self.lead_time - 1 + self.max_useful_life,),
+                    ),
+                }  # Flat
+            ),
+            "issuing": gymnasium.spaces.Dict(
+                {
+                    "action_mask": gymnasium.spaces.Box(
+                        low=0, high=1, shape=(self.max_useful_life + 1,)
+                    ),
+                    "stock": gymnasium.spaces.Box(
+                        low=0,
+                        high=self.max_order_quantity,
+                        shape=(self.max_useful_life,),
+                    ),
+                    "observations": gymnasium.spaces.Box(
+                        low=0,
+                        high=self.max_order_quantity,
+                        shape=(self.max_useful_life,),
+                    ),
+                }  # Here flat is the same as stock, but not nec always the case, e.g. with multiple products we would flattern from 2D box for this bit
+            ),
+        }
+        self.action_spaces = {
+            "replenishment": gymnasium.spaces.Discrete(self.max_order_quantity + 1),
+            "issuing": gymnasium.spaces.Discrete(self.max_useful_life + 1),
+        }
+
+        self.rewards = {i: 0 for i in self.agents}
+        self.terminations = {i: False for i in self.agents}
+        self.truncations = {i: False for i in self.agents}
+        self.infos = {
+            "replenishment": {
+                "holding": 0,
+                "wastage": 0,
+                "shortage": 0,
+                "demand": 0,
+                "order": 0,
+                "step": 0,
+            },
+            "issuing": {},
+        }
+        self.agent_selection = "replenishment"
 
         self._np_random = None
 
-    @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
-        if agent == "replenishment":
-            return gymnasium.spaces.Box(
-                low=0,
-                high=self.max_order_quantity,
-                shape=(self.lead_time - 1 + self.max_useful_life,),
-            )
-        elif agent == "issuing":
-            return gymnasium.spaces.Box(
-                low=0, high=self.max_order_quantity, shape=(self.max_useful_life,)
-            )
-        else:
-            raise ValueError("Agent must be one of {}".format(self.possible_agents))
+        return self.observation_spaces[agent]
 
-    @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        if agent == "replenishment":
-            return gymnasium.spaces.Discrete(self.max_order_quantity + 1)
-        elif agent == "issuing":
-            return gymnasium.spaces.Discrete(self.max_useful_life + 1)
-        else:
-            raise ValueError("Agent must be one of {}".format(self.possible_agents))
+        return self.action_spaces[agent]
 
     def observe(self, agent):
         """
@@ -130,7 +174,14 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         self.terminations = {agent: False for agent in self.agents}
         self.truncations = {agent: False for agent in self.agents}
         self.infos = {
-            "replenishment": {"holding": 0, "wastage": 0, "shortage": 0, "demand": 0},
+            "replenishment": {
+                "holding": 0,
+                "wastage": 0,
+                "shortage": 0,
+                "demand": 0,
+                "order": 0,
+                "step": 0,
+            },
             "issuing": {},
         }
 
@@ -144,7 +195,7 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
             "replenishment": np.hstack([self.in_transit[1:], self.stock]),
             "issuing": self.stock,
         }
-        self.observations = self.state
+        self.observations = {a: self.observe(a) for a in self.agents}
 
         """
         Our agent_selector utility allows easy cyclic stepping through the agents list.
@@ -185,6 +236,9 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
                 "wastage": 0,
                 "shortage": 0,
                 "demand": 0,
+                "order": 0,
+                "step": self.infos["replenishment"]["step"]
+                + 1,  # Next time it returns it will be next step, use for custom metrics in RLLib
             }
         self.rewards = {agent: 0 for agent in self.agents}
         self._cumulative_rewards[agent] = 0
@@ -208,9 +262,8 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
 
         # Update the state and observation for each agent
         self.state["replenishment"] = np.hstack([self.in_transit[1:], self.stock])
-        self.observations["replenishment"] = self.state["replenishment"]
         self.state["issuing"] = self.stock
-        self.observations["issuing"] = self.state["issuing"]
+        self.observations = {a: self.observe(a) for a in self.agents}
 
         # For now, use truncation rather than termination
         # TODO: Check how this should really be handled in PettingZoo
@@ -240,6 +293,7 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
             self.max_demand,
         )
         self.infos["replenishment"]["demand"] += self.remaining_demand
+        self.infos["replenishment"]["order"] += order
 
     @partial(jax.profiler.annotate_function, name="issue_step")
     def _issuing_step(self, action):
@@ -277,6 +331,32 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         self.stock[0] = self.in_transit[-1]
         self.in_transit = np.roll(self.in_transit, 1)
         self.in_transit[0] = 0
+
+    def observe(self, agent):
+        if agent == "replenishment":
+            return self._observe_replenishment()
+        elif agent == "issuing":
+            return self._observe_issuing()
+        else:
+            raise ValueError("Agent must be one of {}".format(self.possible_agents))
+
+    def _observe_replenishment(self):
+        action_mask = np.ones(self.max_order_quantity + 1)
+        observations = np.hstack([self.in_transit[1:], self.stock])
+        return {
+            "action_mask": action_mask,
+            "in_transit": self.in_transit[1:],
+            "stock": self.stock,
+            "observations": observations,
+        }
+
+    def _observe_issuing(self):
+        action_mask = np.hstack([np.array([1]), (self.stock > 0).astype(int)])
+        return {
+            "action_mask": action_mask,
+            "stock": self.stock,
+            "observations": self.stock,
+        }
 
 
 class DeMoorPerishableMAJAXSampling(DeMoorPerishableMA):
@@ -365,9 +445,9 @@ class DeMoorPerishableMAJAXSampling(DeMoorPerishableMA):
 
         # Update the state and observation for each agent
         self.state["replenishment"] = np.hstack([self.in_transit[1:], self.stock])
-        self.observations["replenishment"] = self.state["replenishment"]
         self.state["issuing"] = self.stock
-        self.observations["issuing"] = self.state["issuing"]
+
+        self.observations = {a: self.observe(a) for a in self.agents}
 
         # For now, use truncation rather than termination
         # TODO: Check how this should really be handled in PettingZoo
