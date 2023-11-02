@@ -1,7 +1,6 @@
 wandb:
   project: "demoor_rllib_example"
 
-
 env:
   _target_: bloodbank_marl.scenarios.de_moor_perishable.pettingzoo_env.DeMoorPerishableMA
 
@@ -24,26 +23,32 @@ algorithm_additional_config:
     evaluation_duration: 10
     evaluation_duration_unit: "episodes"
     evaluation_num_workers: 5
+    evaluation_parallel_to_training: True
   experimental: {}
   fault_tolerance: {}
   framework: torch
   multi_agent:
     policies:
       replenishment:
+        _target_: ray.rllib.policy.policy.PolicySpec
         config:
           _target_: ray.rllib.algorithms.ppo.PPOConfig.overrides
           model:
             custom_model: "TorchActionMaskModel"
+          gamma: 0.8
       issuing:
+        _target_: ray.rllib.policy.policy.PolicySpec
         config:
           _target_: ray.rllib.algorithms.ppo.PPOConfig.overrides
           model:
             custom_model: "TorchActionMaskModel"
+          gamma: 0.8
     policies_to_train: ["replenishment", "issuing"]
   offline_data: {}
   python_environment: {}
   reporting: {}
   resources:
+    num_gpus: 1
     num_cpus_per_worker: 1
   rl_module: {}
   rollouts:
@@ -55,5 +60,5 @@ tune:
     _target_ : ray.air.RunConfig
     verbose: 1
     stop:
-      training_iteration: 10
+      training_iteration: 200
 

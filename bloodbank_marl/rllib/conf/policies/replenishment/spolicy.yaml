@@ -1,0 +1,7 @@
+_target_: ray.rllib.policy.policy.PolicySpec
+policy_class:
+  _target_: hydra.utils.get_class
+  path: bloodbank_marl.rllib.policies.replenishment.SPolicy
+config:
+  policy_args:
+    S: 7

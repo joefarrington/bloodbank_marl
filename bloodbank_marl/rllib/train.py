@@ -42,17 +42,13 @@ def main(hydra_cfg):
         .framework(hydra_cfg.algorithm_additional_config.framework)
         .multi_agent(
             policies={
-                "replenishment": PolicySpec(
-                    config=hydra.utils.call(
-                        hydra_cfg.algorithm_additional_config.multi_agent.policies.replenishment.config
-                    ),
+                "replenishment": hydra.utils.instantiate(
+                    hydra_cfg.algorithm_additional_config.multi_agent.policies.replenishment,
                     observation_space=example_env.observation_space("replenishment"),
                     action_space=example_env.action_space("replenishment"),
                 ),
-                "issuing": PolicySpec(
-                    config=hydra.utils.call(
-                        hydra_cfg.algorithm_additional_config.multi_agent.policies.replenishment.config
-                    ),
+                "issuing": hydra.utils.instantiate(
+                    hydra_cfg.algorithm_additional_config.multi_agent.policies.issuing,
                     observation_space=example_env.observation_space("issuing"),
                     action_space=example_env.action_space("issuing"),
                 ),
