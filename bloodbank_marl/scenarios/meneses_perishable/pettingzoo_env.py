@@ -25,7 +25,7 @@ import chex
 # TODO: We could add the target KPI penalties
 
 # TODO: With obs spaces, we should try to make sure that the way we create the flat "observations" key is consistent with how it
-# would be done automtically by gymnasium. May want the inner components to be nested, e.g action_mask, raw_obs (stock, requested_type, etc), t
+# would be done automtically by gymnasium. May want the inner components to be nested, e.g action_mask, raw_obs (stock, request_type, etc), t
 # then observations which is flat.
 
 C = 1e10
@@ -67,6 +67,21 @@ substitution_cost_ratios = [
     [3 / 8, C, 2 / 8, C, 1 / 8, C, 0, C],  # AB- pt
     [7 / 8, 6 / 8, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 1 / 8, 0],  # AB+ pt
 ]
+
+action_mask_per_request_type = np.array(
+    [
+        [
+            [1, 0, 0, 0, 0, 0, 0, 0],  # O- pt
+            [1, 1, 0, 0, 0, 0, 0, 0],  # O+ pt
+            [1, 0, 1, 0, 0, 0, 0, 0],  # A- pt
+            [1, 1, 1, 1, 0, 0, 0, 0],  # A+ pt
+            [1, 0, 0, 0, 1, 0, 0, 0],  # B- pt
+            [1, 1, 0, 0, 1, 1, 0, 0],  # B+ pt
+            [1, 0, 1, 0, 1, 0, 1, 0],  # AB- pt
+            [1, 1, 1, 1, 1, 1, 1, 1],  # AB+ pt
+        ]
+    ]
+)
 
 
 class MenesesPerishableMA(pettingzoo.AECEnv):
@@ -169,7 +184,7 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
                         high=np.max(self.max_order_quantities),
                         shape=(self.n_products, self.max_useful_life),
                     ),
-                    "requested_type": gymnasium.spaces.Discrete(self.n_products),
+                    "request_type": gymnasium.spaces.Discrete(self.n_products),
                     "observations": gymnasium.spaces.Box(
                         low=0,
                         high=np.max(self.max_order_quantities),
@@ -391,7 +406,9 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
 
     def _replenishment_step(self, action):
         # Clip order to between 0 and maximum order
-        orders = np.clip(action, a_min=0, a_max=self.max_order_quantities)
+        # TODO: For now, just rounding the orders
+        # NOTE: Could do more, e.g. map to zero/one then multiply by max order, or use as order-up-to
+        orders = np.round(np.clip(action, a_min=0, a_max=self.max_order_quantities), 0)
         order_placed = 1 if orders.sum() > 0 else 0
 
         # Place the order
@@ -502,7 +519,9 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
         )
 
     def _observe_replenishment(self):
-        action_mask = np.ones(self.n_products)
+        action_mask = np.ones(
+            self.n_products
+        )  # Always 1, not used just here for consistency
         observations = np.hstack(
             [self.in_transit[:, 1:].reshape(-1), self.stock.reshape(-1)]
         )
@@ -515,7 +534,11 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
 
     def _observe_issuing(self):
         action_mask = np.hstack(
-            [np.array([1]), (self.stock.sum(axis=1) > 0).astype(int)]
+            [
+                np.array([1]),
+                (self.stock.sum(axis=1) > 0).astype(int)
+                * (action_mask_per_request_type[self.request_type]),
+            ]
         )
         request_type_one_hot = np.zeros(self.n_products)
         request_type_one_hot[self.request_type] + 1
