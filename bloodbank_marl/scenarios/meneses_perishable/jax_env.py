@@ -740,6 +740,7 @@ class MenesesPerishableEnv(MarlEnvironment):
             infos.allocations,
         )
         # TODO: Works here because dealing with one demand at a time
+        # TODO: Check if this way of calculating sub costs correctly accounts for shortage
         substitution_cost = -params.substitution_costs[state.request_type, product_idx]
         cumulative_rewards = cumulative_rewards + substitution_cost
 
