@@ -65,7 +65,7 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
                         low=0,
                         high=self.max_order_quantity,
                         shape=(self.max_useful_life,),
-                    ),  # Check this; should obs actually not have the whole of max useful life?
+                    ),
                     "observations": gymnasium.spaces.Box(
                         low=0,
                         high=self.max_order_quantity,
@@ -96,9 +96,9 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
             "issuing": gymnasium.spaces.Discrete(self.max_useful_life + 1),
         }
 
-        self.rewards = {i: 0 for i in self.agents}
-        self.terminations = {i: False for i in self.agents}
-        self.truncations = {i: False for i in self.agents}
+        self.rewards = {a: 0 for a in self.agents}
+        self.terminations = {a: False for a in self.agents}
+        self.truncations = {a: False for a in self.agents}
         self.infos = {
             "replenishment": {
                 "holding": 0,
@@ -126,8 +126,12 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         should return a sane observation (though not necessarily the most up to date possible)
         at any time after reset() is called.
         """
-        # observation of one agent is the previous state of the other
-        return np.array(self.observations[agent])
+        if agent == "replenishment":
+            return self._observe_replenishment()
+        elif agent == "issuing":
+            return self._observe_issuing()
+        else:
+            raise ValueError("Agent must be one of {}".format(self.possible_agents))
 
     def close(self):
         """
@@ -331,14 +335,6 @@ class DeMoorPerishableMA(pettingzoo.AECEnv):
         self.stock[0] = self.in_transit[-1]
         self.in_transit = np.roll(self.in_transit, 1)
         self.in_transit[0] = 0
-
-    def observe(self, agent):
-        if agent == "replenishment":
-            return self._observe_replenishment()
-        elif agent == "issuing":
-            return self._observe_issuing()
-        else:
-            raise ValueError("Agent must be one of {}".format(self.possible_agents))
 
     def _observe_replenishment(self):
         action_mask = np.ones(self.max_order_quantity + 1)

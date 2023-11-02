@@ -2,8 +2,6 @@ import gymnasium
 import numpy as np
 import pettingzoo
 import functools
-import jax
-import jax.numpy as jnp
 import distrax
 from functools import partial
 from typing import List, Optional, Dict, Union
@@ -25,6 +23,10 @@ import chex
 # TODO: Handle warmup if needed
 
 # TODO: We could add the target KPI penalties
+
+# TODO: With obs spaces, we should try to make sure that the way we create the flat "observations" key is consistent with how it
+# would be done automtically by gymnasium. May want the inner components to be nested, e.g action_mask, raw_obs (stock, requested_type, etc), t
+# then observations which is flat.
 
 C = 1e10
 substitution_cost_ratios = [
@@ -121,29 +123,89 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
 
         self.max_days_in_episode = max_days_in_episode
 
-        self.possible_agents = ["replenishment", "issuing"]
+        self.agents = ["replenishment", "issuing"]
+        self.possible_agents = self.agents[:]
+
+        self.observation_spaces = {
+            "replenishment": gymnasium.spaces.Dict(
+                {
+                    "action_mask": gymnasium.spaces.Box(
+                        low=0,
+                        high=1,
+                        shape=(
+                            self.n_products,
+                        ),  # Will not be used, just for consistency
+                    ),
+                    "in_transit": gymnasium.spaces.Box(
+                        low=0,
+                        high=np.max(self.max_order_quantities),
+                        shape=(
+                            self.n_products,
+                            self.lead_time - 1,
+                        ),
+                    ),
+                    "stock": gymnasium.spaces.Box(
+                        low=0,
+                        high=np.max(self.max_order_quantities),
+                        shape=(self.n_products, self.max_useful_life),
+                    ),
+                    "observations": gymnasium.spaces.Box(
+                        low=0,
+                        high=np.max(self.max_order_quantities),
+                        shape=(
+                            self.n_products
+                            * (self.lead_time + self.max_useful_life - 1),
+                        ),
+                    ),
+                }  # Flat
+            ),
+            "issuing": gymnasium.spaces.Dict(
+                {
+                    "action_mask": gymnasium.spaces.Box(
+                        low=0, high=1, shape=(self.n_products + 1,)
+                    ),
+                    "stock": gymnasium.spaces.Box(
+                        low=0,
+                        high=np.max(self.max_order_quantities),
+                        shape=(self.n_products, self.max_useful_life),
+                    ),
+                    "requested_type": gymnasium.spaces.Discrete(self.n_products),
+                    "observations": gymnasium.spaces.Box(
+                        low=0,
+                        high=np.max(self.max_order_quantities),
+                        shape=(
+                            self.n_products * (self.max_useful_life + 1),
+                        ),  # Reflect the fact that when flatted by gymnasium, Discrete turns to one-hot
+                    ),
+                }
+            ),
+        }
+        self.action_spaces = {
+            "replenishment": gymnasium.spaces.Box(
+                low=0, high=self.max_order_quantities, shape=(self.n_products,)
+            ),
+            "issuing": gymnasium.spaces.Discrete(
+                self.n_products + 1
+            ),  # idx 0 for nothing issued, then 1 for each product in order
+        }
+
+        self.rewards = {a: 0.0 for a in self.agents}
+        self.terminations = {a: False for a in self.agents}
+        self.truncations = {a: False for a in self.agents}
+        self.infos = {
+            "replenishment": self._get_empty_info(),
+            "issuing": self._get_empty_info(),
+        }
+
+        self.agent_selection = "replenishment"
 
         self._np_random = None
 
-    # TODO: Add obs space
-    @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
-        if agent == "replenishment":
-            raise NotImplementedError
-        elif agent == "issuing":
-            raise NotImplementedError
-        else:
-            raise ValueError("Agent must be one of {}".format(self.possible_agents))
+        return self.observation_spaces[agent]
 
-    # TODO: Add action space
-    @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        if agent == "replenishment":
-            raise NotImplementedError
-        elif agent == "issuing":
-            raise NotImplementedError
-        else:
-            raise ValueError("Agent must be one of {}".format(self.possible_agents))
+        return self.action_spaces[agent]
 
     def observe(self, agent):
         """
@@ -151,7 +213,12 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
         should return a sane observation (though not necessarily the most up to date possible)
         at any time after reset() is called.
         """
-        return self.observations[agent]
+        if agent == "replenishment":
+            return self._observe_replenishment()
+        elif agent == "issuing":
+            return self._observe_issuing()
+        else:
+            raise ValueError("Agent must be one of {}".format(self.possible_agents))
 
     def close(self):
         """
@@ -172,7 +239,6 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
     def np_random(self, value: np.random.Generator):
         self._np_random = value
 
-    # TODO Other elements that would need to be reset
     def reset(self, seed=None, options=None):
         """
         Reset needs to initialize the following attributes
@@ -192,11 +258,10 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
             self._np_random, seed = gymnasium.utils.seeding.np_random(seed)
 
         self.agents = self.possible_agents[:]
-        self.rewards = {agent: 0 for agent in self.agents}
-        self._cumulative_rewards = {agent: 0 for agent in self.agents}
+        self.rewards = {agent: 0.0 for agent in self.agents}
+        self._cumulative_rewards = {agent: 0.0 for agent in self.agents}
         self.terminations = {agent: False for agent in self.agents}
         self.truncations = {agent: False for agent in self.agents}
-        # TODO: Decide what we should be tracking in infos
         self.infos = {
             "replenishment": self._get_empty_info(),
             "issuing": self._get_empty_info(),
@@ -207,8 +272,8 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
 
         self.request_time = 0.0
         self.request_type = 0
-        self.request_intervals = jnp.zeros(self.max_demand + 1)
-        self.request_types = jnp.zeros(self.max_demand + 1)
+        self.request_intervals = np.zeros(self.max_demand + 1)
+        self.request_types = np.zeros(self.max_demand + 1)
         self.request_idx = 0
 
         self.day = 0
@@ -227,7 +292,7 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
             },
         }
         # TODO: Check if this next line is what we intend
-        self.observations = self.state
+        self.observations = {a: self.observe(a) for a in self.agents}
 
         self.agent_selection = "replenishment"
 
@@ -245,7 +310,6 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
             "day_counter": 0,
         }
 
-    # TODO: Finalise step
     def step(self, action):
         """
         step(action) takes in an action for the current agent (specified by
@@ -276,8 +340,8 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
         # TODO: Update when we decide exactly what will go in info
 
         self.infos[agent] = self._get_empty_info()
-        self.rewards = {agent: 0 for agent in self.agents}
-        self._cumulative_rewards[agent] = 0
+        self.rewards = {agent: 0.0 for agent in self.agents}
+        self._cumulative_rewards[agent] = 0.0
 
         if agent == "replenishment":
             self._replenishment_step(action)
@@ -325,7 +389,6 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
         # Adds .rewards to ._cumulative_rewards
         self._accumulate_rewards()
 
-    # TODO: Finalise replenishment step
     def _replenishment_step(self, action):
         # Clip order to between 0 and maximum order
         orders = np.clip(action, a_min=0, a_max=self.max_order_quantities)
@@ -355,36 +418,31 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
             self.infos[agent]["orders"] += orders
             self.infos[agent]["order_placed"] += order_placed
 
-    # TODO: Finalise issuing step
     def _issuing_step(self, action):
-        # Raw action is one-hot encoded so both agents have same shape of action
-        product_idx = np.argmax(action, axis=-1)
+        # Product_idx is action -1 because action 0 is no product issued
+        product_idx = action - 1
 
         # Record if there was a shortage; either we have selected action 0 or no stock of the allocated type
-        shortage = (
-            1 if (self.stock[product_idx].sum() == 0) or (action.sum() == 0) else 0
-        )
-        shortage_cost = np.dot(shortage * action, -self.shortage_costs)
+        shortage = 1 if ((self.stock[product_idx].sum() == 0) or (action == 0)) else 0
+        shortage_cost = -self.shortage_costs[self.request_type] * shortage
         for agent in self.agents:
             self.rewards[agent] += shortage_cost
 
         # Issue the select unit FIFO if there isn't a shortage, otherwise do nothing
-        stock_before_issue = self.stock.copy()
         if shortage == 0:
+            stock_before_issue = self.stock.copy()
             self._issue_one_unit(product_idx)
 
-        # If we've allocated a unit (no shortage), then record the allocation and calculate the substitution cost
-        issued = stock_before_issue - self.stock
+            # If we've allocated a unit (no shortage), then record the allocation and calculate the substitution cost
+            issued = stock_before_issue - self.stock
 
-        # TODO Something here with allocations
-        # TODO: Works here because dealing with one demand at a time
-        substitution_cost = (
-            -self.substitution_costs[self.request_type, product_idx]
-            if shortage == 0
-            else 0
-        )
-        for agent in self.agents:
-            self.rewards[agent] += substitution_cost
+            # TODO Something here with allocations
+            # TODO: Works here because dealing with one demand at a time
+            substitution_cost = -self.substitution_costs[self.request_type, product_idx]
+
+            for agent in self.agents:
+                self.rewards[agent] += substitution_cost
+                self.infos[agent]["allocations"][self.request_type] += issued
 
         # Record to info
         for agent in self.agents:
@@ -392,13 +450,10 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
             self.infos[agent]["shortages"][self.request_type] += (
                 1 if shortage == 1 else 0
             )
-            self.infos[agent]["allocations"][self.request_type] += issued
 
         # Updated the request_index
         self.request_idx += 1
 
-    # TODO Finalise age stock
-    # TODO: What do we want to record in info
     def _age_stock(self):
         # Age the stock by one day and calculate wastage cost
         expired = self.stock[:, -1]
@@ -412,7 +467,7 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
 
         # Calculate holding cost
         holding = self.stock.sum(axis=-1)
-        holding_cost = jnp.dot(holding, -self.holding_costs)
+        holding_cost = np.dot(holding, -self.holding_costs)
         for agent in self.agents:
             self.rewards[agent] += holding_cost
 
@@ -445,6 +500,32 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
         return self.np_random.multinomial(
             n=order_received.astype(int), pvals=self.age_on_arrival_distribution_probs
         )
+
+    def _observe_replenishment(self):
+        action_mask = np.ones(self.n_products)
+        observations = np.hstack(
+            [self.in_transit[:, 1:].reshape(-1), self.stock.reshape(-1)]
+        )
+        return {
+            "action_mask": action_mask,
+            "in_transit": self.in_transit[:, 1:],
+            "stock": self.stock,
+            "observations": observations,
+        }
+
+    def _observe_issuing(self):
+        action_mask = np.hstack(
+            [np.array([1]), (self.stock.sum(axis=1) > 0).astype(int)]
+        )
+        request_type_one_hot = np.zeros(self.n_products)
+        request_type_one_hot[self.request_type] + 1
+        observations = np.hstack([self.stock.reshape(-1), request_type_one_hot])
+        return {
+            "action_mask": action_mask,
+            "stock": self.stock,
+            "request_type": self.request_type,
+            "observations": observations,
+        }
 
     @classmethod
     def calculate_kpis(cls, cum_info):
@@ -511,7 +592,7 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
     @classmethod
     def _calculate_exact_match_pc(cls, cum_info: Dict) -> float:
         """Calculate the exact match percentage"""
-        exact_matches = jnp.trace(
+        exact_matches = np.trace(
             cum_info["allocations"].sum(axis=(-1)),
             axis1=-2,
             axis2=-1,
@@ -525,7 +606,7 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
     ) -> chex.Array:
         """Calculate the mean age at transfusion by patient blood group (i.e. irrespective of what they were allocated)"""
         # TODO: We might also want to do this by product type
-        ages = jnp.arange(cum_info["allocations"].shape[-1])
+        ages = np.arange(cum_info["allocations"].shape[-1])
         age_weighted_allocations = cum_info["allocations"] * ages[None, None, :]
         total_age_per_request_type = age_weighted_allocations.sum(axis=(-2, -1))
         total_allocated_per_request_type = cum_info["allocations"].sum(axis=(-2, -1))
