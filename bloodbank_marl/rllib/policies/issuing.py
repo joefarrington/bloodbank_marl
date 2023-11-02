@@ -1,27 +1,16 @@
 import numpy as np
-from ray.rllib.policy.policy import Policy
+from typing import Union
+from ray.rllib.policy.sample_batch import SampleBatch
+import gymnasium
+from gymnasium.spaces.utils import unflatten
+from bloodbank_marl.rllib.policies.common import DictObsSpacePolicy
 
 
 # TODO: For now this is designed for a single product
 # We can tweak later to handle multiple products if that is
 # easiest way to handle that
-class OufoPolicy(Policy):
+class OufoPolicy(DictObsSpacePolicy):
     """Issue oldest unit first"""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def compute_actions(
-        self,
-        obs_batch,
-        state_batches=None,
-        prev_action_batch=None,
-        prev_reward_batch=None,
-        info_batch=None,
-        episodes=None,
-        **kwargs
-    ):
-        return [self._compute_single_action(x) for x in obs_batch], [], {}
 
     def _compute_single_action(self, obs):
         # This relies on the dict obs space we're currently using
@@ -32,37 +21,11 @@ class OufoPolicy(Policy):
         else:
             return len(obs["stock"]) - (obs["stock"] > 0)[::-1].argmax()
 
-    def learn_on_batch(self, samples):
-        pass
-
-    def get_weights(self):
-        pass
-
-    def set_weights(self, weights):
-        pass
-
-    # TODO: For now this is designed for a single product
-
 
 # We can tweak later to handle multiple products if that is
 # easiest way to handle that
-class YufoPolicy(Policy):
+class YufoPolicy(DictObsSpacePolicy):
     """Issue oldest unit first"""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def compute_actions(
-        self,
-        obs_batch,
-        state_batches=None,
-        prev_action_batch=None,
-        prev_reward_batch=None,
-        info_batch=None,
-        episodes=None,
-        **kwargs
-    ):
-        return [self._compute_single_action(x) for x in obs_batch], [], {}
 
     def _compute_single_action(self, obs):
         # This relies on the dict obs space we're currently using
@@ -75,12 +38,3 @@ class YufoPolicy(Policy):
             return (
                 obs["stock"] > 0
             ).argmax() + 1  # Add one because action 0 is issue nothing
-
-    def learn_on_batch(self, samples):
-        pass
-
-    def get_weights(self):
-        pass
-
-    def set_weights(self, weights):
-        pass
