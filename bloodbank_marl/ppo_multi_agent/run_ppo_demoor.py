@@ -745,17 +745,6 @@ def main(cfg):
     wandb.log({"return_mean": eval_output[0].mean()})
     wandb.log({"return_std": eval_output[0].std()})
 
-    """
-    print(len(output["metrics"]["rep"]["loss"]))
-    print(output["metrics"]["rep"]["loss"][0].shape)
-    print(len(output["metrics"]["rep"]["loss"][1]))
-    print(print(output["metrics"]["rep"]["loss"][1][0].shape))
-    print(len(output["metrics"]["issue"]["loss"]))
-    print(output["metrics"]["issue"]["loss"][0].shape)
-    print(len(output["metrics"]["issue"]["loss"][1]))
-    print(print(output["metrics"]["issue"]["loss"][1][0].shape))
-    """
-
     if config["plot_policies"]:
         plot_policies(network_rep, network_issue, policy_params)
 
