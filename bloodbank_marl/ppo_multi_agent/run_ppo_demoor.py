@@ -25,43 +25,12 @@ from typing import Optional, Tuple, Union, Any
 from gymnax.environments import environment, spaces
 from bloodbank_marl.utils.gymnax_fitness import make
 import hydra
-
-
-config = {
-    "ENV_NAME": "DeMoorPerishable",
-    "REP": {
-        "NUM_ENVS": 40,  # Must be same for both
-        "LR": 1e-5,
-        "NUM_STEPS": 2000,
-        "TOTAL_TIMESTEPS": 8e5,
-        "UPDATE_EPOCHS": 4,
-        "NUM_MINIBATCHES": 5,
-        "GAMMA": 0.8,
-        "GAE_LAMBDA": 0.95,
-        "CLIP_EPS": 0.2,
-        "ENT_COEF": 0.05,
-        "VF_COEF": 0.5,
-        "MAX_GRAD_NORM": 0.5,
-        "ACTIVATION": "tanh",
-        "ANNEAL_LR": True,
-    },
-    "ISSUE": {
-        "NUM_ENVS": 40,
-        "LR": 1e-5,
-        "NUM_STEPS": 8000,
-        "TOTAL_TIMESTEPS": 32e5,
-        "UPDATE_EPOCHS": 4,
-        "NUM_MINIBATCHES": 5,
-        "GAMMA": 0.8,
-        "GAE_LAMBDA": 0.95,
-        "CLIP_EPS": 0.2,
-        "ENT_COEF": 0.05,
-        "VF_COEF": 0.5,
-        "MAX_GRAD_NORM": 0.5,
-        "ACTIVATION": "tanh",
-        "ANNEAL_LR": True,
-    },
-}
+import omegaconf
+import wandb
+from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 @struct.dataclass
@@ -272,12 +241,12 @@ def make_train(config):
     ## functions can be jitted.
     ## Hyperparams set here are not things that we could vmap over because they relate to arrays sizes/
     for agent in ["REP", "ISSUE"]:
-        config[agent]["NUM_UPDATES"] = (
+        config[agent]["NUM_UPDATES"] = int(
             config[agent]["TOTAL_TIMESTEPS"]
             // config[agent]["NUM_STEPS"]
             // config[agent]["NUM_ENVS"]
         )
-        config[agent]["MINIBATCH_SIZE"] = (
+        config[agent]["MINIBATCH_SIZE"] = int(
             config[agent]["NUM_ENVS"]
             * config[agent]["NUM_STEPS"]
             // config[agent]["NUM_MINIBATCHES"]
@@ -621,7 +590,10 @@ def make_train(config):
                 last_obs,
                 rng,
             )
-            metric = (metric_rep, metric_issue)
+            metric = {
+                "rep": {"loss": loss_info_rep},
+                "issue": {"loss": loss_info_issue},
+            }
 
             return runner_state, metric
 
@@ -631,7 +603,10 @@ def make_train(config):
         runner_state = (train_state_rep, train_state_issue, env_state, obsv, _rng)
         ## Run NUM_UPDATES training updates (for now just use REP, but we have assert to make sure same for both)
         runner_state, metric = jax.lax.scan(
-            _update_step, runner_state, None, config["REP"]["NUM_UPDATES"]
+            _update_step,
+            runner_state,
+            None,
+            config["REP"]["NUM_UPDATES"],
         )
         # Output from whole training process
         return {"runner_state": runner_state, "metrics": metric}
@@ -639,11 +614,99 @@ def make_train(config):
     return train
 
 
+# Just temporary, quite rough, useful to be able to see policies when
+# there is only a small obs space
+def plot_policies(network_rep, network_issue, policy_params):
+    stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
+
+    stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
+    in_transit = jnp.array([0] * 121).reshape(121, 1)
+    agent_id = jnp.array([1] * 121).reshape(121, 1)
+    all_obs = EnvObs(stock=stock, in_transit=in_transit, agent_id=agent_id)
+
+    @struct.dataclass
+    class SimpleEnvObs:
+        obs: jnp.ndarray
+
+    simple_all_obs = SimpleEnvObs(all_obs.obs[:, 1:])
+
+    rep_actions = jax.vmap(
+        jax.vmap(network_rep.get_deterministic_action, in_axes=(0, None, None)),
+        in_axes=(None, 0, None),
+    )(policy_params, simple_all_obs, jax.random.PRNGKey(1))
+    rep_df = pd.DataFrame(
+        {
+            "age_1": all_obs.stock[:, 0],
+            "age_2": all_obs.stock[:, 1],
+            "action": rep_actions.reshape(-1),
+        }
+    )
+    rep_df = rep_df.pivot(columns="age_2", index="age_1", values="action").sort_index(
+        ascending=False
+    )
+    fig, ax = plt.subplots(figsize=(5, 5))
+    rep_heatmap = sns.heatmap(
+        rep_df, annot=True, cmap="Greens_r", vmax=5, square=True, ax=ax
+    )
+    wandb.log({"rep/policy_plot": wandb.Image(rep_heatmap)})
+
+    issue_actions = jax.vmap(
+        jax.vmap(network_issue.get_deterministic_action, in_axes=(0, None, None)),
+        in_axes=(None, 0, None),
+    )(policy_params, simple_all_obs, jax.random.PRNGKey(1))
+    issue_df = pd.DataFrame(
+        {
+            "age_1": all_obs.stock[:, 0],
+            "age_2": all_obs.stock[:, 1],
+            "action": issue_actions.reshape(-1),
+        }
+    )
+    issue_df = issue_df.pivot(
+        columns="age_2", index="age_1", values="action"
+    ).sort_index(ascending=False)
+    fig, ax = plt.subplots(figsize=(5, 5))
+    issue_heatmap = sns.heatmap(
+        issue_df, annot=True, cmap="Greens_r", vmax=5, square=True, ax=ax
+    )
+    wandb.log({"issue/policy_plot": wandb.Image(issue_heatmap)})
+
+
+def log_losses(config, metrics):
+    for i in range(
+        1, config["REP"]["NUM_UPDATES"] + 1
+    ):  # TODO: Again using rep but we have forced them to be the same
+        # These are all approximate, they ignore extra steps we have to take and
+        # just count the ones we trained on. We can adjust later.
+        rep_steps = i * config["REP"]["NUM_STEPS"] * config["REP"]["NUM_ENVS"]
+        issue_steps = i * config["ISSUE"]["NUM_STEPS"] * config["ISSUE"]["NUM_ENVS"]
+        total_steps = rep_steps + issue_steps
+        # TODO: This is just one way to log the losses, can return to and edit later
+        log_dict = {}
+
+        # Log omce for each update (i-1)
+        # Take the final epoch (which is axis 1)
+        # And the mean over the minibatches for that epocj
+        for a in ["rep", "issue"]:
+            log_dict[f"{a}/total_loss"] = metrics[a]["loss"][0][i - 1, -1, :].mean()
+            log_dict[f"{a}/value_loss"] = metrics[a]["loss"][1][0][i - 1, -1, :].mean()
+            log_dict[f"{a}loss_actor"] = metrics[a]["loss"][1][1][i - 1, -1, :].mean()
+            log_dict[f"{a}/entropy"] = metrics[a]["loss"][1][2][i - 1, -1, :].mean()
+
+        log_dict["rep/steps"] = rep_steps
+        log_dict["issue/steps"] = issue_steps
+        log_dict["total_steps"] = total_steps
+
+        wandb.log(log_dict)
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg):
+    config = omegaconf.OmegaConf.to_container(cfg, resolve=True)
+    run = wandb.init(**config["wandb"]["init"], config=config)
     train = make_train(config)
     print("Starting training")
     output = train(jax.random.PRNGKey(0))
+    log_losses(config, output["metrics"])
     print("Training complete, starting evaluation")
 
     # Unlike above, this PM has rng like normal for compatability with GymnaxFitness, need to unift
@@ -678,7 +741,23 @@ def main(cfg):
     )
     policy_params = {0: rep_params, 1: issue_params}
     eval_output = fitness.rollout(jax.random.PRNGKey(5), policy_params)
-    print(eval_output[0].mean())
+    print(f"Mean return on eval episodes: {eval_output[0].mean()}")
+    wandb.log({"return_mean": eval_output[0].mean()})
+    wandb.log({"return_std": eval_output[0].std()})
+
+    """
+    print(len(output["metrics"]["rep"]["loss"]))
+    print(output["metrics"]["rep"]["loss"][0].shape)
+    print(len(output["metrics"]["rep"]["loss"][1]))
+    print(print(output["metrics"]["rep"]["loss"][1][0].shape))
+    print(len(output["metrics"]["issue"]["loss"]))
+    print(output["metrics"]["issue"]["loss"][0].shape)
+    print(len(output["metrics"]["issue"]["loss"][1]))
+    print(print(output["metrics"]["issue"]["loss"][1][0].shape))
+    """
+
+    if config["plot_policies"]:
+        plot_policies(network_rep, network_issue, policy_params)
 
 
 if __name__ == "__main__":
