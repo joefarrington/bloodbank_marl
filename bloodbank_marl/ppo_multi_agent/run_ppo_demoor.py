@@ -189,10 +189,6 @@ def update_transition_post_step(idx, t, update):
 
 class ActorCritic(nn.Module):
     action_dim: Sequence[int]
-    # When using discrete actions, pad so that logits for each dist have same dims
-    # We pad with a large negative number so that the probability of these actions
-    # is effectively zero
-    action_pad: int = 0
     activation: str = "tanh"
 
     @nn.compact
@@ -201,12 +197,6 @@ class ActorCritic(nn.Module):
             activation = nn.relu
         else:
             activation = nn.tanh
-        action_pad = jnp.hstack(
-            [
-                jnp.zeros(self.action_dim - self.action_pad),
-                jnp.full(self.action_pad, -1e9),
-            ]
-        )
         actor_mean = nn.Dense(
             64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
@@ -218,7 +208,6 @@ class ActorCritic(nn.Module):
         actor_mean = nn.Dense(
             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
-        actor_mean = actor_mean + action_pad
         pi = distrax.Categorical(logits=actor_mean)
 
         critic = nn.Dense(
@@ -413,15 +402,12 @@ def make_train(config):
             model_class=ActorCritic,
             model_kwargs={
                 "action_dim": 11,
-                "action_pad": 0,
                 "activation": config["REP"]["ACTIVATION"],
             },
             policy_id=0,
             env_kwargs={"max_useful_life": 2},
         )
         rng, _rng = jax.random.split(rng)
-        # init_x_rep = jnp.zeros(2)  # TODO Don't hardcode
-        # network_params_rep = network_rep.model.init(_rng, init_x_rep)
         network_params_rep = network_rep.get_initial_params(_rng)
         if config["REP"]["ANNEAL_LR"]:
             tx_rep = optax.chain(
@@ -446,8 +432,7 @@ def make_train(config):
         network_issue = FlaxStochasticPolicy(
             model_class=ActorCritic,
             model_kwargs={
-                "action_dim": 11,
-                "action_pad": 8,
+                "action_dim": 3,
                 "activation": config["ISSUE"]["ACTIVATION"],
             },
             policy_id=1,
@@ -455,8 +440,6 @@ def make_train(config):
         )
         rng, _rng = jax.random.split(rng)
         network_params_issue = network_issue.get_initial_params(_rng)
-        # init_x_issue = jnp.zeros(2)  # TODO: Don't hardcodde
-        # network_params_issue = network_issue.model.init(_rng, init_x_issue)
 
         if config["ISSUE"]["ANNEAL_LR"]:
             tx_issue = optax.chain(
@@ -891,7 +874,6 @@ def main(cfg):
         model_class=ActorCritic,
         model_kwargs={
             "action_dim": 11,
-            "action_pad": 0,
             "activation": config["REP"]["ACTIVATION"],
         },
         policy_id=0,
@@ -900,8 +882,7 @@ def main(cfg):
     network_issue = FlaxStochasticPolicy(
         model_class=ActorCritic,
         model_kwargs={
-            "action_dim": 11,
-            "action_pad": 8,
+            "action_dim": 3,
             "activation": config["ISSUE"]["ACTIVATION"],
         },
         policy_id=1,
