@@ -31,6 +31,89 @@ from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import plotly
+
+
+class GymnaxWrapper(object):
+    """Base class for Gymnax wrappers."""
+
+    def __init__(self, env):
+        self._env = env
+
+    # provide proxy access to regular attributes of wrapped object
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+
+@struct.dataclass
+class LogEnvState:
+    env_state: environment.EnvState
+    episode_returns: float
+    episode_lengths: int
+    returned_episode_returns: float
+    returned_episode_lengths: int
+    timestep: int
+
+
+class LogWrapper(GymnaxWrapper):
+    """Log the episode returns and lengths."""
+
+    # TODO This is customised for our setup, so we should probably give it a more specific name
+    # TODO: Check discounting of new_ep_return by using known policies.
+
+    def __init__(self, env: environment.Environment):
+        super().__init__(env)
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(
+        self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+    ) -> Tuple[chex.Array, environment.EnvState]:
+        obs, env_state = self._env.reset(key, params)
+        state = LogEnvState(env_state, 0, 0, 0, 0, 0)
+        return obs, state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(
+        self,
+        key: chex.PRNGKey,
+        state: environment.EnvState,
+        action: Union[int, float],
+        params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+        obs, env_state, reward, truncation, termination, _ = self._env.step(
+            key, state.env_state, action, params
+        )
+        done = jax.lax.eq(env_state.live_agents.sum(axis=-1), 0)
+        new_episode_return = state.episode_returns + (
+            reward
+            * (1 - env_state.agent_id)
+            * (params.gamma ** jnp.clip(env_state.day - 1, 0, None))
+        )  # So we only capture the reward of the first agent
+        new_episode_length = state.episode_lengths + 1
+        state = LogEnvState(
+            env_state=env_state,
+            episode_returns=new_episode_return * (1 - done),
+            episode_lengths=new_episode_length * (1 - done),
+            returned_episode_returns=state.returned_episode_returns * (1 - done)
+            + new_episode_return * done,
+            returned_episode_lengths=state.returned_episode_lengths * (1 - done)
+            + new_episode_length * done,
+            timestep=state.timestep + 1,
+        )
+        info = {}
+        info["returned_episode_returns"] = state.returned_episode_returns
+        info["returned_episode_lengths"] = state.returned_episode_lengths
+        info["timestep"] = state.timestep
+        info["returned_episode"] = done
+        return obs, state, reward, truncation, termination, info
+
+
+@struct.dataclass
+class LogInfo:
+    timestep: int
+    returned_episode_returns: float
+    returned_episode_lengths: int
+    returned_episode: bool
 
 
 @struct.dataclass
@@ -41,6 +124,7 @@ class Transition:
     reward: jnp.ndarray
     log_prob: jnp.ndarray
     obs: jnp.ndarray
+    info: LogInfo
 
 
 def empty_transitions(n_steps, obs_dim):
@@ -51,6 +135,12 @@ def empty_transitions(n_steps, obs_dim):
         reward=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
         log_prob=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
         obs=jnp.array([[-1] * obs_dim] * n_steps, dtype=jnp.float32),
+        info=LogInfo(
+            timestep=jnp.array([-1] * n_steps, dtype=jnp.int32),
+            returned_episode_returns=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
+            returned_episode_lengths=jnp.array([-1] * n_steps, dtype=jnp.int32),
+            returned_episode=jnp.array([False] * n_steps, dtype=jnp.bool_),
+        ),
     )
 
 
@@ -64,12 +154,35 @@ def update_transition_pre_step(idx, t, update):
     return idx, t.replace(obs=obs, action=action, value=value, log_prob=log_prob)
 
 
+def update_transition_post_step_with_info(idx, t, update):
+    _reward, _done, _info = update
+    # done
+    done = t.done.at[idx].set(_done)
+    # reward
+    reward = t.reward.at[idx].set(_reward)
+    # info
+    info = t.info.replace(
+        timestep=t.info.timestep.at[idx].set(_info["timestep"]),
+        returned_episode_returns=t.info.returned_episode_returns.at[idx].set(
+            _info["returned_episode_returns"]
+        ),
+        returned_episode_lengths=t.info.returned_episode_lengths.at[idx].set(
+            _info["returned_episode_lengths"]
+        ),
+        returned_episode=t.info.returned_episode.at[idx].set(_info["returned_episode"]),
+    )
+    idx += 1
+    return idx, t.replace(done=done, reward=reward, info=info)
+
+
 def update_transition_post_step(idx, t, update):
     _reward, _done = update
     # done
     done = t.done.at[idx].set(_done)
     # reward
     reward = t.reward.at[idx].set(_reward)
+    # info
+    # We don't log info for issuing; would just be duplication
     idx += 1
     return idx, t.replace(done=done, reward=reward)
 
@@ -261,9 +374,8 @@ def make_train(config):
     ), "Number of updates must be the same for both policies"
 
     env, env_params = make(config["ENV_NAME"])
-    # TODO: We probably want a log wrapper as a min but need to see how it interacts with our multi-agent env
+    env = LogWrapper(env)
     # env = FlattenObservationWrapper(env)
-    # env = LogWrapper(env)
 
     ## Supporting function for annealing the learning rate.
     def linear_schedule(count, config):
@@ -295,7 +407,7 @@ def make_train(config):
         else:
             tx_rep = optax.chain(
                 optax.clip_by_global_norm(config["REP"]["MAX_GRAD_NORM"]),
-                optax.adam(config["LR"], eps=1e-5),
+                optax.adam(config["REP"]["LR"], eps=1e-5),
             )
         train_state_rep = TrainState.create(
             apply_fn=network_rep.apply,
@@ -320,7 +432,7 @@ def make_train(config):
         else:
             tx_issue = optax.chain(
                 optax.clip_by_global_norm(config["ISSUE"]["MAX_GRAD_NORM"]),
-                optax.adam(config["LR"], eps=1e-5),
+                optax.adam(config["ISSUE"]["LR"], eps=1e-5),
             )
         train_state_issue = TrainState.create(
             apply_fn=network_issue.apply,
@@ -328,7 +440,6 @@ def make_train(config):
             tx=tx_issue,
         )
         ## Policy manager with both networks
-        policy_params = {0: network_params_rep, 1: network_params_issue}
         pm = PolicyManager([network_rep.apply, network_issue.apply])
 
         train_state = (train_state_rep, train_state_issue)
@@ -350,6 +461,7 @@ def make_train(config):
             # COLLECT TRAJECTORIES
             ## Single step in the environment, collecting a transition
             train_state_rep, train_state_issue, env_state, last_obs, rng = runner_state
+            policy_params = {0: train_state_rep.params, 1: train_state_issue.params}
 
             # TODO: Right now, we're resetting the env each time we want to collect a trajectory.
             # We probably shouldn't do this; we can use env_state to start back where we stopped.
@@ -399,11 +511,11 @@ def make_train(config):
                 # Update transition with reward, done, and info for the last step of the agent that will act next
                 rep_idx, rep_t = jax.lax.cond(
                     obsv.agent_id == 0,
-                    update_transition_post_step,
+                    update_transition_post_step_with_info,
                     lambda idx, t, update: (idx, t),
                     rep_idx,
                     rep_t,
-                    (reward, done),
+                    (reward, done, info),
                 )
                 issue_idx, issue_t = jax.lax.cond(
                     obsv.agent_id == 1,
@@ -448,7 +560,9 @@ def make_train(config):
                 )
 
             # This does the collection for a single env, using the while loop to collect until we have enough steps
-            def _collect_ma_trajectories(rng, last_obs, last_env_state, n_rep, n_issue):
+            def _collect_ma_trajectories(
+                rng, last_obs, last_env_state, n_rep, n_issue, policy_params
+            ):
                 rep_idx = 0
                 rep_t = empty_transitions(n_rep, 2)
                 issue_idx = 0
@@ -475,6 +589,7 @@ def make_train(config):
                     _collect_ma_trajectories,
                     n_rep=config["REP"]["NUM_STEPS"] + 2,
                     n_issue=config["ISSUE"]["NUM_STEPS"] + 2,
+                    policy_params=policy_params,
                 )
             )
             vmap_collect_trajectories = jax.vmap(get_ma_samples)
@@ -561,7 +676,7 @@ def make_train(config):
             )
             train_state_rep = update_state_rep[0]
             # TODO: Not collecting info at the moment
-            metric_rep = None  # traj_batch_rep.info
+            metric_rep = traj_batch_rep.info
             # TODO: Sort this out, will be needed when we want to continue collection instead of resetting
 
             # And for issuing
@@ -580,8 +695,7 @@ def make_train(config):
                 config["ISSUE"]["UPDATE_EPOCHS"],
             )
             train_state_issue = update_state_issue[0]
-            metric_issue = None  # traj_batch_issue.info
-            # TODO: Sort this out, will be needed when we want to continue collection instead of resetting
+            metric_issue = None  # traj_batch_issue.info For now, we're just taking info for replenishment so we don't duplicate
 
             runner_state = (
                 train_state_rep,
@@ -591,7 +705,11 @@ def make_train(config):
                 rng,
             )
             metric = {
-                "rep": {"loss": loss_info_rep},
+                "rep": {
+                    "loss": loss_info_rep,
+                    # TODO might want to grab some more metrics here
+                    "returned_episode_returns": metric_rep.returned_episode_returns,
+                },
                 "issue": {"loss": loss_info_issue},
             }
 
@@ -689,7 +807,7 @@ def log_losses(config, metrics):
         for a in ["rep", "issue"]:
             log_dict[f"{a}/total_loss"] = metrics[a]["loss"][0][i - 1, -1, :].mean()
             log_dict[f"{a}/value_loss"] = metrics[a]["loss"][1][0][i - 1, -1, :].mean()
-            log_dict[f"{a}loss_actor"] = metrics[a]["loss"][1][1][i - 1, -1, :].mean()
+            log_dict[f"{a}/loss_actor"] = metrics[a]["loss"][1][1][i - 1, -1, :].mean()
             log_dict[f"{a}/entropy"] = metrics[a]["loss"][1][2][i - 1, -1, :].mean()
 
         log_dict["rep/steps"] = rep_steps
@@ -699,14 +817,25 @@ def log_losses(config, metrics):
         wandb.log(log_dict)
 
 
+def log_episode_metrics(config, metrics):
+    mean_completed_return_over_envs = metrics["rep"]["returned_episode_returns"].mean(
+        axis=-1
+    )
+    mean_completed_return_over_envs = mean_completed_return_over_envs.reshape(-1)
+    rew_fig, ax = plt.subplots()
+    plt.plot(mean_completed_return_over_envs)
+    wandb.log({"rep/mean_completed_return": rew_fig})
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg):
     config = omegaconf.OmegaConf.to_container(cfg, resolve=True)
     run = wandb.init(**config["wandb"]["init"], config=config)
     train = make_train(config)
     print("Starting training")
-    output = train(jax.random.PRNGKey(0))
+    output = train(jax.random.PRNGKey(config["TRAIN_SEED"]))
     log_losses(config, output["metrics"])
+    log_episode_metrics(config, output["metrics"])
     print("Training complete, starting evaluation")
 
     # Unlike above, this PM has rng like normal for compatability with GymnaxFitness, need to unift
@@ -740,7 +869,9 @@ def main(cfg):
         lambda x: jnp.array([x]), output["runner_state"][1].params
     )
     policy_params = {0: rep_params, 1: issue_params}
-    eval_output = fitness.rollout(jax.random.PRNGKey(5), policy_params)
+    eval_output = fitness.rollout(
+        jax.random.PRNGKey(config["EVAL_SEED"]), policy_params
+    )
     print(f"Mean return on eval episodes: {eval_output[0].mean()}")
     wandb.log({"return_mean": eval_output[0].mean()})
     wandb.log({"return_std": eval_output[0].std()})
