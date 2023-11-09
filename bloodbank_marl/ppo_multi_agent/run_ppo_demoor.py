@@ -187,8 +187,9 @@ def update_transition_post_step(idx, t, update):
     return idx, t.replace(done=done, reward=reward)
 
 
-class ActorCritic(nn.Module):
-    action_dim: Sequence[int]
+class DiscreteActorCritic(nn.Module):
+    n_actions: int
+    n_hidden: int = 64
     activation: str = "tanh"
 
     @nn.compact
@@ -198,24 +199,24 @@ class ActorCritic(nn.Module):
         else:
             activation = nn.tanh
         actor_mean = nn.Dense(
-            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
         actor_mean = activation(actor_mean)
         actor_mean = nn.Dense(
-            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(actor_mean)
         actor_mean = activation(actor_mean)
         actor_mean = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+            self.n_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
         pi = distrax.Categorical(logits=actor_mean)
 
         critic = nn.Dense(
-            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
         critic = activation(critic)
         critic = nn.Dense(
-            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(critic)
         critic = activation(critic)
         critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
@@ -399,9 +400,9 @@ def make_train(config):
         ## Replenishment network
         # TODO: Don't hardcode action_dim
         network_rep = FlaxStochasticPolicy(
-            model_class=ActorCritic,
+            model_class=DiscreteActorCritic,
             model_kwargs={
-                "action_dim": 11,
+                "n_actions": 11,
                 "activation": config["REP"]["ACTIVATION"],
             },
             policy_id=0,
@@ -430,9 +431,9 @@ def make_train(config):
         ## Issuing network
         # TODO: Don't hardcode action dim
         network_issue = FlaxStochasticPolicy(
-            model_class=ActorCritic,
+            model_class=DiscreteActorCritic,
             model_kwargs={
-                "action_dim": 3,
+                "n_actions": 3,
                 "activation": config["ISSUE"]["ACTIVATION"],
             },
             policy_id=1,
@@ -871,18 +872,18 @@ def main(cfg):
         max_warmup_steps=1500,
     )
     network_rep = FlaxStochasticPolicy(
-        model_class=ActorCritic,
+        model_class=DiscreteActorCritic,
         model_kwargs={
-            "action_dim": 11,
+            "n_actions": 11,
             "activation": config["REP"]["ACTIVATION"],
         },
         policy_id=0,
         env_kwargs={"max_useful_life": 2},
     )
     network_issue = FlaxStochasticPolicy(
-        model_class=ActorCritic,
+        model_class=DiscreteActorCritic,
         model_kwargs={
-            "action_dim": 3,
+            "n_actions": 3,
             "activation": config["ISSUE"]["ACTIVATION"],
         },
         policy_id=1,
