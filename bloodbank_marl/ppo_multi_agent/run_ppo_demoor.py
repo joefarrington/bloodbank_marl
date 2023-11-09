@@ -236,28 +236,46 @@ class ActorCritic(nn.Module):
         return pi, jnp.squeeze(critic, axis=-1)
 
 
-class FlaxPolicy:
-    def __init__(self, policy_id, action_dim, action_pad=0, activation="tanh"):
+# Maybe Flax PPO network?
+class FlaxStochasticPolicy:
+    def __init__(
+        self,
+        model_class,
+        model_kwargs,
+        policy_id,
+        env_name=None,
+        env_kwargs={},
+        env_params={},
+    ):
         self.policy_id = policy_id
-        self.model = ActorCritic(
-            action_dim + action_pad, action_pad, activation=activation
-        )
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        self.env_params = env_params
+        self.model = model_class(**model_kwargs)
 
-    def apply(self, policy_params, obs):
-        return self.model.apply(policy_params[self.policy_id], obs.obs)
+    def apply(self, policy_params, obs, rng):
+        # Apply should get you an action
+        # TODO: We probably want to use env obs/action space when initialising the network
+        pi, _ = self.model.apply(policy_params[self.policy_id], obs.obs)
+        return pi.sample(seed=rng)
 
-    def get_deterministic_action(self, policy_params, obs, rng):
+    def apply_for_training(self, policy_params, obs, rng):
+        # Apply training should sample an action and return action, log_prob and value
+        # In training, this should help us avoid issues around different action spaces
+        # as long as both Discrete/both Box of same length etc.
+        pi, value = self.model.apply(policy_params[self.policy_id], obs.obs)
+        action = pi.sample(seed=rng)
+        log_prob = pi.log_prob(action)
+        return action, log_prob, value
+
+    def apply_deterministic(self, policy_params, obs, rng):
+        # Get the most likely action
         pi, _ = self.model.apply(policy_params[self.policy_id], obs.obs)
         return pi.probs.argmax(axis=-1)
 
-
-class PolicyManager:
-    def __init__(self, policies: list):
-        self.policies = policies
-
-    def apply(self, policy_params, obs):
-        # Tweaked this so it uses correct policy_params and just gives the flattened observation
-        return jax.lax.switch(obs.agent_id, self.policies, policy_params, obs)
+    def get_initial_params(self, rng):
+        # TODO For now, hardcoded for DeMoor with L=1; will want to make more general
+        return self.model.init(rng, jnp.zeros(self.env_kwargs["max_useful_life"]))
 
 
 # We need an update epoch function for each policy. We'll pass in the network and the config for the policy
@@ -390,12 +408,21 @@ def make_train(config):
     def train(rng):
         # INIT NETWORKS
         ## Replenishment network
-        network_rep = FlaxPolicy(
-            0, 11, 0, activation=config["REP"]["ACTIVATION"]
-        )  # TODO: Don't hardcode action size/padding
+        # TODO: Don't hardcode action_dim
+        network_rep = FlaxStochasticPolicy(
+            model_class=ActorCritic,
+            model_kwargs={
+                "action_dim": 11,
+                "action_pad": 0,
+                "activation": config["REP"]["ACTIVATION"],
+            },
+            policy_id=0,
+            env_kwargs={"max_useful_life": 2},
+        )
         rng, _rng = jax.random.split(rng)
-        init_x_rep = jnp.zeros(2)  # TODO Don't hardcode
-        network_params_rep = network_rep.model.init(_rng, init_x_rep)
+        # init_x_rep = jnp.zeros(2)  # TODO Don't hardcode
+        # network_params_rep = network_rep.model.init(_rng, init_x_rep)
+        network_params_rep = network_rep.get_initial_params(_rng)
         if config["REP"]["ANNEAL_LR"]:
             tx_rep = optax.chain(
                 optax.clip_by_global_norm(config["REP"]["MAX_GRAD_NORM"]),
@@ -415,12 +442,22 @@ def make_train(config):
             tx=tx_rep,
         )
         ## Issuing network
-        network_issue = FlaxPolicy(
-            1, 3, 8, activation=config["ISSUE"]["ACTIVATION"]
-        )  # TODO: Don't hardcode action size/padding
+        # TODO: Don't hardcode action dim
+        network_issue = FlaxStochasticPolicy(
+            model_class=ActorCritic,
+            model_kwargs={
+                "action_dim": 11,
+                "action_pad": 8,
+                "activation": config["ISSUE"]["ACTIVATION"],
+            },
+            policy_id=1,
+            env_kwargs={"max_useful_life": 2},
+        )
         rng, _rng = jax.random.split(rng)
-        init_x_issue = jnp.zeros(2)  # TODO: Don't hardcodde
-        network_params_issue = network_issue.model.init(_rng, init_x_issue)
+        network_params_issue = network_issue.get_initial_params(_rng)
+        # init_x_issue = jnp.zeros(2)  # TODO: Don't hardcodde
+        # network_params_issue = network_issue.model.init(_rng, init_x_issue)
+
         if config["ISSUE"]["ANNEAL_LR"]:
             tx_issue = optax.chain(
                 optax.clip_by_global_norm(config["ISSUE"]["MAX_GRAD_NORM"]),
@@ -440,7 +477,9 @@ def make_train(config):
             tx=tx_issue,
         )
         ## Policy manager with both networks
-        pm = PolicyManager([network_rep.apply, network_issue.apply])
+        pm = policy_manager.PolicyManager(
+            [network_rep.apply_for_training, network_issue.apply_for_training]
+        )
 
         train_state = (train_state_rep, train_state_issue)
         # INIT ENV
@@ -478,10 +517,11 @@ def make_train(config):
                     policy_params,
                     rng,
                 ) = vals
-                pi, value = pm.apply(policy_params, last_obs)
                 rng, _rng = jax.random.split(rng)
-                action = pi.sample(seed=_rng)
-                log_prob = pi.log_prob(action)
+                action, log_prob, value = pm.apply(policy_params, last_obs, _rng)
+                # rng, _rng = jax.random.split(rng)
+                # action = pi.sample(seed=_rng)
+                # log_prob = pi.log_prob(action)
 
                 # Update transition with last_obs and action for the agent that is about to act
                 rep_idx, rep_t = jax.lax.cond(
@@ -620,8 +660,10 @@ def make_train(config):
             traj_batch_issue = jax.tree_util.tree_map(
                 lambda x: x[1:-1, ...], trans_issue
             )
+
             _, last_val_issue = network_issue.model.apply(
-                policy_params[1], last_obs_issue
+                policy_params[1],
+                last_obs_issue,
             )
 
             def _calculate_gae(traj_batch, last_val, config):
@@ -749,7 +791,7 @@ def plot_policies(network_rep, network_issue, policy_params):
     simple_all_obs = SimpleEnvObs(all_obs.obs[:, 1:])
 
     rep_actions = jax.vmap(
-        jax.vmap(network_rep.get_deterministic_action, in_axes=(0, None, None)),
+        jax.vmap(network_rep.apply_deterministic, in_axes=(0, None, None)),
         in_axes=(None, 0, None),
     )(policy_params, simple_all_obs, jax.random.PRNGKey(1))
     rep_df = pd.DataFrame(
@@ -769,7 +811,7 @@ def plot_policies(network_rep, network_issue, policy_params):
     wandb.log({"rep/policy_plot": wandb.Image(rep_heatmap)})
 
     issue_actions = jax.vmap(
-        jax.vmap(network_issue.get_deterministic_action, in_axes=(0, None, None)),
+        jax.vmap(network_issue.apply_deterministic, in_axes=(0, None, None)),
         in_axes=(None, 0, None),
     )(policy_params, simple_all_obs, jax.random.PRNGKey(1))
     issue_df = pd.DataFrame(
@@ -838,15 +880,6 @@ def main(cfg):
     log_episode_metrics(config, output["metrics"])
     print("Training complete, starting evaluation")
 
-    # Unlike above, this PM has rng like normal for compatability with GymnaxFitness, need to unift
-    class PolicyManager:
-        def __init__(self, policies: list):
-            self.policies = policies
-
-        def apply(self, policy_params, obs, rng):
-            # Tweaked this so it uses correct policy_params and just gives the flattened observation
-            return jax.lax.switch(obs.agent_id, self.policies, policy_params, obs, rng)
-
     fitness = GymnaxFitness(
         config["ENV_NAME"],
         5000,
@@ -854,10 +887,28 @@ def main(cfg):
         num_warmup_days=100,
         max_warmup_steps=1500,
     )
-    network_rep = FlaxPolicy(0, 11, 0, activation=config["REP"]["ACTIVATION"])
-    network_issue = FlaxPolicy(1, 3, 8, activation=config["ISSUE"]["ACTIVATION"])
-    pm = PolicyManager(
-        [network_rep.get_deterministic_action, network_issue.get_deterministic_action]
+    network_rep = FlaxStochasticPolicy(
+        model_class=ActorCritic,
+        model_kwargs={
+            "action_dim": 11,
+            "action_pad": 0,
+            "activation": config["REP"]["ACTIVATION"],
+        },
+        policy_id=0,
+        env_kwargs={"max_useful_life": 2},
+    )
+    network_issue = FlaxStochasticPolicy(
+        model_class=ActorCritic,
+        model_kwargs={
+            "action_dim": 11,
+            "action_pad": 8,
+            "activation": config["ISSUE"]["ACTIVATION"],
+        },
+        policy_id=1,
+        env_kwargs={"max_useful_life": 2},
+    )
+    pm = policy_manager.PolicyManager(
+        [network_rep.apply_deterministic, network_issue.apply_deterministic]
     )
 
     fitness.set_apply_fn(pm.apply)
