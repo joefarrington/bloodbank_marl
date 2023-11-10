@@ -154,12 +154,32 @@ class EnvObs:
     agent_id: int  # Following Tianhou;
     in_transit: chex.Array
     stock: chex.Array
-    # mask: chex.Array # TODO: Action masking
+    action_mask: chex.Array
 
     @property
     def obs(self):
         return jnp.hstack([self.in_transit, self.stock])
 
+    @classmethod
+    def create_empty_obs(
+        cls, env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10}, n_steps=1 
+    ):
+        # For replenishment, action size is max_order_quantity + 1, for issuing it's max_useful_life + 1
+        # If we want to use action masking, which we do for issuing at least, we need the action mask
+        # to be the same dimensions in the observation for both agents in order to work with JIT.
+        # We need a consistent action size, so pick the largest and use masking to ensure only
+        # valid actions are taken
+        action_dim = jnp.maximum(env_kwargs["max_useful_life"], env_kwargs["max_order_quantity"]) + 1
+        return cls(
+            agent_id=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
+            in_transit=jnp.zeros(
+                (n_steps, env_kwargs["lead_time"] - 1), dtype=jnp.int32
+            ).squeeze(),
+            stock=jnp.zeros((n_steps, env_kwargs["max_useful_life"]), dtype=jnp.int32).squeeze(),
+            action_mask=jnp.zeros(
+                (n_steps, action_dim), dtype=jnp.int32
+            ).squeeze(),
+        )
 
 class DeMoorPerishableMAJAX(MarlEnvironment):
     """Jittable abstract base class for all gymnax-inspired Multi-Agent Environments."""
@@ -186,6 +206,10 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
     @property
     def empty_infos(self) -> EnvInfo:
         return EnvInfo.create_empty_infos(self.num_agents)
+
+    @property
+    def empty_obs(self, n_steps=1) -> EnvObs:
+        return EnvObs.create_empty_obs(env_kwargs={"max_useful_life": self.max_useful_life, "lead_time": self.lead_time, "max_order_quantity": self.max_order_quantity}, n_steps=n_steps)
 
     def live_step(
         self,
@@ -294,8 +318,22 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
         # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
         return EnvObs(
-            state.agent_id, state.in_transit[1 : self.lead_time + 1], state.stock
+            state.agent_id, state.in_transit[1 : self.lead_time + 1], state.stock, self._get_action_mask(state, agent_id)
         )
+
+    def _get_action_mask(self, state: EnvState, agent_id: int) -> chex.Array:
+        """Get action mask for agent with id `agent_id`."""
+        action_mask = jax.lax.switch(agent_id, [lambda x: self._get_replenishment_mask(x), lambda x: self._get_issuing_mask(x)], state)
+
+    def _get_replenishment_mask(self, state: EnvState) -> chex.Array:
+        """Get action mask for replenishment agent."""
+        return jnp.ones(self.max_order_quantity + 1, dtype=jnp.int32)
+    
+    def _get_issuing_mask(self, state: EnvState) -> chex.Array:
+        """Get action mask for issuing agent."""
+        base_mask = (state.stock > 0).astype(jnp.int32)
+        # Issuing nothing (action 0) always allowed, then one action per age if in stock, then pad with zeros
+        return jnp.hstack([jnp.array([1]), base_mask, jnp.zeros(self.max_order_quantity - self.max_useful_life, dtype=jnp.int32)])
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
         """Check whether state transition is terminal."""
@@ -317,11 +355,15 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
     @property
     def num_actions(self, agent_id: int) -> int:
         """Number of actions possible in environment for agent with id `agent_id`."""
-        # TODO Add in number of actions
+        # TODO: Decide if this should reflect the action space, or actual number of actions
+        # without padding. Depends on how we might want to use it.
         raise NotImplementedError
 
     def action_space(self, params: EnvParams, agent_id: int):
         """Action space of the agent with id `agent_id`"""
+        # We use the same action space for each agent
+        # Both are Discrete, we set limit as the maximum of the two
+        # And then enforce using action masking in agents and clipping in steps
         rep_space = spaces.Discrete(self.max_order_quantity + 1)
         issue_space = spaces.Discrete(self.max_useful_life + 1)
         return jax.lax.switch(agent_id, [lambda: rep_space, lambda: issue_space])
@@ -459,6 +501,10 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
             state.infos,
             state.cumulative_rewards,
         )
+        
+        # If action is above viable range, we set to 0 (nothing issued)
+        action = jax.lax.select(action > self.max_useful_life, 0, action)
+
         # Meeting one unit of demand
         remaining_demand -= 1
         infos = infos.replace(demand=infos.demand.at[:].add(1))
