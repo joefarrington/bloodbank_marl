@@ -1,6 +1,7 @@
 import bloodbank_marl
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness, make
+from bloodbank_marl.policies.replenishment import FlaxRepPolicy
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
@@ -87,7 +88,7 @@ def main(cfg):
         rng, rng_init, rng_ask, rng_train, rng_eval = jax.random.split(rng, 5)
         x, state = strategy.ask(rng_ask, state)
         reshaped_params = param_reshaper.reshape(x)
-        fitness = train_evaluator.rollout(rng_train, reshaped_params).mean(axis=-1)
+        fitness = train_evaluator.rollout(rng_train, reshaped_params)[0].mean(axis=-1)
         fit_re = fitness_shaper.apply(x, fitness)
         state = strategy.tell(x, fit_re, state)
         log = es_logging.update(log, x, fitness)
@@ -104,20 +105,20 @@ def main(cfg):
         if gen % cfg.evosax.evaluate_every_k_gens == 0:
             x_test = jnp.stack([best_params, mean_params], axis=0)
             reshaped_test_params = test_param_reshaper.reshape(x_test)
-            test_fitness = test_evaluator.rollout(rng_eval, reshaped_test_params).mean(
-                axis=-1
-            )
+            test_fitness = test_evaluator.rollout(rng_eval, reshaped_test_params)[
+                0
+            ].mean(axis=-1)
             log_to_wandb["top_1_test"] = test_fitness[0]
             log_to_wandb["mean_params_test"] = test_fitness[1]
 
+            # TODO Perhaps only update checkpoint when we're doing better on test fitness?
+            ckpt = {
+                "state": state,
+                "best_params": param_reshaper.reshape(best_params.reshape(1, -1)),
+                "mean_params": param_reshaper.reshape(mean_params.reshape(1, -1)),
+            }
+            checkpoint_manager.save(gen, ckpt)
         wandb.log(log_to_wandb)
-        # TODO Perhaps only update checkpoint when we're doing better on test fitness?
-        ckpt = {
-            "state": state,
-            "best_params": param_reshaper.reshape(best_params.reshape(1, -1)),
-            "mean_params": param_reshaper.reshape(mean_params.reshape(1, -1)),
-        }
-        checkpoint_manager.save(gen, ckpt)
 
 
 if __name__ == "__main__":
