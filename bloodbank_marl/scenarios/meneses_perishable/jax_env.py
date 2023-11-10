@@ -17,12 +17,6 @@ from jax import lax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
-# TODO: Should the actions have an explicit action for issuing nothing?
-# If so, we need an extra action in the action spact, and so we'd probably need to
-# pad the replenishment action by one to make them the same shape
-
-# TODO: Action masking
-
 n_products = 8
 
 
@@ -285,7 +279,7 @@ class EnvObs:
     request_type: int
     in_transit: chex.Array
     stock: chex.Array
-    # mask: chex.Array # TODO: Action masking
+    action_mask: chex.Array
 
     @property
     def obs(self):
@@ -296,6 +290,36 @@ class EnvObs:
                 self.in_transit.reshape(-1),
                 self.stock.reshape(-1),
             ]
+        )
+
+    @classmethod
+    def create_empty_obs(
+        cls,
+        env_kwargs={
+            "agent_names": ["replenishment", "issuing"],
+            "n_products": 8,
+            "max_useful_life": 35,
+            "lead_time": 1,
+            "max_order_quantities": [100] * 8,
+            "max_demand": 100,
+        },
+        n_steps=1,
+    ):
+        return cls(
+            agent_id=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
+            time=jnp.zeros(n_steps, dtype=jnp.float32).squeeze(),
+            request_type=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
+            in_transit=jnp.zeros(
+                (n_steps, env_kwargs["n_products"], env_kwargs["lead_time"] - 1),
+                dtype=jnp.int32,
+            ).squeeze(),
+            stock=jnp.zeros(
+                (n_steps, env_kwargs["n_products"], env_kwargs["max_useful_life"]),
+                dtype=jnp.int32,
+            ).squeeze(),
+            action_mask=jnp.zeros(
+                (n_steps, env_kwargs["n_products"]), dtype=jnp.int32
+            ).squeeze(),
         )
 
 
@@ -329,6 +353,20 @@ class MenesesPerishableEnv(MarlEnvironment):
     def empty_infos(self) -> EnvInfo:
         return EnvInfo.create_empty_infos(
             self.num_agents, self.n_products, self.max_useful_life
+        )
+
+    @property
+    def empty_obs(self, n_steps=1) -> EnvObs:
+        return EnvObs.create_empty_obs(
+            env_kwargs={
+                "agent_names": self.possible_agents,
+                "n_products": self.n_products,
+                "max_useful_life": self.max_useful_life,
+                "lead_time": self.lead_time,
+                "max_order_quantity": self.max_order_quantities,
+                "max_demand": self.max_demand,
+            },
+            n_steps=n_steps,
         )
 
     def live_step(
@@ -454,7 +492,27 @@ class MenesesPerishableEnv(MarlEnvironment):
             state.request_type,
             state.in_transit[: self.n_products, 1 : self.lead_time],
             state.stock,
+            self.get_action_mask(state, agent_id),
         )
+
+    def _get_action_mask(self, state: EnvState, agent_id: int) -> chex.Array:
+        """Get action mask for agent with id `agent_id`."""
+        return jax.lax.switch(
+            agent_id,
+            [
+                lambda x: self._get_replenishment_mask(x),
+                lambda x: self._get_issuing_mask(x),
+            ],
+            state,
+        )
+
+    def _get_replenishment_mask(self, state: EnvState) -> chex.Array:
+        """Get action mask for replenishment agent."""
+        return jnp.ones(self.n_products, dtype=jnp.int32)
+
+    def _get_issuing_mask(self, state: EnvState) -> chex.Array:
+        """Get action mask for issuing agent."""
+        return jnp.where(state.stock.sum(axis=-1) > 0, 1, 0)
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
         """Check whether state transition is terminal."""
@@ -707,7 +765,7 @@ class MenesesPerishableEnv(MarlEnvironment):
         # Raw action is one-hot encoded so both agents have same shape of action
         product_idx = jnp.argmax(action, axis=-1)
 
-        # Record if there was a shortage; either we have selected action 0 or no stock of the allocated type
+        # Record if there was a shortage; either we have issued nothing or no stock of the allocated type
         shortage = jax.lax.select(
             jax.lax.bitwise_or(
                 jnp.sum(action) == 0,
