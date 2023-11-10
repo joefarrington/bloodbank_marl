@@ -5,12 +5,17 @@ import chex
 from typing import Optional
 from bloodbank_marl.utils.gymnax_fitness import make
 
+# TODO: Should probably unify actions for DeMoor and Meneses environments
+# At the moment, the DemOOr issue action 0 is issue nothing,
+# Whereas in Meneses, all zeros means 0.
+# NOTE: Actually, I think we'll have to keep them separate.
+
 
 class FlaxIssuePolicy:
     def __init__(
         self,
-        policy_class,
-        policy_kwargs,
+        model_class,
+        model_kwargs,
         policy_id,
         env_name,
         env_kwargs={},
@@ -19,32 +24,62 @@ class FlaxIssuePolicy:
         self.policy_id = policy_id
         self.env_name = env_name
         self.env_kwargs = env_kwargs
-        self.env_params = env_params
         env, default_env_params = make(self.env_name, **self.env_kwargs)
-        self.policy_net = policy_class(
-            n_actions=env.max_useful_life + 1, **policy_kwargs
+        self.env_params = default_env_params.replace(**env_params)
+        self.model = model_class(
+            n_actions=env.action_space(self.env_params, policy_id).n, **model_kwargs
         )
 
     def get_params(self, rng):
-        env, default_env_params = make(self.env_name, **self.env_kwargs)
-        obs = jnp.zeros(env.observation_space(self.env_params, 0).shape)
-        return self.policy_net.init(rng, obs)
+        env, _ = make(self.env_name, **self.env_kwargs)
+        rng, _rng = jax.random.split(rng)
+        obs, _ = env.reset(_rng, self.env_params)
+        return self.model.init(rng, obs)
 
     def apply(self, policy_params, obs, rng):
-        return self.policy_net.apply(policy_params[self.policy_id], obs.obs, rng)
+        return self.model.apply(policy_params[self.policy_id], obs, rng)
 
 
-class IssueMLP(nn.Module):
+class IssueDiscreteMLP(nn.Module):
     n_hidden: int
     n_actions: int
 
     @nn.compact
-    def __call__(self, x, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
+    def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
+        x = obs.stock
         x = nn.Dense(self.n_hidden)(x)
         x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
-        s = jnp.argmax(x, axis=-1)
-        return s
+        x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
+        x = jnp.argmax(x, axis=-1)
+        return x
+
+
+class IssueMultiProductMLP(nn.Module):
+    # NOTE: Here we expect to be selecting between products, and then we'll automatically
+    # use an OUFO policy to choose between units of that product.
+
+    # NOTE: This is designed for the Meneses environment, and for use with NeuroEvo.
+    # Action spaces need to be the same size, so this has one action dim per product type
+    # And will be all zeros if no products are issued.
+
+    n_hidden: int
+    n_actions: int  # This will be the number of products
+
+    @nn.compact
+    def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
+        x = obs.stock
+        x = nn.Dense(self.n_hidden)(x)
+        x = nn.relu(x)
+        x = nn.Dense(self.n_actions)(x)
+        x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
+        x = jnp.argmax(x, axis=-1)
+        a = jnp.zeros_like(x)
+        a = a.at[x].set(1)
+        a = (
+            a * ob.action_mask
+        )  # Catch the case where no stock and so first element is argmax by default
+        return a
 
 
 def issue_fifo(policy_params, obs, rng, env_kwargs):

@@ -323,7 +323,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
 
     def _get_action_mask(self, state: EnvState, agent_id: int) -> chex.Array:
         """Get action mask for agent with id `agent_id`."""
-        action_mask = jax.lax.switch(agent_id, [lambda x: self._get_replenishment_mask(x), lambda x: self._get_issuing_mask(x)], state)
+        return jax.lax.switch(agent_id, [lambda x: self._get_replenishment_mask(x), lambda x: self._get_issuing_mask(x)], state)
 
     def _get_replenishment_mask(self, state: EnvState) -> chex.Array:
         """Get action mask for replenishment agent."""
@@ -331,7 +331,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
     
     def _get_issuing_mask(self, state: EnvState) -> chex.Array:
         """Get action mask for issuing agent."""
-        base_mask = (state.stock > 0).astype(jnp.int32)
+        base_mask = jnp.where(state.stock > 0, 1, 0)
         # Issuing nothing (action 0) always allowed, then one action per age if in stock, then pad with zeros
         return jnp.hstack([jnp.array([1]), base_mask, jnp.zeros(self.max_order_quantity - self.max_useful_life, dtype=jnp.int32)])
 
@@ -364,9 +364,8 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         # We use the same action space for each agent
         # Both are Discrete, we set limit as the maximum of the two
         # And then enforce using action masking in agents and clipping in steps
-        rep_space = spaces.Discrete(self.max_order_quantity + 1)
-        issue_space = spaces.Discrete(self.max_useful_life + 1)
-        return jax.lax.switch(agent_id, [lambda: rep_space, lambda: issue_space])
+        max_action = jnp.maximum(self.max_order_quantity, self.max_useful_life)
+        return spaces.Discrete(max_action + 1)
 
     def observation_space(self, params: EnvParams, agent_id: int = 1) -> spaces.Box:
         """Observation space of the agent with id `agent_id`. For now, both the same"""
