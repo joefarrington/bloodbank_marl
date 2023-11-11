@@ -166,6 +166,7 @@ class EnvObs:
         env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
         n_steps=1,
     ):
+        print(env_kwargs)
         # For replenishment, action size is max_order_quantity + 1, for issuing it's max_useful_life + 1
         # If we want to use action masking, which we do for issuing at least, we need the action mask
         # to be the same dimensions in the observation for both agents in order to work with JIT.
@@ -386,12 +387,11 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         """Environment name."""
         return "DeMoorPerishable"
 
-    @property
     def num_actions(self, agent_id: int) -> int:
         """Number of actions possible in environment for agent with id `agent_id`."""
-        # TODO: Decide if this should reflect the action space, or actual number of actions
-        # without padding. Depends on how we might want to use it.
-        raise NotImplementedError
+        # NOTE: We use this to get the output dim of the policy network
+        # Therefore, same for both agents, the maximum of the two
+        return self.action_space(self.default_params, agent_id).n
 
     def action_space(self, params: EnvParams, agent_id: int):
         """Action space of the agent with id `agent_id`"""

@@ -380,7 +380,7 @@ class MenesesPerishableEnv(MarlEnvironment):
                 "n_products": self.n_products,
                 "max_useful_life": self.max_useful_life,
                 "lead_time": self.lead_time,
-                "max_order_quantity": self.max_order_quantities,
+                "max_order_quantities": self.max_order_quantities,
                 "max_demand": self.max_demand,
             },
             n_steps=n_steps,
@@ -506,7 +506,7 @@ class MenesesPerishableEnv(MarlEnvironment):
             state.request_type,
             state.in_transit[: self.n_products, 1 : self.lead_time],
             state.stock,
-            self.get_action_mask(state, params, agent_id),
+            self._get_action_mask(state, params, agent_id),
         )
 
     def _get_action_mask(
@@ -553,19 +553,19 @@ class MenesesPerishableEnv(MarlEnvironment):
         """Environment name."""
         return "MensesesPerishable"
 
-    @property
     def num_actions(self, agent_id: int) -> int:
         """Number of actions possible in environment for agent with id `agent_id`."""
-        # TODO Add in number of actions
-        raise NotImplementedError
+        # NOTE: We use this to get the output dim of the policy network
+        # Therefore, same for both agents, the maximum of the two
+        return self.action_space(self.default_params, agent_id).shape[0]
 
     def action_space(self, params: EnvParams, agent_id: int):
         """Action space of the agent with id `agent_id`"""
-        rep_space = spaces.Box(
-            low=0, high=params.max_order_quantities + 1, shape=(self.n_products,)
+        # NOTE: Strictly speaking, issuing action space would have min=0 max=1 and same shape
+        # But for simiplicity, just keep like this
+        return spaces.Box(
+            low=0, high=self.max_order_quantities + 1, shape=(self.n_products,)
         )
-        issue_space = spaces.Box(low=0, high=1, shape=(self.n_products,))
-        return jax.lax.switch(agent_id, [lambda: rep_space, lambda: issue_space])
 
     def observation_space(self, params: EnvParams, agent_id: int = 1):
         """Observation space of the agent with id `agent_id`. For now, both the same"""
@@ -575,8 +575,8 @@ class MenesesPerishableEnv(MarlEnvironment):
                 [
                     1e10,
                     self.n_products,
-                    jnp.repeat(params.max_order_quantities, self.lead_time - 1),
-                    jnp.repeat(params.max_order_quantities, self.max_useful_life),
+                    jnp.repeat(self.max_order_quantities, self.lead_time - 1),
+                    jnp.repeat(self.max_order_quantities, self.max_useful_life),
                 ]
             ),
             shape=(
@@ -821,7 +821,9 @@ class MenesesPerishableEnv(MarlEnvironment):
         )
         # TODO: Works here because dealing with one demand at a time
         substitution_cost = jax.lax.select(
-            shortage < 1, -params.substitution_costs[state.request_type, product_idx], 0
+            shortage < 1,
+            -params.substitution_costs[state.request_type, product_idx],
+            0.0,
         )
         cumulative_rewards = cumulative_rewards + substitution_cost
 

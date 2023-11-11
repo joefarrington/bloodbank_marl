@@ -184,7 +184,7 @@ class MarlEnvironment(object):
             agent_id=next_agent_id, live_agents=live_agents, step=state.step + 1
         )
         return (
-            lax.stop_gradient(self.get_obs(state, next_agent_id)),
+            lax.stop_gradient(self.get_obs(state, params, next_agent_id)),
             lax.stop_gradient(state),
             state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
@@ -202,7 +202,7 @@ class MarlEnvironment(object):
         raise NotImplementedError
 
         return (
-            self.get_obs(state, next_agent_id),
+            self.get_obs(state, params, next_agent_id),
             state,
             state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
@@ -221,7 +221,7 @@ class MarlEnvironment(object):
 
         raise NotImplementedError
 
-    def get_obs(self, state: EnvState, agent_id: int) -> EnvObs:
+    def get_obs(self, state: EnvState, params: EnvParams, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
 
         raise NotImplementedError
