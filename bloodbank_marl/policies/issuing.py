@@ -77,7 +77,7 @@ class IssueMultiProductMLP(nn.Module):
         a = jnp.zeros_like(x)
         a = a.at[x].set(1)
         a = (
-            a * ob.action_mask
+            a * obs.action_mask
         )  # Catch the case where no stock and so first element is argmax by default
         return a
 
