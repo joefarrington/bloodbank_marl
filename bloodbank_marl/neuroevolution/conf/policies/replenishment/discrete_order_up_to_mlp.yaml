@@ -1,7 +1,7 @@
-_target_: bloodbank_marl.policies.replenishment.FlaxRepPolicy
+_target_: bloodbank_marl.policies.replenishment.FlaxOrderUpToRepPolicy
 model_class:
   _target_: hydra.utils.get_class
-  path: bloodbank_marl.policies.replenishment.RepDiscreteOrderUpToMLP
+  path: bloodbank_marl.policies.replenishment.RepDiscreteMLP
 model_kwargs:
   n_hidden: 64
 policy_id: 0
