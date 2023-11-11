@@ -32,9 +32,7 @@ class FlaxRepPolicy:
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.replace(**env_params)
-        self.model = model_class(
-            n_actions=env.action_space(self.env_params, policy_id).n, **model_kwargs
-        )
+        self.model = model_class(n_actions=env.num_actions(policy_id), **model_kwargs)
 
     def get_params(self, rng):
         env, _ = make(self.env_name, **self.env_kwargs)
@@ -43,7 +41,74 @@ class FlaxRepPolicy:
         return self.model.init(rng, obs)
 
     def apply(self, policy_params, obs, rng):
-        return self.model.apply(policy_params[self.policy_id], obs, rng)
+        raw_action = self.model.apply(policy_params[self.policy_id], obs, rng)
+        return self.postprocess_action(obs, raw_action)
+
+    def postprocess_action(self, obs, raw_action):
+        return raw_action
+
+
+class FlaxOrderUpToRepPolicy(FlaxRepPolicy):
+    def postprocess_action(self, obs, raw_action):
+        return jnp.clip(
+            raw_action - obs.stock.sum(axis=-1) - obs.in_transit.sum(axis=-1),
+            a_min=0,
+            a_max=None,
+        ).astype(jnp.int32)
+
+
+class FlaxMultiProductRepPolicy(FlaxRepPolicy):
+    def __init__(
+        self,
+        model_class,
+        model_kwargs,
+        policy_id,
+        env_name,
+        env_kwargs={},
+        env_params={},
+        clip_min=-1,
+        clip_max=1,
+        min_order_quantity=0,
+    ):
+        self.policy_id = policy_id
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        env, default_env_params = make(self.env_name, **self.env_kwargs)
+        self.env_params = default_env_params.replace(**env_params)
+        self.model = model_class(n_actions=env.num_actions(policy_id), **model_kwargs)
+        self.clip_min = clip_min
+        self.clip_max = clip_max
+        self.max_order_quantities = env.max_order_quantities
+        self.min_order_quantities = (
+            jnp.ones_like(self.max_order_quantities) * min_order_quantity
+        )
+
+    def postprocess_action(self, obs, raw_action):
+        clipped_outputs = jnp.clip(raw_action, a_min=self.clip_min, a_max=self.clip_max)
+        action = (
+            jnp.ceil(
+                (
+                    (
+                        (clipped_outputs - self.clip_min)
+                        / (self.clip_max - self.clip_min)
+                    )
+                    * (self.max_order_quantities - self.min_order_quantities)
+                )
+                + self.min_order_quantities
+            ).astype(jnp.int32)
+            * obs.action_mask
+        )
+        return action
+
+
+class FlaxMultiProductOrderUpToRepPolicy(FlaxMultiProductRepPolicy):
+    def postprocess_action(self, obs, raw_action):
+        S = super().postprocess_action(obs, raw_action)
+        return jnp.clip(
+            S - obs.stock.sum(axis=-1) - obs.in_transit.sum(axis=-1),
+            a_min=0,
+            a_max=None,
+        )
 
 
 class RepDiscreteMLP(nn.Module):
@@ -61,37 +126,9 @@ class RepDiscreteMLP(nn.Module):
         return x
 
 
-class RepDiscreteOrderUpToMLP(nn.Module):
-    # NOTE: This is fine for order-up-to for NeuroEvo because
-    # we don't have to calculate the log_prob of the action
-    # but it won't work for PPO because we need to calculate
-    # the log_prob of the action. For that, we'd need some post-processing
-    # of the action so that the S level can be stored in the transition but the
-    # order quantity is given to the environment.
-
-    n_hidden: int
-    n_actions: int
-
-    @nn.compact
-    def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
-        x = obs.obs
-        x = nn.Dense(self.n_hidden)(x)
-        x = nn.relu(x)
-        x = nn.Dense(self.n_actions)(x)
-        x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
-        S = jnp.argmax(x, axis=-1)
-        return jnp.clip(S - obs.obs.sum(axis=-1), a_min=0).astype(jnp.int32)
-
-
 class RepMultiProductMLP(nn.Module):
-    # NOTE: Don't need a distribution for NeuroEvo, so instead of sampling from Gaussian we're applying tanh
-    # therefore clip_min is -1 and clip_max is +1 (and there won't be any actual clipping)
     n_hidden: int
     n_actions: int
-    max_order_quantity: int
-    min_order_quantity: int = 0
-    clip_min = -1
-    clip_max = 1
 
     @nn.compact
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
@@ -100,45 +137,8 @@ class RepMultiProductMLP(nn.Module):
         x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
         x = nn.tanh(x)
-        x = self.map_to_discrete(x)
-        x = (
-            x * obs.action_mask
-        )  # We assume that action mask just says whether we can order this product at all or no
         return x
 
-    def map_to_discrete(self, x):
-        clipped_outputs = jnp.clip(
-            jnp.round(x), a_min=self.clip_min, a_max=self.clip_max
-        )
-        return jnp.ceil(
-            (
-                ((clipped_outputs - self.clip_min) / (self.clip_max - self.clip_min))
-                * (self.max_order_quantity - self.min_order_quantity)
-            )
-            + self.min_order_quantity
-        ).astype(jnp.int32)
-
-class RepMultiProductOrderUpToMLP(RepMultiProductMLP):
-    # NOTE: As with the discrete one, this is fine for order-up-to for NeuroEvo because
-    # we don't have to calculate the log_prob of the action
-    # but it won't work for PPO because we need to calculate
-    # the log_prob of the action. For that, we'd need some post-processing
-    # of the action so that the S level can be stored in the transition but the
-    # order quantity is given to the environment.
-
-
-    @nn.compact
-    def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
-        x = obs.obs
-        x = nn.Dense(self.n_hidden)(x)
-        x = nn.relu(x)
-        x = nn.Dense(self.n_actions)(x)
-        x = nn.tanh(x)
-        x = self.map_to_discrete(x)
-        S = (
-            x * obs.action_mask
-        )  # We assume that action mask just says whether we can order this product at all or no
-        return return jnp.clip(S - obs.obs.sum(axis=-1), a_min=0).astype(jnp.int32)
 
 # Order up to policy function for use with FixedPolicy
 def order_up_to(policy_params, obs, rng, env_kwargs):

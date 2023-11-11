@@ -26,9 +26,7 @@ class FlaxIssuePolicy:
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.replace(**env_params)
-        self.model = model_class(
-            n_actions=env.action_space(self.env_params, policy_id).n, **model_kwargs
-        )
+        self.model = model_class(n_actions=env.num_actions(policy_id), **model_kwargs)
 
     def get_params(self, rng):
         env, _ = make(self.env_name, **self.env_kwargs)
@@ -38,6 +36,9 @@ class FlaxIssuePolicy:
 
     def apply(self, policy_params, obs, rng):
         return self.model.apply(policy_params[self.policy_id], obs, rng)
+
+    def postprocess_action(self, obs, raw_action):
+        return raw_action
 
 
 class IssueDiscreteMLP(nn.Module):
@@ -68,14 +69,12 @@ class IssueMultiProductMLP(nn.Module):
 
     @nn.compact
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
-        x = obs.stock
+        x = obs.obs
         x = nn.Dense(self.n_hidden)(x)
         x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
         x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
-        x = jnp.argmax(x, axis=-1)
-        a = jnp.zeros_like(x)
-        a = a.at[x].set(1)
+        a = jnp.where(x == x.max(), 1, 0)
         a = (
             a * obs.action_mask
         )  # Catch the case where no stock and so first element is argmax by default
