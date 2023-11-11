@@ -798,8 +798,9 @@ class MenesesPerishableEnv(MarlEnvironment):
             infos.allocations,
         )
         # TODO: Works here because dealing with one demand at a time
-        # TODO: Check if this way of calculating sub costs correctly accounts for shortage
-        substitution_cost = -params.substitution_costs[state.request_type, product_idx]
+        substitution_cost = jax.lax.select(
+            shortage < 1, -params.substitution_costs[state.request_type, product_idx], 0
+        )
         cumulative_rewards = cumulative_rewards + substitution_cost
 
         # Get the details of the next request
@@ -828,23 +829,6 @@ class MenesesPerishableEnv(MarlEnvironment):
         """Issue stock using FIFO policy"""
         age_idx = (self.max_useful_life - 1) - (stock[::-1] > 0).argmax()
         return jnp.clip(stock.at[age_idx].add(-1), a_min=0)
-
-    """
-    def _sample_next_request(
-        self, key: chex.PRNGKey, state: EnvState, params: EnvParams
-    ) -> Tuple[int, int]:
-        interval_key, product_key = jax.random.split(key, 2)
-        # Interval until next request
-        # Gamma distribution with concentration of 1 is equivalent to an Exponential dist - modelling time between Poisson events
-        request_interval = distrax.Gamma(
-            concentration=1, rate=params.poisson_demand_mean
-        ).sample(seed=interval_key)
-        # Type of unit (e.g. blood group of patient who next request made for)
-        request_type = distrax.Categorical(probs=params.product_probabilities).sample(
-            seed=product_key
-        )
-        return request_interval, request_type
-    """
 
     def _get_next_request(self, state: EnvState):
         request_interval = state.request_intervals[state.request_idx]

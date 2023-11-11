@@ -68,18 +68,17 @@ substitution_cost_ratios = [
     [7 / 8, 6 / 8, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 1 / 8, 0],  # AB+ pt
 ]
 
+# NOTE: The is for PRBCs, remember platelets are different
 action_mask_per_request_type = np.array(
     [
-        [
-            [1, 0, 0, 0, 0, 0, 0, 0],  # O- pt
-            [1, 1, 0, 0, 0, 0, 0, 0],  # O+ pt
-            [1, 0, 1, 0, 0, 0, 0, 0],  # A- pt
-            [1, 1, 1, 1, 0, 0, 0, 0],  # A+ pt
-            [1, 0, 0, 0, 1, 0, 0, 0],  # B- pt
-            [1, 1, 0, 0, 1, 1, 0, 0],  # B+ pt
-            [1, 0, 1, 0, 1, 0, 1, 0],  # AB- pt
-            [1, 1, 1, 1, 1, 1, 1, 1],  # AB+ pt
-        ]
+        [1, 0, 0, 0, 0, 0, 0, 0],  # O- pt
+        [1, 1, 0, 0, 0, 0, 0, 0],  # O+ pt
+        [1, 0, 1, 0, 0, 0, 0, 0],  # A- pt
+        [1, 1, 1, 1, 0, 0, 0, 0],  # A+ pt
+        [1, 0, 0, 0, 1, 0, 0, 0],  # B- pt
+        [1, 1, 0, 0, 1, 1, 0, 0],  # B+ pt
+        [1, 0, 1, 0, 1, 0, 1, 0],  # AB- pt
+        [1, 1, 1, 1, 1, 1, 1, 1],  # AB+ pt
     ]
 )
 
@@ -536,8 +535,8 @@ class MenesesPerishableMA(pettingzoo.AECEnv):
         action_mask = np.hstack(
             [
                 np.array([1]),
-                (self.stock.sum(axis=1) > 0).astype(int)
-                * (action_mask_per_request_type[self.request_type]),
+                (self.stock.sum(axis=1) > 0).reshape(-1).astype(int)
+                * (action_mask_per_request_type[self.request_type, :]).reshape(-1),
             ]
         )
         request_type_one_hot = np.zeros(self.n_products)
