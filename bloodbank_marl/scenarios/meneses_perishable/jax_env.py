@@ -19,6 +19,20 @@ jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
 n_products = 8
 
+# NOTE: The is for PRBCs, remember platelets are different
+action_mask_per_request_type = np.array(
+    [
+        [1, 0, 0, 0, 0, 0, 0, 0],  # O- pt
+        [1, 1, 0, 0, 0, 0, 0, 0],  # O+ pt
+        [1, 0, 1, 0, 0, 0, 0, 0],  # A- pt
+        [1, 1, 1, 1, 0, 0, 0, 0],  # A+ pt
+        [1, 0, 0, 0, 1, 0, 0, 0],  # B- pt
+        [1, 1, 0, 0, 1, 1, 0, 0],  # B+ pt
+        [1, 0, 1, 0, 1, 0, 1, 0],  # AB- pt
+        [1, 1, 1, 1, 1, 1, 1, 1],  # AB+ pt
+    ]
+)
+
 
 # TODO: Recheck all defaults
 @struct.dataclass
@@ -35,6 +49,7 @@ class EnvParams:
     # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
     # then it is the wost and so should be 7/8)
     substitution_costs: chex.Array
+    action_mask_per_request_type: chex.Array
     max_expiry_target: float
     min_service_level_target: float
     target_kpi_breach_penalty: float
@@ -110,6 +125,7 @@ class EnvParams:
             [7 / 8, 6 / 8, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 1 / 8, 0],  # AB+ pt
         ],
         max_substitution_cost: float = 1340,
+        action_mask_per_request_type: chex.Array = action_mask_per_request_type,
         max_expiry_target: float = 1.0,
         min_service_level_target: float = 0.0,
         target_kpi_breach_penalty: float = 1e10,
@@ -127,6 +143,7 @@ class EnvParams:
             jnp.array(wastage_costs),
             jnp.array(holding_costs),
             jnp.array(substitution_cost_ratios) * max_substitution_cost,
+            jnp.array(action_mask_per_request_type),
             max_expiry_target,
             min_service_level_target,
             target_kpi_breach_penalty,
@@ -430,7 +447,7 @@ class MenesesPerishableEnv(MarlEnvironment):
         )
 
         return (
-            lax.stop_gradient(self.get_obs(state, next_agent_id)),
+            lax.stop_gradient(self.get_obs(state, params, next_agent_id)),
             lax.stop_gradient(state),
             state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
@@ -469,7 +486,7 @@ class MenesesPerishableEnv(MarlEnvironment):
         #    request_time=state.time + request_interval, request_type=request_type
         # )
 
-        return self.get_obs(state, state.agent_id), state
+        return self.get_obs(state, params, state.agent_id), state
 
     def end_of_warmup_reset(
         self, key: chex.PRNGKey, state: EnvState, params: EnvParams
@@ -479,40 +496,45 @@ class MenesesPerishableEnv(MarlEnvironment):
         # We want to keep the stock on hand and in transit, but reset everything else
         return state_reset.replace(stock=state.stock, in_transit=state.in_transit)
 
-    def get_obs(self, state: EnvState, agent_id: int) -> EnvObs:
+    def get_obs(self, state: EnvState, params: EnvParams, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
         # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
 
-        request_type = jax.lax.select(
-            agent_id == 0, 0, state.request_type
-        )  # If a rep action, pad this space with zero so both observations same shape
         return EnvObs(
             state.agent_id,
             state.time,
             state.request_type,
             state.in_transit[: self.n_products, 1 : self.lead_time],
             state.stock,
-            self.get_action_mask(state, agent_id),
+            self.get_action_mask(state, params, agent_id),
         )
 
-    def _get_action_mask(self, state: EnvState, agent_id: int) -> chex.Array:
+    def _get_action_mask(
+        self, state: EnvState, params: EnvParams, agent_id: int
+    ) -> chex.Array:
         """Get action mask for agent with id `agent_id`."""
         return jax.lax.switch(
             agent_id,
             [
-                lambda x: self._get_replenishment_mask(x),
-                lambda x: self._get_issuing_mask(x),
+                lambda x, y: self._get_replenishment_mask(x, y),
+                lambda x, y: self._get_issuing_mask(x, y),
             ],
             state,
+            params,
         )
 
-    def _get_replenishment_mask(self, state: EnvState) -> chex.Array:
+    def _get_replenishment_mask(self, state: EnvState, params: EnvParams) -> chex.Array:
         """Get action mask for replenishment agent."""
         return jnp.ones(self.n_products, dtype=jnp.int32)
 
-    def _get_issuing_mask(self, state: EnvState) -> chex.Array:
+    def _get_issuing_mask(self, state: EnvState, params: EnvParams) -> chex.Array:
         """Get action mask for issuing agent."""
-        return jnp.where(state.stock.sum(axis=-1) > 0, 1, 0)
+        # To be a viable issuing action, need to have stock and it needs to be a
+        # possible substitution
+        return (
+            jnp.where(state.stock.sum(axis=-1) > 0, 1, 0)
+            * params.action_mask_per_request_type[state.request_type]
+        )
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
         """Check whether state transition is terminal."""

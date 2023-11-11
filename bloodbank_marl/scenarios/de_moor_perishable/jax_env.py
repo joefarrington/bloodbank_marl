@@ -162,24 +162,30 @@ class EnvObs:
 
     @classmethod
     def create_empty_obs(
-        cls, env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10}, n_steps=1 
+        cls,
+        env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
+        n_steps=1,
     ):
         # For replenishment, action size is max_order_quantity + 1, for issuing it's max_useful_life + 1
         # If we want to use action masking, which we do for issuing at least, we need the action mask
         # to be the same dimensions in the observation for both agents in order to work with JIT.
         # We need a consistent action size, so pick the largest and use masking to ensure only
         # valid actions are taken
-        action_dim = jnp.maximum(env_kwargs["max_useful_life"], env_kwargs["max_order_quantity"]) + 1
+        action_dim = (
+            jnp.maximum(env_kwargs["max_useful_life"], env_kwargs["max_order_quantity"])
+            + 1
+        )
         return cls(
             agent_id=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
             in_transit=jnp.zeros(
                 (n_steps, env_kwargs["lead_time"] - 1), dtype=jnp.int32
             ).squeeze(),
-            stock=jnp.zeros((n_steps, env_kwargs["max_useful_life"]), dtype=jnp.int32).squeeze(),
-            action_mask=jnp.zeros(
-                (n_steps, action_dim), dtype=jnp.int32
+            stock=jnp.zeros(
+                (n_steps, env_kwargs["max_useful_life"]), dtype=jnp.int32
             ).squeeze(),
+            action_mask=jnp.zeros((n_steps, action_dim), dtype=jnp.int32).squeeze(),
         )
+
 
 class DeMoorPerishableMAJAX(MarlEnvironment):
     """Jittable abstract base class for all gymnax-inspired Multi-Agent Environments."""
@@ -209,7 +215,14 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
 
     @property
     def empty_obs(self, n_steps=1) -> EnvObs:
-        return EnvObs.create_empty_obs(env_kwargs={"max_useful_life": self.max_useful_life, "lead_time": self.lead_time, "max_order_quantity": self.max_order_quantity}, n_steps=n_steps)
+        return EnvObs.create_empty_obs(
+            env_kwargs={
+                "max_useful_life": self.max_useful_life,
+                "lead_time": self.lead_time,
+                "max_order_quantity": self.max_order_quantity,
+            },
+            n_steps=n_steps,
+        )
 
     def live_step(
         self,
@@ -279,7 +292,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
             step=state.step + 1,
         )
         return (
-            lax.stop_gradient(self.get_obs(state, next_agent_id)),
+            lax.stop_gradient(self.get_obs(state, params, next_agent_id)),
             lax.stop_gradient(state),
             state.cumulative_rewards[next_agent_id],
             state.truncations[next_agent_id],
@@ -304,7 +317,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
             day=0,
             step=0,
         )
-        return self.get_obs(state, state.agent_id), state
+        return self.get_obs(state, params, state.agent_id), state
 
     def end_of_warmup_reset(
         self, key: chex.PRNGKey, state: EnvState, params: EnvParams
@@ -314,26 +327,47 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         # We want to keep the stock on hand and in transit, but reset everything else
         return state_reset.replace(stock=state.stock, in_transit=state.in_transit)
 
-    def get_obs(self, state: EnvState, agent_id: int) -> EnvObs:
+    def get_obs(self, state: EnvState, params: EnvParams, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
         # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
         return EnvObs(
-            state.agent_id, state.in_transit[1 : self.lead_time + 1], state.stock, self._get_action_mask(state, agent_id)
+            state.agent_id,
+            state.in_transit[1 : self.lead_time + 1],
+            state.stock,
+            self._get_action_mask(state, params, agent_id),
         )
 
-    def _get_action_mask(self, state: EnvState, agent_id: int) -> chex.Array:
+    def _get_action_mask(
+        self, state: EnvState, params: EnvParams, agent_id: int
+    ) -> chex.Array:
         """Get action mask for agent with id `agent_id`."""
-        return jax.lax.switch(agent_id, [lambda x: self._get_replenishment_mask(x), lambda x: self._get_issuing_mask(x)], state)
+        return jax.lax.switch(
+            agent_id,
+            [
+                lambda x, y: self._get_replenishment_mask(x, y),
+                lambda x, y: self._get_issuing_mask(x, y),
+            ],
+            state,
+            params,
+        )
 
-    def _get_replenishment_mask(self, state: EnvState) -> chex.Array:
+    def _get_replenishment_mask(self, state: EnvState, params: EnvParams) -> chex.Array:
         """Get action mask for replenishment agent."""
         return jnp.ones(self.max_order_quantity + 1, dtype=jnp.int32)
-    
-    def _get_issuing_mask(self, state: EnvState) -> chex.Array:
+
+    def _get_issuing_mask(self, state: EnvState, params: EnvParams) -> chex.Array:
         """Get action mask for issuing agent."""
         base_mask = jnp.where(state.stock > 0, 1, 0)
         # Issuing nothing (action 0) always allowed, then one action per age if in stock, then pad with zeros
-        return jnp.hstack([jnp.array([1]), base_mask, jnp.zeros(self.max_order_quantity - self.max_useful_life, dtype=jnp.int32)])
+        return jnp.hstack(
+            [
+                jnp.array([1]),
+                base_mask,
+                jnp.zeros(
+                    self.max_order_quantity - self.max_useful_life, dtype=jnp.int32
+                ),
+            ]
+        )
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
         """Check whether state transition is terminal."""
@@ -500,7 +534,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
             state.infos,
             state.cumulative_rewards,
         )
-        
+
         # If action is above viable range, we set to 0 (nothing issued)
         action = jax.lax.select(action > self.max_useful_life, 0, action)
 
