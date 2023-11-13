@@ -13,6 +13,8 @@ from bloodbank_marl.policies import replenishment, issuing, policy_manager, comm
 from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness
 from bloodbank_marl.utils.rollout_manager import RolloutManager
 from bloodbank_marl.utils.gymnax_wrappers import LogEnvState, LogWrapper, LogInfo
+from bloodbank_marl.ppo_multi_agent.ppo_networks import DiscreteActorCritic
+from bloodbank_marl.ppo_multi_agent.ppo_policies import FlaxStochasticPolicy
 import flax.linen as nn
 import numpy as np
 import optax
@@ -95,95 +97,6 @@ def update_transition_post_step(idx, t, update):
     return idx, t.replace(done=done, reward=reward)
 
 
-class DiscreteActorCritic(nn.Module):
-    n_actions: int
-    n_hidden: int = 64
-    activation: str = "tanh"
-
-    @nn.compact
-    def __call__(self, obs):
-        if self.activation == "relu":
-            activation = nn.relu
-        else:
-            activation = nn.tanh
-        x = obs.obs  # Flat representation
-        actor_mean = nn.Dense(
-            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(x)
-        actor_mean = activation(actor_mean)
-        actor_mean = nn.Dense(
-            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(actor_mean)
-        actor_mean = activation(actor_mean)
-        actor_mean = nn.Dense(
-            self.n_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(actor_mean)
-        # Apply action masking to logits
-        actor_mean = actor_mean + jnp.where(obs.action_mask == 0, -1e8, 0.0)
-        pi = distrax.Categorical(logits=actor_mean)
-
-        critic = nn.Dense(
-            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(x)
-        critic = activation(critic)
-        critic = nn.Dense(
-            self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(critic)
-        critic = activation(critic)
-        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
-            critic
-        )
-
-        return pi, jnp.squeeze(critic, axis=-1)
-
-
-# Maybe Flax PPO network?
-class FlaxStochasticPolicy:
-    def __init__(
-        self,
-        model_class,
-        model_kwargs,
-        policy_id,
-        env_name=None,
-        env_kwargs={},
-        env_params={},
-    ):
-        self.policy_id = policy_id
-        self.env_name = env_name
-        self.env_kwargs = env_kwargs
-        self.env_params = env_params
-        self.model = model_class(**model_kwargs)
-
-    def apply(self, policy_params, obs, rng):
-        # Apply should get you an action
-        # TODO: We probably want to use env obs/action space when initialising the network
-        pi, _ = self.model.apply(policy_params[self.policy_id], obs)
-        return pi.sample(seed=rng)
-
-    def apply_for_training(self, policy_params, obs, rng):
-        # Apply training should sample an action and return action, log_prob and value
-        # In training, this should help us avoid issues around different action spaces
-        # as long as both Discrete/both Box of same length etc.
-        pi, value = self.model.apply(policy_params[self.policy_id], obs)
-        action = pi.sample(seed=rng)
-        log_prob = pi.log_prob(action)
-        return action, log_prob, value
-
-    def apply_for_loss_fn(self, policy_params, obs):
-        # Apply for loss fn should return the pi and value
-        pi, value = self.model.apply(policy_params[self.policy_id], obs)
-        return pi, value
-
-    def apply_deterministic(self, policy_params, obs, rng):
-        # Get the most likely action
-        pi, _ = self.model.apply(policy_params[self.policy_id], obs)
-        return pi.probs.argmax(axis=-1)
-
-    def get_initial_params(self, rng):
-        # TODO For now, hardcoded for DeMoor with L=1; will want to make more general
-        return self.model.init(rng, EnvObs.create_empty_obs(self.env_kwargs, 1))
-
-
 # We need an update epoch function for each policy. We'll pass in the network and the config for the policy
 def make_update_epoch(policy, config):
     def _update_epoch(update_state, unused):
@@ -195,8 +108,10 @@ def make_update_epoch(policy, config):
             def _loss_fn(params, traj_batch, gae, targets):
                 # RERUN NETWORK
                 params = {policy.policy_id: params}
-                pi, value = policy.apply_for_loss_fn(params, traj_batch.obs)
-                log_prob = pi.log_prob(traj_batch.action)
+                log_prob, value, entropy = policy.apply_for_loss_fn(
+                    params, traj_batch.obs, traj_batch.action
+                )
+                # log_prob = pi.log_prob(traj_batch.action)
 
                 # CALCULATE VALUE LOSS
                 value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
@@ -222,7 +137,7 @@ def make_update_epoch(policy, config):
                 )
                 loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                 loss_actor = loss_actor.mean()
-                entropy = pi.entropy().mean()
+                # entropy = pi.entropy().mean()
 
                 total_loss = (
                     loss_actor
@@ -347,10 +262,10 @@ def make_train(config):
         network_rep = FlaxStochasticPolicy(
             model_class=DiscreteActorCritic,
             model_kwargs={
-                "n_actions": 11,
                 "activation": config["REP"]["ACTIVATION"],
             },
             policy_id=0,
+            env_name=config["ENV_NAME"],
             env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
         )
         rng, _rng = jax.random.split(rng)
@@ -378,10 +293,10 @@ def make_train(config):
         network_issue = FlaxStochasticPolicy(
             model_class=DiscreteActorCritic,
             model_kwargs={
-                "n_actions": 11,
                 "activation": config["ISSUE"]["ACTIVATION"],
             },
             policy_id=1,
+            env_name=config["ENV_NAME"],
             env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
         )
         rng, _rng = jax.random.split(rng)
@@ -431,9 +346,6 @@ def make_train(config):
             train_state_rep, train_state_issue, env_state, last_obs, rng = runner_state
             policy_params = {0: train_state_rep.params, 1: train_state_issue.params}
 
-            # TODO: Right now, we're resetting the env each time we want to collect a trajectory.
-            # We probably shouldn't do this; we can use env_state to start back where we stopped.
-            # But this will need a bit of rewriting that is not essential for getting training to work.
             def _env_step(vals):
                 (
                     rep_idx,
@@ -447,7 +359,9 @@ def make_train(config):
                     rng,
                 ) = vals
                 rng, _rng = jax.random.split(rng)
-                action, log_prob, value = pm.apply(policy_params, last_obs, _rng)
+                action, tr_action, log_prob, value = pm.apply(
+                    policy_params, last_obs, _rng
+                )
                 # rng, _rng = jax.random.split(rng)
                 # action = pi.sample(seed=_rng)
                 # log_prob = pi.log_prob(action)
@@ -459,7 +373,7 @@ def make_train(config):
                     lambda idx, t, update: (idx, t),
                     rep_idx,
                     rep_t,
-                    (last_obs, action, value, log_prob),
+                    (last_obs, tr_action, value, log_prob),
                 )
                 issue_idx, issue_t = jax.lax.cond(
                     last_obs.agent_id == 1,
@@ -467,7 +381,7 @@ def make_train(config):
                     lambda idx, t, update: (idx, t),
                     issue_idx,
                     issue_t,
-                    (last_obs, action, value, log_prob),
+                    (last_obs, tr_action, value, log_prob),
                 )
 
                 # Take a step in the environment
@@ -831,19 +745,19 @@ def main(cfg):
     network_rep = FlaxStochasticPolicy(
         model_class=DiscreteActorCritic,
         model_kwargs={
-            "n_actions": 11,
             "activation": config["REP"]["ACTIVATION"],
         },
         policy_id=0,
+        env_name=config["ENV_NAME"],
         env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
     )
     network_issue = FlaxStochasticPolicy(
         model_class=DiscreteActorCritic,
         model_kwargs={
-            "n_actions": 11,
             "activation": config["ISSUE"]["ACTIVATION"],
         },
         policy_id=1,
+        env_name=config["ENV_NAME"],
         env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
     )
     pm = policy_manager.PolicyManager(
