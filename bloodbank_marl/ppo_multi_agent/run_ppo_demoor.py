@@ -13,7 +13,7 @@ from bloodbank_marl.policies import replenishment, issuing, policy_manager, comm
 from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness
 from bloodbank_marl.utils.rollout_manager import RolloutManager
 from bloodbank_marl.utils.gymnax_wrappers import LogEnvState, LogWrapper, LogInfo
-from bloodbank_marl.ppo_multi_agent.ppo_networks import DiscreteActorCritic
+from bloodbank_marl.ppo_multi_agent.ppo_models import DiscreteActorCritic
 from bloodbank_marl.ppo_multi_agent.ppo_policies import FlaxStochasticPolicy
 import flax.linen as nn
 import numpy as np
@@ -115,7 +115,7 @@ def make_update_epoch(policy, config):
 
                 # CALCULATE VALUE LOSS
                 value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
-                    -config["CLIP_EPS"], config["CLIP_EPS"]
+                    -config["clip_eps"], config["clip_eps"]
                 )
                 value_losses = jnp.square(value - targets)
                 value_losses_clipped = jnp.square(value_pred_clipped - targets)
@@ -130,19 +130,18 @@ def make_update_epoch(policy, config):
                 loss_actor2 = (
                     jnp.clip(
                         ratio,
-                        1.0 - config["CLIP_EPS"],
-                        1.0 + config["CLIP_EPS"],
+                        1.0 - config["clip_eps"],
+                        1.0 + config["clip_eps"],
                     )
                     * gae
                 )
                 loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                 loss_actor = loss_actor.mean()
-                # entropy = pi.entropy().mean()
 
                 total_loss = (
                     loss_actor
-                    + config["VF_COEF"] * value_loss
-                    - config["ENT_COEF"] * entropy
+                    + config["vf_coef"] * value_loss
+                    - config["ent_coef"] * entropy
                 )
                 return total_loss, (value_loss, loss_actor, entropy)
 
@@ -156,9 +155,9 @@ def make_update_epoch(policy, config):
         ## Unpack update state passed into _update_epoch
         train_state, traj_batch, advantages, targets, rng = update_state
         rng, _rng = jax.random.split(rng)
-        batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
+        batch_size = config["minibatch_size"] * config["num_minibatches"]
         assert (
-            batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
+            batch_size == config["num_steps"] * config["num_envs"]
         ), "batch size must be equal to number of steps * number of envs"
         ## Create shuffled minibatches from the collected trjectories
         permutation = jax.random.permutation(_rng, batch_size)
@@ -172,7 +171,7 @@ def make_update_epoch(policy, config):
         minibatches = jax.tree_util.tree_map(
             lambda x: jnp.reshape(
                 x,
-                [config["NUM_MINIBATCHES"], config["MINIBATCH_SIZE"]]
+                [config["num_minibatches"], config["minibatch_size"]]
                 + list(x.shape[1:]),
             ),
             shuffled_batch,
@@ -195,28 +194,29 @@ def make_train(config):
     ## experience and the size of batches for training. These all need to be calculated and fixed so that the resulting
     ## functions can be jitted.
     ## Hyperparams set here are not things that we could vmap over because they relate to arrays sizes/
-    for agent in ["REP", "ISSUE"]:
-        config[agent]["NUM_UPDATES"] = int(
-            config[agent]["TOTAL_TIMESTEPS"]
-            // config[agent]["NUM_STEPS"]
-            // config[agent]["NUM_ENVS"]
+    for agent in ["replenishment", "issuing"]:
+        config[agent]["num_updates"] = int(
+            config[agent]["total_timesteps"]
+            // config[agent]["num_steps"]
+            // config[agent]["num_envs"]
         )
-        config[agent]["MINIBATCH_SIZE"] = int(
-            config[agent]["NUM_ENVS"]
-            * config[agent]["NUM_STEPS"]
-            // config[agent]["NUM_MINIBATCHES"]
+        config[agent]["minibatch_size"] = int(
+            config[agent]["num_envs"]
+            * config[agent]["num_steps"]
+            // config[agent]["num_minibatches"]
         )
 
     # TODO There is probably a better way to enfore this but this will do for now
     assert (
-        config["REP"]["NUM_ENVS"] == config["ISSUE"]["NUM_ENVS"]
+        config["replenishment"]["num_envs"] == config["issuing"]["num_envs"]
     ), "Number of envs must be the same for both policies"
     assert (
-        config["REP"]["NUM_UPDATES"] == config["ISSUE"]["NUM_UPDATES"]
+        config["replenishment"]["num_updates"] == config["issuing"]["num_updates"]
     ), "Number of updates must be the same for both policies"
 
-    env_kwargs = {"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10}
-    env, env_params = make(config["ENV_NAME"], **env_kwargs)
+    env, env_params = make(
+        config["environment"]["env_name"], **config["environment"]["env_kwargs"]
+    )
     env = LogWrapper(env)
     # env = FlattenObservationWrapper(env)
 
@@ -249,80 +249,86 @@ def make_train(config):
     def linear_schedule(count, config):
         frac = (
             1.0
-            - (count // (config["NUM_MINIBATCHES"] * config["UPDATE_EPOCHS"]))
-            / config["NUM_UPDATES"]
+            - (count // (config["num_minibatches"] * config["update_epochs"]))
+            / config["num_updates"]
         )
-        return config["LR"] * frac
+        return config["lr"] * frac
 
     # Inner, created function that we will subsequently JIT
     def train(rng):
         # INIT NETWORKS
         ## Replenishment network
         # TODO: Don't hardcode action_dim
-        network_rep = FlaxStochasticPolicy(
-            model_class=DiscreteActorCritic,
-            model_kwargs={
-                "activation": config["REP"]["ACTIVATION"],
-            },
-            policy_id=0,
-            env_name=config["ENV_NAME"],
-            env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
-        )
+        policy_rep = hydra.utils.instantiate(config["replenishment"]["policy"])
+        # network_rep = FlaxStochasticPolicy(
+        #    model_class=DiscreteActorCritic,
+        #    model_kwargs={
+        #        "activation": "tanh",
+        #    },
+        #    policy_id=0,
+        #    env_name=config["environment"]["env_name"],
+        #    env_kwargs=config["environment"]["env_kwargs"],
+        #    env_params=config["environment"]["env_params"],
+        # )
         rng, _rng = jax.random.split(rng)
-        network_params_rep = network_rep.get_initial_params(_rng)
-        if config["REP"]["ANNEAL_LR"]:
+        network_params_rep = policy_rep.get_initial_params(_rng)
+        if config["replenishment"]["anneal_lr"]:
             tx_rep = optax.chain(
-                optax.clip_by_global_norm(config["REP"]["MAX_GRAD_NORM"]),
+                optax.clip_by_global_norm(config["replenishment"]["max_grad_norm"]),
                 optax.adam(
-                    learning_rate=partial(linear_schedule, config=config["REP"]),
+                    learning_rate=partial(
+                        linear_schedule, config=config["replenishment"]
+                    ),
                     eps=1e-5,
                 ),
             )
         else:
             tx_rep = optax.chain(
-                optax.clip_by_global_norm(config["REP"]["MAX_GRAD_NORM"]),
-                optax.adam(config["REP"]["LR"], eps=1e-5),
+                optax.clip_by_global_norm(config["replenishment"]["max_grad_norm"]),
+                optax.adam(config["replenishment"]["lr"], eps=1e-5),
             )
         train_state_rep = TrainState.create(
-            apply_fn=network_rep.apply,
+            apply_fn=policy_rep.apply,
             params=network_params_rep,
             tx=tx_rep,
         )
         ## Issuing network
         # TODO: Don't hardcode action dim
-        network_issue = FlaxStochasticPolicy(
-            model_class=DiscreteActorCritic,
-            model_kwargs={
-                "activation": config["ISSUE"]["ACTIVATION"],
-            },
-            policy_id=1,
-            env_name=config["ENV_NAME"],
-            env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
-        )
+        policy_issue = hydra.utils.instantiate(config["issuing"]["policy"])
+        # policy_issue = FlaxStochasticPolicy(
+        #    model_class=DiscreteActorCritic,
+        #    model_kwargs={
+        #        "activation": "tanh",
+        #    },
+        #    policy_id=1,
+        #    env_name=config["environment"]["env_name"],
+        #    env_kwargs=config["environment"]["env_kwargs"],
+        #    env_params=config["environment"]["env_params"],
+        # )
         rng, _rng = jax.random.split(rng)
-        network_params_issue = network_issue.get_initial_params(_rng)
+        network_params_issue = policy_issue.get_initial_params(_rng)
 
-        if config["ISSUE"]["ANNEAL_LR"]:
+        if config["issuing"]["anneal_lr"]:
             tx_issue = optax.chain(
-                optax.clip_by_global_norm(config["ISSUE"]["MAX_GRAD_NORM"]),
+                optax.clip_by_global_norm(config["issuing"]["max_grad_norm"]),
                 optax.adam(
-                    learning_rate=partial(linear_schedule, config=config["ISSUE"]),
+                    learning_rate=partial(linear_schedule, config=config["issuing"]),
                     eps=1e-5,
                 ),
             )
         else:
             tx_issue = optax.chain(
-                optax.clip_by_global_norm(config["ISSUE"]["MAX_GRAD_NORM"]),
-                optax.adam(config["ISSUE"]["LR"], eps=1e-5),
+                optax.clip_by_global_norm(config["issuing"]["max_grad_norm"]),
+                optax.adam(config["issuing"]["lr"], eps=1e-5),
             )
         train_state_issue = TrainState.create(
-            apply_fn=network_issue.apply,
+            apply_fn=policy_issue.apply,
             params=network_params_issue,
             tx=tx_issue,
         )
         ## Policy manager with both networks
         pm = policy_manager.PolicyManager(
-            [network_rep.apply_for_training, network_issue.apply_for_training]
+            [policy_rep.apply_for_training, policy_issue.apply_for_training]
         )
 
         train_state = (train_state_rep, train_state_issue)
@@ -331,15 +337,15 @@ def make_train(config):
         ## but using the same env_params
         # NOTE: At the moment this isn't really getting used
         rng, _rng = jax.random.split(rng)
-        reset_rng = jax.random.split(_rng, config["REP"]["NUM_ENVS"])
+        reset_rng = jax.random.split(_rng, config["replenishment"]["num_envs"])
         obsv, env_state = jax.vmap(env.reset, in_axes=(0, None))(reset_rng, env_params)
 
         # Build update epoch functions
-        _update_epoch_rep = make_update_epoch(network_rep, config["REP"])
-        _update_epoch_issue = make_update_epoch(network_issue, config["ISSUE"])
+        _update_epoch_rep = make_update_epoch(policy_rep, config["replenishment"])
+        _update_epoch_issue = make_update_epoch(policy_issue, config["issuing"])
 
         # TRAIN LOOP
-        ## This outer function is what will be run NUM_UPDATES times
+        ## This outer function is what will be run num_updates times
         def _update_step(runner_state, unused):
             # COLLECT TRAJECTORIES
             ## Single step in the environment, collecting a transition
@@ -471,15 +477,15 @@ def make_train(config):
             get_ma_samples = jax.jit(
                 partial(
                     _collect_ma_trajectories,
-                    n_rep=config["REP"]["NUM_STEPS"] + 2,
-                    n_issue=config["ISSUE"]["NUM_STEPS"] + 2,
+                    n_rep=config["replenishment"]["num_steps"] + 2,
+                    n_issue=config["issuing"]["num_steps"] + 2,
                     policy_params=policy_params,
                 )
             )
             vmap_collect_trajectories = jax.vmap(get_ma_samples)
 
             rng, _rng = jax.random.split(rng)
-            _rng = jax.random.split(_rng, config["REP"]["NUM_ENVS"])
+            _rng = jax.random.split(_rng, config["replenishment"]["num_envs"])
             rollout_output = vmap_collect_trajectories(_rng, last_obs, env_state)
             # Last obs here is the last observation, will be one agent or the other
             # So, we take the last observation in each trajectory as "last obs" for the purposes of calculating last value and GAE
@@ -495,7 +501,7 @@ def make_train(config):
             )
             last_obs_rep = jax.tree_util.tree_map(lambda x: x[-1], trans_rep.obs)
             traj_batch_rep = jax.tree_util.tree_map(lambda x: x[1:-1, ...], trans_rep)
-            _, last_val_rep = network_rep.model.apply(policy_params[0], last_obs_rep)
+            _, last_val_rep = policy_rep.model.apply(policy_params[0], last_obs_rep)
 
             trans_issue = jax.tree_util.tree_map(
                 lambda x: x.swapaxes(0, 1), rollout_output[3]
@@ -505,7 +511,7 @@ def make_train(config):
                 lambda x: x[1:-1, ...], trans_issue
             )
 
-            _, last_val_issue = network_issue.model.apply(
+            _, last_val_issue = policy_issue.model.apply(
                 policy_params[1],
                 last_obs_issue,
             )
@@ -518,10 +524,10 @@ def make_train(config):
                         transition.value,
                         transition.reward,
                     )
-                    delta = reward + config["GAMMA"] * next_value * (1 - done) - value
+                    delta = reward + config["gamma"] * next_value * (1 - done) - value
                     gae = (
                         delta
-                        + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
+                        + config["gamma"] * config["gae_lambda"] * (1 - done) * gae
                     )
                     return (gae, value), gae
 
@@ -534,8 +540,8 @@ def make_train(config):
                 )
                 return advantages, advantages + traj_batch.value
 
-            _calculate_gae_rep = partial(_calculate_gae, config=config["REP"])
-            _calculate_gae_issue = partial(_calculate_gae, config=config["ISSUE"])
+            _calculate_gae_rep = partial(_calculate_gae, config=config["replenishment"])
+            _calculate_gae_issue = partial(_calculate_gae, config=config["issuing"])
 
             ## Using the trajectories and the value of the last observation, calculate the advantages and targets
             advantages_rep, targets_rep = _calculate_gae_rep(
@@ -558,7 +564,7 @@ def make_train(config):
                 _update_epoch_rep,
                 update_state_rep,
                 None,
-                config["REP"]["UPDATE_EPOCHS"],
+                config["replenishment"]["update_epochs"],
             )
             train_state_rep = update_state_rep[0]
             # TODO: Not collecting info at the moment
@@ -578,7 +584,7 @@ def make_train(config):
                 _update_epoch_issue,
                 update_state_issue,
                 None,
-                config["ISSUE"]["UPDATE_EPOCHS"],
+                config["issuing"]["update_epochs"],
             )
             train_state_issue = update_state_issue[0]
             metric_issue = None  # traj_batch_issue.info For now, we're just taking info for replenishment so we don't duplicate
@@ -605,12 +611,12 @@ def make_train(config):
 
         ## Create an initial runner_state from network set-up and env reset
         runner_state = (train_state_rep, train_state_issue, env_state, obsv, _rng)
-        ## Run NUM_UPDATES training updates (for now just use REP, but we have assert to make sure same for both)
+        ## Run num_updates training updates (for now just use REP, but we have assert to make sure same for both)
         runner_state, metric = jax.lax.scan(
             _update_step,
             runner_state,
             None,
-            config["REP"]["NUM_UPDATES"],
+            config["replenishment"]["num_updates"],
         )
         # Output from whole training process
         return {"runner_state": runner_state, "metrics": metric}
@@ -620,7 +626,7 @@ def make_train(config):
 
 # Just temporary, quite rough, useful to be able to see policies when
 # there is only a small obs space
-def plot_policies(network_rep, network_issue, policy_params):
+def plot_policies(policy_rep, policy_issue, policy_params):
     # For simplicity, redefine here without incluing in_transit
     # because for the simple example we can plot there is no in-transit
     # ANd having it with no shape causes problems
@@ -640,7 +646,7 @@ def plot_policies(network_rep, network_issue, policy_params):
     all_obs = EnvObs(stock=stock, agent_id=agent_id, action_mask=action_mask)
 
     rep_actions = jax.vmap(
-        jax.vmap(network_rep.apply_deterministic, in_axes=(0, None, None)),
+        jax.vmap(policy_rep.apply_deterministic, in_axes=(0, None, None)),
         in_axes=(None, 0, None),
     )(policy_params, all_obs, jax.random.PRNGKey(1))
     rep_df = pd.DataFrame(
@@ -666,7 +672,7 @@ def plot_policies(network_rep, network_issue, policy_params):
     all_obs = EnvObs(stock=stock, agent_id=agent_id, action_mask=action_mask)
 
     issue_actions = jax.vmap(
-        jax.vmap(network_issue.apply_deterministic, in_axes=(0, None, None)),
+        jax.vmap(policy_issue.apply_deterministic, in_axes=(0, None, None)),
         in_axes=(None, 0, None),
     )(policy_params, all_obs, jax.random.PRNGKey(1))
     issue_df = pd.DataFrame(
@@ -688,12 +694,16 @@ def plot_policies(network_rep, network_issue, policy_params):
 
 def log_losses(config, metrics):
     for i in range(
-        1, config["REP"]["NUM_UPDATES"] + 1
+        1, config["replenishment"]["num_updates"] + 1
     ):  # TODO: Again using rep but we have forced them to be the same
         # These are all approximate, they ignore extra steps we have to take and
         # just count the ones we trained on. We can adjust later.
-        rep_steps = i * config["REP"]["NUM_STEPS"] * config["REP"]["NUM_ENVS"]
-        issue_steps = i * config["ISSUE"]["NUM_STEPS"] * config["ISSUE"]["NUM_ENVS"]
+        rep_steps = (
+            i
+            * config["replenishment"]["num_steps"]
+            * config["replenishment"]["num_envs"]
+        )
+        issue_steps = i * config["issuing"]["num_steps"] * config["issuing"]["num_envs"]
         total_steps = rep_steps + issue_steps
         # TODO: This is just one way to log the losses, can return to and edit later
         log_dict = {}
@@ -727,41 +737,20 @@ def log_episode_metrics(config, metrics):
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg):
     config = omegaconf.OmegaConf.to_container(cfg, resolve=True)
-    run = wandb.init(**config["wandb"]["init"], config=config)
+    run = wandb.init(**cfg.wandb.init, config=config)
     train = make_train(config)
     print("Starting training")
-    output = train(jax.random.PRNGKey(config["TRAIN_SEED"]))
+    output = train(jax.random.PRNGKey(cfg.training.seed))
     log_losses(config, output["metrics"])
     log_episode_metrics(config, output["metrics"])
     print("Training complete, starting evaluation")
 
-    fitness = GymnaxFitness(
-        config["ENV_NAME"],
-        5000,
-        num_rollouts=10000,
-        num_warmup_days=100,
-        max_warmup_steps=1500,
-    )
-    network_rep = FlaxStochasticPolicy(
-        model_class=DiscreteActorCritic,
-        model_kwargs={
-            "activation": config["REP"]["ACTIVATION"],
-        },
-        policy_id=0,
-        env_name=config["ENV_NAME"],
-        env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
-    )
-    network_issue = FlaxStochasticPolicy(
-        model_class=DiscreteActorCritic,
-        model_kwargs={
-            "activation": config["ISSUE"]["ACTIVATION"],
-        },
-        policy_id=1,
-        env_name=config["ENV_NAME"],
-        env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
-    )
+    fitness = hydra.utils.instantiate(cfg.test_evaluator)
+
+    policy_rep = hydra.utils.instantiate(cfg.replenishment.policy)
+    policy_issue = hydra.utils.instantiate(cfg.issuing.policy)
     pm = policy_manager.PolicyManager(
-        [network_rep.apply_deterministic, network_issue.apply_deterministic]
+        [policy_rep.apply_deterministic, policy_issue.apply_deterministic]
     )
 
     fitness.set_apply_fn(pm.apply)
@@ -774,14 +763,14 @@ def main(cfg):
     )
     policy_params = {0: rep_params, 1: issue_params}
     eval_output = fitness.rollout(
-        jax.random.PRNGKey(config["EVAL_SEED"]), policy_params
+        jax.random.PRNGKey(cfg.evaluation_seed), policy_params
     )
     print(f"Mean return on eval episodes: {eval_output[0].mean()}")
     wandb.log({"return_mean": eval_output[0].mean()})
     wandb.log({"return_std": eval_output[0].std()})
 
     if config["plot_policies"]:
-        plot_policies(network_rep, network_issue, policy_params)
+        plot_policies(policy_rep, policy_issue, policy_params)
 
 
 if __name__ == "__main__":

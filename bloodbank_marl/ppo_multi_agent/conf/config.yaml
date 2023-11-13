@@ -1,42 +1,88 @@
 wandb:
   init:
     project: "marl_ppo_jax_demoor"
-plot_policies: True
-ENV_NAME: "DeMoorPerishable"
-NUM_ENVS: 40
-TRAIN_SEED: 123
-EVAL_SEED: 456
-REP:
-  NUM_ENVS: ${NUM_ENVS}
-  LR: 2.5e-4
-  NUM_STEPS: 50
-  TOTAL_TIMESTEPS: 1e6
-  UPDATE_EPOCHS: 3
-  NUM_MINIBATCHES: 10
-  GAMMA: 0.9
-  GAE_LAMBDA: 0.95
-  CLIP_EPS: 0.2
-  ENT_COEF: 0.01
-  VF_COEF: 0.5
-  MAX_GRAD_NORM: 0.5
-  ACTIVATION: "tanh"
-  ANNEAL_LR: True
-ISSUE:
-  NUM_ENVS: ${NUM_ENVS}
-  LR: 2.5e-4
-  NUM_STEPS: 200
-  TOTAL_TIMESTEPS: 4e6
-  UPDATE_EPOCHS: 3
-  NUM_MINIBATCHES: 20
-  GAMMA: 0.9
-  GAE_LAMBDA: 0.95
-  CLIP_EPS: 0.2
-  ENT_COEF: 0.01
-  VF_COEF: 0.5
-  MAX_GRAD_NORM: 0.5
-  ACTIVATION: "tanh"
-  ANNEAL_LR: True
+plot_policies: False
 
+training:
+  num_envs: 40
+  seed: 123
+evaluation_seed: 456
+replenishment:
+  num_envs: ${training.num_envs}
+  lr: 2.5e-4
+  num_steps: 50
+  total_timesteps: 1e6
+  update_epochs: 3
+  num_minibatches: 10
+  gamma: 0.9
+  gae_lambda: 0.95
+  clip_eps: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  anneal_lr: True
+  policy:
+    _target_: bloodbank_marl.ppo_multi_agent.ppo_policies.FlaxStochasticPolicy
+    model_class:
+      _target_: hydra.utils.get_class
+      path: bloodbank_marl.ppo_multi_agent.ppo_models.DiscreteActorCritic
+    model_kwargs:
+      activation: "tanh"
+    policy_id: 0
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+issuing:
+  num_envs: ${training.num_envs}
+  lr: 2.5e-4
+  num_steps: 200
+  total_timesteps: 4e6
+  update_epochs: 3
+  num_minibatches: 20
+  gamma: 0.9
+  gae_lambda: 0.95
+  clip_eps: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  activation: "tanh"
+  anneal_lr: True
+  policy:
+    _target_: bloodbank_marl.ppo_multi_agent.ppo_policies.FlaxStochasticPolicy
+    model_class:
+      _target_: hydra.utils.get_class
+      path: bloodbank_marl.ppo_multi_agent.ppo_models.DiscreteActorCritic
+    model_kwargs:
+      activation: "tanh"
+    policy_id: 1
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+
+environment:
+  env_name: "DeMoorPerishable"
+  num_env_steps: 5000
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 2
+    max_order_quantity: 10
+  env_params: {}
+  num_warmup_days: 100
+  max_warmup_steps: 1500
+  gamma: 0.99
+
+test_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: 10000
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: True
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
 
 
 
