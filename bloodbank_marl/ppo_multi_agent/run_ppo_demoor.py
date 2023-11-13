@@ -18,6 +18,7 @@ import optax
 from flax.linen.initializers import constant, orthogonal
 from typing import Sequence, NamedTuple, Any
 from flax.training.train_state import TrainState
+
 import gymnax
 import chex
 from functools import partial
@@ -123,32 +124,20 @@ class Transition:
     value: jnp.ndarray
     reward: jnp.ndarray
     log_prob: jnp.ndarray
-    obs: jnp.ndarray
+    obs: EnvObs
     info: LogInfo
-
-
-def empty_transitions(n_steps, obs_dim):
-    return Transition(
-        done=jnp.array([False] * n_steps, dtype=jnp.bool_),
-        action=jnp.array([-1] * n_steps, dtype=jnp.int32),
-        value=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
-        reward=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
-        log_prob=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
-        obs=jnp.array([[-1] * obs_dim] * n_steps, dtype=jnp.float32),
-        info=LogInfo(
-            timestep=jnp.array([-1] * n_steps, dtype=jnp.int32),
-            returned_episode_returns=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
-            returned_episode_lengths=jnp.array([-1] * n_steps, dtype=jnp.int32),
-            returned_episode=jnp.array([False] * n_steps, dtype=jnp.bool_),
-        ),
-    )
 
 
 def update_transition_pre_step(idx, t, update):
     # Want to update obs, action, value and log prob
     _obs, _action, _value, _log_prob = update
     action = t.action.at[idx].set(_action)
-    obs = t.obs.at[idx].set(_obs.obs)
+    obs = t.obs.replace(
+        agent_id=t.obs.agent_id.at[idx].set(_obs.agent_id),
+        in_transit=t.obs.in_transit.at[idx].set(_obs.in_transit),
+        stock=t.obs.stock.at[idx].set(_obs.stock),
+        action_mask=t.obs.action_mask.at[idx].set(_obs.action_mask),
+    )
     value = t.value.at[idx].set(_value)
     log_prob = t.log_prob.at[idx].set(_log_prob)
     return idx, t.replace(obs=obs, action=action, value=value, log_prob=log_prob)
@@ -193,11 +182,12 @@ class DiscreteActorCritic(nn.Module):
     activation: str = "tanh"
 
     @nn.compact
-    def __call__(self, x):
+    def __call__(self, obs):
         if self.activation == "relu":
             activation = nn.relu
         else:
             activation = nn.tanh
+        x = obs.obs  # Flat representation
         actor_mean = nn.Dense(
             self.n_hidden, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )(x)
@@ -209,6 +199,8 @@ class DiscreteActorCritic(nn.Module):
         actor_mean = nn.Dense(
             self.n_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
+        # Apply action masking to logits
+        actor_mean = actor_mean + jnp.where(obs.action_mask == 0, -1e8, 0.0)
         pi = distrax.Categorical(logits=actor_mean)
 
         critic = nn.Dense(
@@ -246,30 +238,35 @@ class FlaxStochasticPolicy:
     def apply(self, policy_params, obs, rng):
         # Apply should get you an action
         # TODO: We probably want to use env obs/action space when initialising the network
-        pi, _ = self.model.apply(policy_params[self.policy_id], obs.obs)
+        pi, _ = self.model.apply(policy_params[self.policy_id], obs)
         return pi.sample(seed=rng)
 
     def apply_for_training(self, policy_params, obs, rng):
         # Apply training should sample an action and return action, log_prob and value
         # In training, this should help us avoid issues around different action spaces
         # as long as both Discrete/both Box of same length etc.
-        pi, value = self.model.apply(policy_params[self.policy_id], obs.obs)
+        pi, value = self.model.apply(policy_params[self.policy_id], obs)
         action = pi.sample(seed=rng)
         log_prob = pi.log_prob(action)
         return action, log_prob, value
 
+    def apply_for_loss_fn(self, policy_params, obs):
+        # Apply for loss fn should return the pi and value
+        pi, value = self.model.apply(policy_params[self.policy_id], obs)
+        return pi, value
+
     def apply_deterministic(self, policy_params, obs, rng):
         # Get the most likely action
-        pi, _ = self.model.apply(policy_params[self.policy_id], obs.obs)
+        pi, _ = self.model.apply(policy_params[self.policy_id], obs)
         return pi.probs.argmax(axis=-1)
 
     def get_initial_params(self, rng):
         # TODO For now, hardcoded for DeMoor with L=1; will want to make more general
-        return self.model.init(rng, jnp.zeros(self.env_kwargs["max_useful_life"]))
+        return self.model.init(rng, EnvObs.create_empty_obs(self.env_kwargs, 1))
 
 
 # We need an update epoch function for each policy. We'll pass in the network and the config for the policy
-def make_update_epoch(network, config):
+def make_update_epoch(policy, config):
     def _update_epoch(update_state, unused):
         ## One whole epoch,
         def _update_minbatch(train_state, batch_info):
@@ -278,7 +275,8 @@ def make_update_epoch(network, config):
 
             def _loss_fn(params, traj_batch, gae, targets):
                 # RERUN NETWORK
-                pi, value = network.model.apply(params, traj_batch.obs)
+                params = {policy.policy_id: params}
+                pi, value = policy.apply_for_loss_fn(params, traj_batch.obs)
                 log_prob = pi.log_prob(traj_batch.action)
 
                 # CALCULATE VALUE LOSS
@@ -339,7 +337,9 @@ def make_update_epoch(network, config):
         )
         minibatches = jax.tree_util.tree_map(
             lambda x: jnp.reshape(
-                x, [config["NUM_MINIBATCHES"], -1] + list(x.shape[1:])
+                x,
+                [config["NUM_MINIBATCHES"], config["MINIBATCH_SIZE"]]
+                + list(x.shape[1:]),
             ),
             shuffled_batch,
         )
@@ -381,9 +381,35 @@ def make_train(config):
         config["REP"]["NUM_UPDATES"] == config["ISSUE"]["NUM_UPDATES"]
     ), "Number of updates must be the same for both policies"
 
-    env, env_params = make(config["ENV_NAME"])
+    env_kwargs = {"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10}
+    env, env_params = make(config["ENV_NAME"], **env_kwargs)
     env = LogWrapper(env)
     # env = FlattenObservationWrapper(env)
+
+    action_dim = jnp.maximum(env.max_order_quantity, env.max_useful_life) + 1
+
+    def empty_transitions(n_steps):
+        return Transition(
+            done=jnp.array([False] * n_steps, dtype=jnp.bool_),
+            action=jnp.array([-1] * n_steps, dtype=jnp.int32),
+            value=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
+            reward=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
+            log_prob=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
+            # This is for DeMoor, ideally we'd have a more general way of doing this
+            # But it is having a tantrum
+            obs=EnvObs(
+                agent_id=jnp.zeros(n_steps, dtype=jnp.int32),
+                in_transit=jnp.zeros((n_steps, env.lead_time - 1), dtype=jnp.int32),
+                stock=jnp.zeros((n_steps, env.max_useful_life), dtype=jnp.int32),
+                action_mask=jnp.zeros((n_steps, action_dim), dtype=jnp.int32),
+            ),
+            info=LogInfo(
+                timestep=jnp.array([-1] * n_steps, dtype=jnp.int32),
+                returned_episode_returns=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
+                returned_episode_lengths=jnp.array([-1] * n_steps, dtype=jnp.int32),
+                returned_episode=jnp.array([False] * n_steps, dtype=jnp.bool_),
+            ),
+        )
 
     ## Supporting function for annealing the learning rate.
     def linear_schedule(count, config):
@@ -406,7 +432,7 @@ def make_train(config):
                 "activation": config["REP"]["ACTIVATION"],
             },
             policy_id=0,
-            env_kwargs={"max_useful_life": 2},
+            env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
         )
         rng, _rng = jax.random.split(rng)
         network_params_rep = network_rep.get_initial_params(_rng)
@@ -433,11 +459,11 @@ def make_train(config):
         network_issue = FlaxStochasticPolicy(
             model_class=DiscreteActorCritic,
             model_kwargs={
-                "n_actions": 3,
+                "n_actions": 11,
                 "activation": config["ISSUE"]["ACTIVATION"],
             },
             policy_id=1,
-            env_kwargs={"max_useful_life": 2},
+            env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
         )
         rng, _rng = jax.random.split(rng)
         network_params_issue = network_issue.get_initial_params(_rng)
@@ -584,13 +610,14 @@ def make_train(config):
                 )
 
             # This does the collection for a single env, using the while loop to collect until we have enough steps
+
             def _collect_ma_trajectories(
                 rng, last_obs, last_env_state, n_rep, n_issue, policy_params
             ):
                 rep_idx = 0
-                rep_t = empty_transitions(n_rep, 2)
+                rep_t = empty_transitions(n_rep)
                 issue_idx = 0
-                issue_t = empty_transitions(n_issue, 2)
+                issue_t = empty_transitions(n_issue)
                 step = 0
                 vals = (
                     rep_idx,
@@ -633,14 +660,14 @@ def make_train(config):
             trans_rep = jax.tree_util.tree_map(
                 lambda x: x.swapaxes(0, 1), rollout_output[1]
             )
-            last_obs_rep = trans_rep.obs[-1, :, :]
+            last_obs_rep = jax.tree_util.tree_map(lambda x: x[-1], trans_rep.obs)
             traj_batch_rep = jax.tree_util.tree_map(lambda x: x[1:-1, ...], trans_rep)
             _, last_val_rep = network_rep.model.apply(policy_params[0], last_obs_rep)
 
             trans_issue = jax.tree_util.tree_map(
                 lambda x: x.swapaxes(0, 1), rollout_output[3]
             )
-            last_obs_issue = trans_issue.obs[-1, :, :]
+            last_obs_issue = jax.tree_util.tree_map(lambda x: x[-1], trans_issue.obs)
             traj_batch_issue = jax.tree_util.tree_map(
                 lambda x: x[1:-1, ...], trans_issue
             )
@@ -761,23 +788,28 @@ def make_train(config):
 # Just temporary, quite rough, useful to be able to see policies when
 # there is only a small obs space
 def plot_policies(network_rep, network_issue, policy_params):
-    stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
-
-    stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
-    in_transit = jnp.array([0] * 121).reshape(121, 1)
-    agent_id = jnp.array([1] * 121).reshape(121, 1)
-    all_obs = EnvObs(stock=stock, in_transit=in_transit, agent_id=agent_id)
-
+    # For simplicity, redefine here without incluing in_transit
+    # because for the simple example we can plot there is no in-transit
+    # ANd having it with no shape causes problems
     @struct.dataclass
-    class SimpleEnvObs:
-        obs: jnp.ndarray
+    class EnvObs:
+        agent_id: int  # Following Tianhou;
+        stock: chex.Array
+        action_mask: chex.Array
 
-    simple_all_obs = SimpleEnvObs(all_obs.obs[:, 1:])
+        @property
+        def obs(self):
+            return jnp.hstack([self.stock])
+
+    stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
+    agent_id = jnp.array([1] * 121).reshape(121, 1)
+    action_mask = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] * 121).reshape(121, 11)
+    all_obs = EnvObs(stock=stock, agent_id=agent_id, action_mask=action_mask)
 
     rep_actions = jax.vmap(
         jax.vmap(network_rep.apply_deterministic, in_axes=(0, None, None)),
         in_axes=(None, 0, None),
-    )(policy_params, simple_all_obs, jax.random.PRNGKey(1))
+    )(policy_params, all_obs, jax.random.PRNGKey(1))
     rep_df = pd.DataFrame(
         {
             "age_1": all_obs.stock[:, 0],
@@ -794,10 +826,16 @@ def plot_policies(network_rep, network_issue, policy_params):
     )
     wandb.log({"rep/policy_plot": wandb.Image(rep_heatmap)})
 
+    # Different action mask for issuing
+    action_mask = jnp.hstack(
+        [jnp.ones((121, 1)), jnp.where(stock > 0, 1, 0), jnp.zeros((121, 8))]
+    )
+    all_obs = EnvObs(stock=stock, agent_id=agent_id, action_mask=action_mask)
+
     issue_actions = jax.vmap(
         jax.vmap(network_issue.apply_deterministic, in_axes=(0, None, None)),
         in_axes=(None, 0, None),
-    )(policy_params, simple_all_obs, jax.random.PRNGKey(1))
+    )(policy_params, all_obs, jax.random.PRNGKey(1))
     issue_df = pd.DataFrame(
         {
             "age_1": all_obs.stock[:, 0],
@@ -878,16 +916,16 @@ def main(cfg):
             "activation": config["REP"]["ACTIVATION"],
         },
         policy_id=0,
-        env_kwargs={"max_useful_life": 2},
+        env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
     )
     network_issue = FlaxStochasticPolicy(
         model_class=DiscreteActorCritic,
         model_kwargs={
-            "n_actions": 3,
+            "n_actions": 11,
             "activation": config["ISSUE"]["ACTIVATION"],
         },
         policy_id=1,
-        env_kwargs={"max_useful_life": 2},
+        env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
     )
     pm = policy_manager.PolicyManager(
         [network_rep.apply_deterministic, network_issue.apply_deterministic]

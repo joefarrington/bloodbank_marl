@@ -1,0 +1,42 @@
+wandb:
+  init:
+    project: "marl_ppo_jax_demoor"
+plot_policies: True
+ENV_NAME: "DeMoorPerishable"
+NUM_ENVS: 40
+TRAIN_SEED: 123
+EVAL_SEED: 456
+REP:
+  NUM_ENVS: ${NUM_ENVS}
+  LR: 2.5e-4
+  NUM_STEPS: 50
+  TOTAL_TIMESTEPS: 1e6
+  UPDATE_EPOCHS: 3
+  NUM_MINIBATCHES: 10
+  GAMMA: 0.9
+  GAE_LAMBDA: 0.95
+  CLIP_EPS: 0.2
+  ENT_COEF: 0.01
+  VF_COEF: 0.5
+  MAX_GRAD_NORM: 0.5
+  ACTIVATION: "tanh"
+  ANNEAL_LR: True
+ISSUE:
+  NUM_ENVS: ${NUM_ENVS}
+  LR: 2.5e-4
+  NUM_STEPS: 200
+  TOTAL_TIMESTEPS: 4e6
+  UPDATE_EPOCHS: 3
+  NUM_MINIBATCHES: 20
+  GAMMA: 0.9
+  GAE_LAMBDA: 0.95
+  CLIP_EPS: 0.2
+  ENT_COEF: 0.01
+  VF_COEF: 0.5
+  MAX_GRAD_NORM: 0.5
+  ACTIVATION: "tanh"
+  ANNEAL_LR: True
+
+
+
+
