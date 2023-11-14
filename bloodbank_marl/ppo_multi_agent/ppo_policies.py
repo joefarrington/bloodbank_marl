@@ -89,7 +89,7 @@ class HeuristicPolicyOufoPPOTraining:
         tr_action = jax.lax.cond(
             jnp.sum(obs.stock) == 0,
             lambda _: jnp.array(0),
-            lambda _: self.env.max_useful_life
+            lambda _: self.env_kwargs["max_useful_life"]
             - jnp.flip(jnp.where(obs.stock > 0, 1, 0)).argmax(),
             None,
         )
