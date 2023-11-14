@@ -14,6 +14,114 @@ from bloodbank_marl.utils.gymnax_fitness import make
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
 
 
+# This is an example of a heuristic policy that can be used with PPO training
+# Start with a basic order up to, we can factor out into a parent later
+# We're putting in NotImplementedErrors to catch if our training script is trying to call
+# these methods -> it shouldn't be!
+class HeuristicPolicyOrderUpToPPOTraining:
+    def __init__(
+        self,
+        policy_id,
+        env_name=None,
+        env_kwargs={},
+        env_params={},
+    ):
+        self.policy_id = policy_id
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        env, default_env_params = make(self.env_name, **self.env_kwargs)
+        self.env_params = default_env_params.replace(**env_params)
+        self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
+
+    def apply(self, policy_params, obs, rng):
+        # Apply should get you an action
+        tr_action = jnp.clip(
+            policy_params[self.policy_id] - obs.stock.sum(axis=-1),
+            a_min=0
+            # - obs.in_transit.sum(axis=-1)
+        )
+        return self._postprocess_action(obs, tr_action)
+
+    def apply_for_training(self, policy_params, obs, rng):
+        action = self.apply(policy_params, obs, rng)
+        return action, action, 0.0, 0.0
+
+    def apply_deterministic(self, policy_params, obs, rng):
+        # Get the most likely action
+        return self.apply(policy_params, obs, rng)
+
+    def apply_for_loss_fn(self, policy_params, obs, tr_action):
+        raise NotImplementedError
+
+    def get_initial_params(self, rng):
+        raise NotImplementedError
+
+    def _postprocess_action(self, obs, tr_action):
+        return tr_action
+
+    def _sample_action(self, pi, rng):
+        raise NotImplementedError
+
+    def _get_log_prob(self, pi, tr_action):
+        raise NotImplementedError
+
+    def _get_mode_action(self, pi):
+        return NotImplementedError
+
+
+class HeuristicPolicyOufoPPOTraining:
+    def __init__(
+        self,
+        policy_id,
+        env_name=None,
+        env_kwargs={},
+        env_params={},
+    ):
+        self.policy_id = policy_id
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        env, default_env_params = make(self.env_name, **self.env_kwargs)
+        self.env_params = default_env_params.replace(**env_params)
+        self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
+
+    def apply(self, policy_params, obs, rng):
+        # Apply should get you an action
+        tr_action = jax.lax.cond(
+            jnp.sum(obs.stock) == 0,
+            lambda _: jnp.array(0),
+            lambda _: self.env.max_useful_life
+            - jnp.flip(jnp.where(obs.stock > 0, 1, 0)).argmax(),
+            None,
+        )
+        return self._postprocess_action(obs, tr_action)
+
+    def apply_for_training(self, policy_params, obs, rng):
+        action = self.apply(policy_params, obs, rng)
+        return action, action, 0.0, 0.0
+
+    def apply_deterministic(self, policy_params, obs, rng):
+        # Get the most likely action
+        return self.apply(policy_params, obs, rng)
+
+    def apply_for_loss_fn(self, policy_params, obs, tr_action):
+        raise NotImplementedError
+
+    def get_initial_params(self, rng):
+        raise NotImplementedError
+
+    def _postprocess_action(self, obs, tr_action):
+        return tr_action
+
+    def _sample_action(self, pi, rng):
+        raise NotImplementedError
+
+    def _get_log_prob(self, pi, tr_action):
+        raise NotImplementedError
+
+    def _get_mode_action(self, pi):
+        return NotImplementedError
+
+
 class FlaxStochasticPolicy:
     def __init__(
         self,
@@ -37,7 +145,7 @@ class FlaxStochasticPolicy:
         # Apply should get you an action
         pi, _ = self.model.apply(policy_params[self.policy_id], obs)
         tr_action = self._sample_action(pi, rng)
-        return self.postprocess_action(obs, tr_action)
+        return self._postprocess_action(obs, tr_action)
 
     def apply_for_training(self, policy_params, obs, rng):
         # Apply training should sample an action and return action, log_prob and value

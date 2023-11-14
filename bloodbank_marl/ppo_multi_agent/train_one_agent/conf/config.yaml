@@ -1,0 +1,73 @@
+wandb:
+  init:
+    project: "marl_ppo_jax_demoor"
+plot_policies: True
+
+training:
+# Note steps relate the agent we are training, not both agents
+  policy_to_train: 1
+  num_envs: 40
+  seed: 123
+  lr: 2.5e-4
+  num_steps: 200 
+  total_timesteps: 4e6
+  update_epochs: 3
+  num_minibatches: 10
+  gamma: 0.9
+  gae_lambda: 0.95
+  clip_eps: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  anneal_lr: True
+  heuristic_params: 7
+evaluation_seed: 456
+replenishment:
+  num_steps: 50
+  policy:
+    _target_: bloodbank_marl.ppo_multi_agent.ppo_policies.HeuristicPolicyOrderUpToPPOTraining
+    policy_id: 0
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+issuing:
+  num_steps: 200
+  policy:
+    _target_: bloodbank_marl.ppo_multi_agent.ppo_policies.FlaxStochasticPolicy
+    model_class:
+      _target_: hydra.utils.get_class
+      path: bloodbank_marl.ppo_multi_agent.ppo_models.DiscreteActorCritic
+    model_kwargs:
+      activation: "tanh"
+    policy_id: 1
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+
+environment:
+  env_name: "DeMoorPerishable"
+  num_env_steps: 5000
+  env_kwargs:
+    max_useful_life: 2
+    lead_time: 1
+    max_order_quantity: 10
+  env_params: {}
+  num_warmup_days: 100
+  max_warmup_steps: 1500
+  gamma: 0.99
+
+test_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: 10000
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: True
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
+
+
+
