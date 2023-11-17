@@ -94,11 +94,11 @@ class HeuristicPolicyExactMatchPPOTraining(HeuristicPolicyPPOTraining):
     def apply(self, policy_params, obs, rng):
         # Apply should get you an action
         total_stock_by_product = obs.stock.sum(axis=-1)
-        action = jnp.zeros_like(total_stock_by_product)
+        tr_action = jnp.zeros_like(total_stock_by_product)
         tr_action = jax.lax.select(
             total_stock_by_product[obs.request_type] > 0,
-            action.at[obs.request_type].set(1),
-            action,
+            tr_action.at[obs.request_type].set(1),
+            tr_action,
         )
         return self._postprocess_action(obs, tr_action)
 
@@ -107,15 +107,15 @@ class HeuristicPolicyPriorityMatchPPOTraining(HeuristicPolicyPPOTraining):
     def apply(self, policy_params, obs, rng):
         # Apply should get you an action
         total_stock_by_product = obs.stock.sum(axis=-1)
-        action = jnp.zeros_like(total_stock_by_product)
+        tr_action = jnp.zeros_like(total_stock_by_product)
         rt = obs.request_type
         in_stock_and_compatible = jnp.where(
             total_stock_by_product[policy_params[rt]] > 0, 1, 0
         ) * jnp.where(policy_params[rt] >= 0, 1, 0)
         tr_action = jax.lax.select(
             jnp.any(in_stock_and_compatible),
-            action.at[policy_params[rt][in_stock_and_compatible.argmax()]].set(1),
-            action,
+            tr_action.at[policy_params[rt][in_stock_and_compatible.argmax()]].set(1),
+            tr_action,
         )
         return self._postprocess_action(obs, tr_action)
 
