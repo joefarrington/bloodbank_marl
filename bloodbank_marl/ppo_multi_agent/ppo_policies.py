@@ -18,7 +18,9 @@ from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
 # Start with a basic order up to, we can factor out into a parent later
 # We're putting in NotImplementedErrors to catch if our training script is trying to call
 # these methods -> it shouldn't be!
-class HeuristicPolicyOrderUpToPPOTraining:
+
+
+class HeuristicPolicyPPOTraining:
     def __init__(
         self,
         policy_id,
@@ -34,14 +36,7 @@ class HeuristicPolicyOrderUpToPPOTraining:
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
 
     def apply(self, policy_params, obs, rng):
-        # Apply should get you an action
-        tr_action = jnp.clip(
-            policy_params[self.policy_id]
-            - obs.stock.sum(axis=-1)
-            - obs.in_transit.sum(axis=-1),
-            a_min=0,
-        )
-        return self._postprocess_action(obs, tr_action)
+        raise NotImplementedError
 
     def apply_for_training(self, policy_params, obs, rng):
         action = self.apply(policy_params, obs, rng)
@@ -70,21 +65,19 @@ class HeuristicPolicyOrderUpToPPOTraining:
         return NotImplementedError
 
 
-class HeuristicPolicyOufoPPOTraining:
-    def __init__(
-        self,
-        policy_id,
-        env_name=None,
-        env_kwargs={},
-        env_params={},
-    ):
-        self.policy_id = policy_id
-        self.env_name = env_name
-        self.env_kwargs = env_kwargs
-        env, default_env_params = make(self.env_name, **self.env_kwargs)
-        self.env_params = default_env_params.replace(**env_params)
-        self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
+class HeuristicPolicyOrderUpToPPOTraining(HeuristicPolicyPPOTraining):
+    def apply(self, policy_params, obs, rng):
+        # Apply should get you an action
+        tr_action = jnp.clip(
+            policy_params[self.policy_id]
+            - obs.stock.sum(axis=-1)
+            - obs.in_transit.sum(axis=-1),
+            a_min=0,
+        )
+        return self._postprocess_action(obs, tr_action)
 
+
+class HeuristicPolicyOufoPPOTraining(HeuristicPolicyPPOTraining):
     def apply(self, policy_params, obs, rng):
         # Apply should get you an action
         tr_action = jax.lax.cond(
@@ -96,31 +89,35 @@ class HeuristicPolicyOufoPPOTraining:
         )
         return self._postprocess_action(obs, tr_action)
 
-    def apply_for_training(self, policy_params, obs, rng):
-        action = self.apply(policy_params, obs, rng)
-        return action, action, 0.0, 0.0
 
-    def apply_deterministic(self, policy_params, obs, rng):
-        # Get the most likely action
-        return self.apply(policy_params, obs, rng)
+class HeuristicPolicyExactMatchPPOTraining(HeuristicPolicyPPOTraining):
+    def apply(self, policy_params, obs, rng):
+        # Apply should get you an action
+        total_stock_by_product = obs.stock.sum(axis=-1)
+        action = jnp.zeros_like(total_stock_by_product)
+        tr_action = jax.lax.select(
+            total_stock_by_product[obs.request_type] > 0,
+            action.at[obs.request_type].set(1),
+            action,
+        )
+        return self._postprocess_action(obs, tr_action)
 
-    def apply_for_loss_fn(self, policy_params, obs, tr_action):
-        raise NotImplementedError
 
-    def get_initial_params(self, rng):
-        raise NotImplementedError
-
-    def _postprocess_action(self, obs, tr_action):
-        return tr_action
-
-    def _sample_action(self, pi, rng):
-        raise NotImplementedError
-
-    def _get_log_prob(self, pi, tr_action):
-        raise NotImplementedError
-
-    def _get_mode_action(self, pi):
-        return NotImplementedError
+class HeuristicPolicyPriorityMatchPPOTraining(HeuristicPolicyPPOTraining):
+    def apply(self, policy_params, obs, rng):
+        # Apply should get you an action
+        total_stock_by_product = obs.stock.sum(axis=-1)
+        action = jnp.zeros_like(total_stock_by_product)
+        rt = obs.request_type
+        in_stock_and_compatible = jnp.where(
+            total_stock_by_product[policy_params[rt]] > 0, 1, 0
+        ) * jnp.where(policy_params[rt] >= 0, 1, 0)
+        tr_action = jax.lax.select(
+            jnp.any(in_stock_and_compatible),
+            action.at[policy_params[rt][in_stock_and_compatible.argmax()]].set(1),
+            action,
+        )
+        return self._postprocess_action(obs, tr_action)
 
 
 class FlaxStochasticPolicy:
