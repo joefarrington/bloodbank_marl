@@ -258,18 +258,7 @@ def make_train(config):
     def train(rng):
         # INIT NETWORKS
         ## Replenishment network
-        # TODO: Don't hardcode action_dim
         policy_rep = hydra.utils.instantiate(config["replenishment"]["policy"])
-        # network_rep = FlaxStochasticPolicy(
-        #    model_class=DiscreteActorCritic,
-        #    model_kwargs={
-        #        "activation": "tanh",
-        #    },
-        #    policy_id=0,
-        #    env_name=config["environment"]["env_name"],
-        #    env_kwargs=config["environment"]["env_kwargs"],
-        #    env_params=config["environment"]["env_params"],
-        # )
         rng, _rng = jax.random.split(rng)
         network_params_rep = policy_rep.get_initial_params(_rng)
         if config["replenishment"]["anneal_lr"]:
@@ -293,18 +282,7 @@ def make_train(config):
             tx=tx_rep,
         )
         ## Issuing network
-        # TODO: Don't hardcode action dim
         policy_issue = hydra.utils.instantiate(config["issuing"]["policy"])
-        # policy_issue = FlaxStochasticPolicy(
-        #    model_class=DiscreteActorCritic,
-        #    model_kwargs={
-        #        "activation": "tanh",
-        #    },
-        #    policy_id=1,
-        #    env_name=config["environment"]["env_name"],
-        #    env_kwargs=config["environment"]["env_kwargs"],
-        #    env_params=config["environment"]["env_params"],
-        # )
         rng, _rng = jax.random.split(rng)
         network_params_issue = policy_issue.get_initial_params(_rng)
 
