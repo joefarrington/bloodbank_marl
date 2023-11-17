@@ -215,25 +215,31 @@ def make_train(config):
     env, env_params = make(
         config["environment"]["env_name"], **config["environment"]["env_kwargs"]
     )
+    default_obs, _ = env.reset(jax.random.PRNGKey(1), env_params)
     env = LogWrapper(env)
     # env = FlattenObservationWrapper(env)
+
+    num_actions = env.num_actions(
+        0
+    )  # Use agent_id for rep, as forced to be same for both agents
+    action_shape = env.action_space(env_params, 0).shape
 
     action_dim = jnp.maximum(env.max_order_quantity, env.max_useful_life) + 1
 
     def empty_transitions(n_steps):
         return Transition(
             done=jnp.array([False] * n_steps, dtype=jnp.bool_),
-            action=jnp.array([-1] * n_steps, dtype=jnp.int32),
+            action=-1
+            * jnp.ones(
+                (n_steps,) + action_shape
+            ),  # Use agent_id=0 because both agents have the same action space
             value=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
             reward=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
             log_prob=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
             # This is for DeMoor, ideally we'd have a more general way of doing this
             # But it is having a tantrum
-            obs=EnvObs(
-                agent_id=jnp.zeros(n_steps, dtype=jnp.int32),
-                in_transit=jnp.zeros((n_steps, env.lead_time - 1), dtype=jnp.int32),
-                stock=jnp.zeros((n_steps, env.max_useful_life), dtype=jnp.int32),
-                action_mask=jnp.zeros((n_steps, action_dim), dtype=jnp.int32),
+            obs=default_obs.create_empty_obs(
+                config["environment"]["env_kwargs"], num_actions, n_steps
             ),
             info=LogInfo(
                 timestep=jnp.array([-1] * n_steps, dtype=jnp.int32),
