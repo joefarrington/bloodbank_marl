@@ -218,6 +218,9 @@ class FlaxMultiProductStochasticIssuePolicy(FlaxStochasticPolicy):
         )
         return tr_action
 
+    def _postprocess_action(self, obs, tr_action):
+        return tr_action.astype(jnp.int32)
+
 
 class FlaxMultiProductStochasticRepPolicy(FlaxStochasticPolicy):
     def __init__(
@@ -237,6 +240,7 @@ class FlaxMultiProductStochasticRepPolicy(FlaxStochasticPolicy):
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.replace(**env_params)
+        self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
         self.model = model_class(n_actions=env.num_actions(policy_id), **model_kwargs)
         self.clip_min = clip_min
         self.clip_max = clip_max
@@ -257,9 +261,9 @@ class FlaxMultiProductStochasticRepPolicy(FlaxStochasticPolicy):
                     * (self.max_order_quantities - self.min_order_quantities)
                 )
                 + self.min_order_quantities
-            ).astype(jnp.int32)
+            )
             * obs.action_mask
-        )
+        ).astype(jnp.int32)
 
         return action
 

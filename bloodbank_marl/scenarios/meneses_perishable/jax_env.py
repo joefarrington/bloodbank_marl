@@ -300,12 +300,15 @@ class EnvObs:
 
     @property
     def obs(self):
+        # Both in_transit and stock are 2D (n_products, n_time_periods)
+        # Any preceding dims are batch dims
+        batch_dims = self.in_transit.shape[:-2]
         return jnp.hstack(
             [
-                self.time,
-                self.request_type,
-                self.in_transit.reshape(-1),
-                self.stock.reshape(-1),
+                self.time.reshape(batch_dims + (1,)),
+                self.request_type.reshape(batch_dims + (1,)),
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
             ]
         )
 
@@ -320,6 +323,7 @@ class EnvObs:
             "max_order_quantities": [100] * 8,
             "max_demand": 100,
         },
+        num_actions=None,
         n_steps=1,
     ):
         return cls(

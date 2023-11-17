@@ -164,6 +164,7 @@ class EnvObs:
     def create_empty_obs(
         cls,
         env_kwargs={"max_useful_life": 2, "lead_time": 1, "max_order_quantity": 10},
+        num_actions=11,
         n_steps=1,
     ):
         # For replenishment, action size is max_order_quantity + 1, for issuing it's max_useful_life + 1
@@ -171,19 +172,17 @@ class EnvObs:
         # to be the same dimensions in the observation for both agents in order to work with JIT.
         # We need a consistent action size, so pick the largest and use masking to ensure only
         # valid actions are taken
-        action_dim = (
-            jnp.maximum(env_kwargs["max_useful_life"], env_kwargs["max_order_quantity"])
-            + 1
-        )
+        # action_dim = (
+        #    jnp.maximum(env_kwargs["max_useful_life"], env_kwargs["max_order_quantity"])
+        #    + 1
+        # )
         return cls(
-            agent_id=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
+            agent_id=jnp.zeros(n_steps, dtype=jnp.int32),
             in_transit=jnp.zeros(
                 (n_steps, env_kwargs["lead_time"] - 1), dtype=jnp.int32
-            ).squeeze(),
-            stock=jnp.zeros(
-                (n_steps, env_kwargs["max_useful_life"]), dtype=jnp.int32
-            ).squeeze(),
-            action_mask=jnp.zeros((n_steps, action_dim), dtype=jnp.int32).squeeze(),
+            ),
+            stock=jnp.zeros((n_steps, env_kwargs["max_useful_life"]), dtype=jnp.int32),
+            action_mask=jnp.zeros((n_steps, num_actions), dtype=jnp.int32),
         )
 
 
