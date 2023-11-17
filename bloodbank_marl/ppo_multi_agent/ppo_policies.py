@@ -190,7 +190,7 @@ class FlaxStochasticOrderUpToRepPolicy(FlaxStochasticPolicy):
     def _postprocess_action(self, obs, tr_action):
         S = tr_action
         action = jnp.clip(
-            S - obs.stock.sum(axis=-1) - obs.in_transit.sum(axis=-1),
+            S - obs.stock.sum(axis=-1),  # - obs.in_transit.sum(axis=-1),
             a_min=0,
             a_max=None,
         )

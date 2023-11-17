@@ -1,3 +1,9 @@
+defaults:
+  - environment: de_moor_perishable
+  - replenishment/policy: one_product_mlp
+  - issuing/policy: one_product_mlp
+  - _self_
+
 wandb:
   init:
     project: "marl_ppo_jax_demoor"
@@ -11,7 +17,7 @@ replenishment:
   num_envs: ${training.num_envs}
   lr: 2.5e-4
   num_steps: 50
-  total_timesteps: 1e6
+  total_timesteps: 1e5
   update_epochs: 3
   num_minibatches: 10
   gamma: 0.9
@@ -21,22 +27,12 @@ replenishment:
   vf_coef: 0.5
   max_grad_norm: 0.5
   anneal_lr: True
-  policy:
-    _target_: bloodbank_marl.ppo_multi_agent.ppo_policies.FlaxStochasticPolicy
-    model_class:
-      _target_: hydra.utils.get_class
-      path: bloodbank_marl.ppo_multi_agent.ppo_models.DiscreteActorCritic
-    model_kwargs:
-      activation: "tanh"
-    policy_id: 0
-    env_name: ${environment.env_name}
-    env_kwargs: ${environment.env_kwargs}
-    env_params: ${environment.env_params}
+
 issuing:
   num_envs: ${training.num_envs}
   lr: 2.5e-4
   num_steps: 200
-  total_timesteps: 4e6
+  total_timesteps: 4e5
   update_epochs: 3
   num_minibatches: 20
   gamma: 0.9
@@ -47,29 +43,6 @@ issuing:
   max_grad_norm: 0.5
   activation: "tanh"
   anneal_lr: True
-  policy:
-    _target_: bloodbank_marl.ppo_multi_agent.ppo_policies.FlaxStochasticPolicy
-    model_class:
-      _target_: hydra.utils.get_class
-      path: bloodbank_marl.ppo_multi_agent.ppo_models.DiscreteActorCritic
-    model_kwargs:
-      activation: "tanh"
-    policy_id: 1
-    env_name: ${environment.env_name}
-    env_kwargs: ${environment.env_kwargs}
-    env_params: ${environment.env_params}
-
-environment:
-  env_name: "DeMoorPerishable"
-  num_env_steps: 5000
-  env_kwargs:
-    max_useful_life: 5
-    lead_time: 2
-    max_order_quantity: 10
-  env_params: {}
-  num_warmup_days: 100
-  max_warmup_steps: 1500
-  gamma: 0.99
 
 test_evaluator:
   _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness

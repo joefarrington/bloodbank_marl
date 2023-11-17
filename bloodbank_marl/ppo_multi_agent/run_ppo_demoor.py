@@ -111,8 +111,6 @@ def make_update_epoch(policy, config):
                 log_prob, value, entropy = policy.apply_for_loss_fn(
                     params, traj_batch.obs, traj_batch.action
                 )
-                # log_prob = pi.log_prob(traj_batch.action)
-
                 # CALCULATE VALUE LOSS
                 value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                     -config["clip_eps"], config["clip_eps"]
@@ -220,7 +218,10 @@ def make_train(config):
     env = LogWrapper(env)
     # env = FlattenObservationWrapper(env)
 
+    # For DeMoor
     action_dim = jnp.maximum(env.max_order_quantity, env.max_useful_life) + 1
+    # For Meneses
+    # action_dim = env.n_products
 
     def empty_transitions(n_steps):
         return Transition(
@@ -237,6 +238,20 @@ def make_train(config):
                 stock=jnp.zeros((n_steps, env.max_useful_life), dtype=jnp.int32),
                 action_mask=jnp.zeros((n_steps, action_dim), dtype=jnp.int32),
             ),
+            # For Meneses
+            # obs=EnvObs(
+            #    agent_id=jnp.zeros(n_steps, dtype=jnp.int32),
+            #    time=jnp.zeros(n_steps, dtype=jnp.float32),
+            #    request_type=jnp.zeros(n_steps, dtype=jnp.int32),
+            #    in_transit=jnp.zeros(
+            #        (n_steps, env,n_products, env.lead_time - 1),
+            #        dtype=jnp.int32,
+            #    ),
+            #    stock=jnp.zeros(
+            #        (n_steps, env.n_products, env.max_useful_life),
+            #        dtype=jnp.int32),
+            #    action_mask=jnp.zeros(
+            #        (n_steps, env.n_products), dtype=jnp.int32),
             info=LogInfo(
                 timestep=jnp.array([-1] * n_steps, dtype=jnp.int32),
                 returned_episode_returns=jnp.array([-1.0] * n_steps, dtype=jnp.float32),

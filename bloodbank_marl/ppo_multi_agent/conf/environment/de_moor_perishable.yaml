@@ -1,0 +1,10 @@
+env_name: "DeMoorPerishable"
+num_env_steps: 5000
+env_kwargs:
+  max_useful_life: 5
+  lead_time: 2
+  max_order_quantity: 10
+env_params: {}
+num_warmup_days: 100
+max_warmup_steps: 1500
+gamma: 0.99
