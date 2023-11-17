@@ -224,8 +224,6 @@ def make_train(config):
     )  # Use agent_id for rep, as forced to be same for both agents
     action_shape = env.action_space(env_params, 0).shape
 
-    action_dim = jnp.maximum(env.max_order_quantity, env.max_useful_life) + 1
-
     def empty_transitions(n_steps):
         return Transition(
             done=jnp.array([False] * n_steps, dtype=jnp.bool_),
@@ -236,8 +234,6 @@ def make_train(config):
             value=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
             reward=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
             log_prob=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
-            # This is for DeMoor, ideally we'd have a more general way of doing this
-            # But it is having a tantrum
             obs=default_obs.create_empty_obs(
                 config["environment"]["env_kwargs"], num_actions, n_steps
             ),

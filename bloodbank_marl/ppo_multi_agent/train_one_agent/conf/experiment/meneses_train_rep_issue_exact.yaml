@@ -1,0 +1,15 @@
+# @package _global_
+defaults:
+  - override /environment: meneses_perishable
+  - override /replenishment/policy: multi_product_mlp
+  - override /issuing/policy: heuristic_exact_match
+
+wandb:
+  init:
+    project: "single_agent_ppo_jax_meneses"
+plot_policies: False
+
+training:
+  policy_to_train: 0
+  num_steps: ${replenishment.num_steps}
+  heuristic_params: 0

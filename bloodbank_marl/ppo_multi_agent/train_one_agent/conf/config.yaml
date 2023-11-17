@@ -7,7 +7,7 @@ defaults:
 
 wandb:
   init:
-    project: "marl_ppo_jax_demoor"
+    project: "single_agent_ppo_jax_demoor"
 plot_policies: True
 
 training:

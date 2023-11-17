@@ -14,12 +14,6 @@ from bloodbank_marl.utils.gymnax_fitness import make
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
 
 
-# This is an example of a heuristic policy that can be used with PPO training
-# Start with a basic order up to, we can factor out into a parent later
-# We're putting in NotImplementedErrors to catch if our training script is trying to call
-# these methods -> it shouldn't be!
-
-
 class HeuristicPolicyPPOTraining:
     def __init__(
         self,
@@ -36,11 +30,17 @@ class HeuristicPolicyPPOTraining:
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
 
     def apply(self, policy_params, obs, rng):
+        tr_action = self._apply(policy_params, obs, rng)
+        action = self._postprocess_action(obs, tr_action)
+        return action
+
+    def _apply(self, policy_params, obs, rng):
         raise NotImplementedError
 
     def apply_for_training(self, policy_params, obs, rng):
-        action = self.apply(policy_params, obs, rng)
-        return action, action, 0.0, 0.0
+        tr_action = self._apply(policy_params, obs, rng)
+        action = self._postprocess_action(obs, tr_action)
+        return action, tr_action, 0.0, 0.0
 
     def apply_deterministic(self, policy_params, obs, rng):
         # Get the most likely action
@@ -53,7 +53,7 @@ class HeuristicPolicyPPOTraining:
         raise NotImplementedError
 
     def _postprocess_action(self, obs, tr_action):
-        return tr_action
+        return tr_action.astype(int)
 
     def _sample_action(self, pi, rng):
         raise NotImplementedError
@@ -66,7 +66,7 @@ class HeuristicPolicyPPOTraining:
 
 
 class HeuristicPolicyOrderUpToPPOTraining(HeuristicPolicyPPOTraining):
-    def apply(self, policy_params, obs, rng):
+    def _apply(self, policy_params, obs, rng):
         # Apply should get you an action
         tr_action = jnp.clip(
             policy_params[self.policy_id]
@@ -74,11 +74,11 @@ class HeuristicPolicyOrderUpToPPOTraining(HeuristicPolicyPPOTraining):
             - obs.in_transit.sum(axis=-1),
             a_min=0,
         )
-        return self._postprocess_action(obs, tr_action)
+        return tr_action
 
 
 class HeuristicPolicyOufoPPOTraining(HeuristicPolicyPPOTraining):
-    def apply(self, policy_params, obs, rng):
+    def _apply(self, policy_params, obs, rng):
         # Apply should get you an action
         tr_action = jax.lax.cond(
             jnp.sum(obs.stock) == 0,
@@ -87,11 +87,11 @@ class HeuristicPolicyOufoPPOTraining(HeuristicPolicyPPOTraining):
             - jnp.flip(jnp.where(obs.stock > 0, 1, 0)).argmax(),
             None,
         )
-        return self._postprocess_action(obs, tr_action)
+        return tr_action
 
 
 class HeuristicPolicyExactMatchPPOTraining(HeuristicPolicyPPOTraining):
-    def apply(self, policy_params, obs, rng):
+    def _apply(self, policy_params, obs, rng):
         # Apply should get you an action
         total_stock_by_product = obs.stock.sum(axis=-1)
         tr_action = jnp.zeros_like(total_stock_by_product)
@@ -100,11 +100,11 @@ class HeuristicPolicyExactMatchPPOTraining(HeuristicPolicyPPOTraining):
             tr_action.at[obs.request_type].set(1),
             tr_action,
         )
-        return self._postprocess_action(obs, tr_action)
+        return tr_action
 
 
 class HeuristicPolicyPriorityMatchPPOTraining(HeuristicPolicyPPOTraining):
-    def apply(self, policy_params, obs, rng):
+    def _apply(self, policy_params, obs, rng):
         # Apply should get you an action
         total_stock_by_product = obs.stock.sum(axis=-1)
         tr_action = jnp.zeros_like(total_stock_by_product)
@@ -117,7 +117,7 @@ class HeuristicPolicyPriorityMatchPPOTraining(HeuristicPolicyPPOTraining):
             tr_action.at[policy_params[rt][in_stock_and_compatible.argmax()]].set(1),
             tr_action,
         )
-        return self._postprocess_action(obs, tr_action)
+        return tr_action
 
 
 class FlaxStochasticPolicy:
