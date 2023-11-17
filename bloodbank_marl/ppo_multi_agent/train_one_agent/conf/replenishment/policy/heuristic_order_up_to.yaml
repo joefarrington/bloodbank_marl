@@ -1,0 +1,5 @@
+_target_: bloodbank_marl.ppo_multi_agent.ppo_policies.HeuristicPolicyOrderUpToPPOTraining
+policy_id: 0
+env_name: ${environment.env_name}
+env_kwargs: ${environment.env_kwargs}
+env_params: ${environment.env_params}

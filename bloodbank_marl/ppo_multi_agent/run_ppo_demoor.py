@@ -226,10 +226,6 @@ def make_train(config):
 
     # env = FlattenObservationWrapper(env)
 
-    # TODO - Can we just delete this?
-    # For DeMoor
-    # action_dim = jnp.maximum(env.max_order_quantity, env.max_useful_life) + 1
-    # For Meneses
     num_actions = env.num_actions(
         0
     )  # Use agent_id for rep, as forced to be same for both agents
@@ -620,6 +616,7 @@ def plot_policies(policy_rep, policy_issue, policy_params):
     class EnvObs:
         agent_id: int  # Following Tianhou;
         stock: chex.Array
+        in_transit: chex.Array
         action_mask: chex.Array
 
         @property
@@ -627,9 +624,14 @@ def plot_policies(policy_rep, policy_issue, policy_params):
             return jnp.hstack([self.stock])
 
     stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
+    in_transit = jnp.array([1] * 121).reshape(121, 1)[
+        :, 1:
+    ]  # Doing this, should get the empty array we expect
     agent_id = jnp.array([1] * 121).reshape(121, 1)
     action_mask = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] * 121).reshape(121, 11)
-    all_obs = EnvObs(stock=stock, agent_id=agent_id, action_mask=action_mask)
+    all_obs = EnvObs(
+        stock=stock, agent_id=agent_id, action_mask=action_mask, in_transit=in_transit
+    )
 
     rep_actions = jax.vmap(
         jax.vmap(policy_rep.apply_deterministic, in_axes=(0, None, None)),
@@ -655,7 +657,9 @@ def plot_policies(policy_rep, policy_issue, policy_params):
     action_mask = jnp.hstack(
         [jnp.ones((121, 1)), jnp.where(stock > 0, 1, 0), jnp.zeros((121, 8))]
     )
-    all_obs = EnvObs(stock=stock, agent_id=agent_id, action_mask=action_mask)
+    all_obs = EnvObs(
+        stock=stock, agent_id=agent_id, action_mask=action_mask, in_transit=in_transit
+    )
 
     issue_actions = jax.vmap(
         jax.vmap(policy_issue.apply_deterministic, in_axes=(0, None, None)),

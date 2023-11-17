@@ -36,9 +36,10 @@ class HeuristicPolicyOrderUpToPPOTraining:
     def apply(self, policy_params, obs, rng):
         # Apply should get you an action
         tr_action = jnp.clip(
-            policy_params[self.policy_id] - obs.stock.sum(axis=-1),
-            a_min=0
-            # - obs.in_transit.sum(axis=-1)
+            policy_params[self.policy_id]
+            - obs.stock.sum(axis=-1)
+            - obs.in_transit.sum(axis=-1),
+            a_min=0,
         )
         return self._postprocess_action(obs, tr_action)
 
@@ -190,7 +191,7 @@ class FlaxStochasticOrderUpToRepPolicy(FlaxStochasticPolicy):
     def _postprocess_action(self, obs, tr_action):
         S = tr_action
         action = jnp.clip(
-            S - obs.stock.sum(axis=-1),  # - obs.in_transit.sum(axis=-1),
+            S - obs.stock.sum(axis=-1) - obs.in_transit.sum(axis=-1),
             a_min=0,
             a_max=None,
         )
