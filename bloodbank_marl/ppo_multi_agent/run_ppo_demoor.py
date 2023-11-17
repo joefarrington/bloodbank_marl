@@ -246,28 +246,6 @@ def make_train(config):
             value=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
             reward=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
             log_prob=jnp.array([-1.0] * n_steps, dtype=jnp.float32),
-            # This is for DeMoor, ideally we'd have a more general way of doing this
-            # But it is having a tantrum
-            # obs=EnvObs(
-            #    agent_id=jnp.zeros(n_steps, dtype=jnp.int32),
-            #    in_transit=jnp.zeros((n_steps, env.lead_time - 1), dtype=jnp.int32),
-            #    stock=jnp.zeros((n_steps, env.max_useful_life), dtype=jnp.int32),
-            #    action_mask=jnp.zeros((n_steps, action_dim), dtype=jnp.int32),
-            # ),
-            # For Meneses
-            # obs=EnvObs(
-            #    agent_id=jnp.zeros(n_steps, dtype=jnp.int32),
-            #    time=jnp.zeros(n_steps, dtype=jnp.float32),
-            #    request_type=jnp.zeros(n_steps, dtype=jnp.int32),
-            #    in_transit=jnp.zeros(
-            #        (n_steps, env.n_products, env.lead_time - 1),
-            #        dtype=jnp.int32,
-            #    ),
-            #    stock=jnp.zeros(
-            #        (n_steps, env.n_products, env.max_useful_life), dtype=jnp.int32
-            #    ),
-            #    action_mask=jnp.zeros((n_steps, env.n_products), dtype=jnp.int32),
-            # ),
             obs=default_obs.create_empty_obs(
                 config["environment"]["env_kwargs"], num_actions, n_steps
             ),
@@ -347,7 +325,6 @@ def make_train(config):
         # INIT ENV
         ## This is pretty standard Gymnax; vmapping over the rng in reset so we can run multiple rollouts in parallele
         ## but using the same env_params
-        # NOTE: At the moment this isn't really getting used
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config["replenishment"]["num_envs"])
         obsv, env_state = jax.vmap(env.reset, in_axes=(0, None))(reset_rng, env_params)
@@ -380,9 +357,6 @@ def make_train(config):
                 action, tr_action, log_prob, value = pm.apply(
                     policy_params, last_obs, _rng
                 )
-                # rng, _rng = jax.random.split(rng)
-                # action = pi.sample(seed=_rng)
-                # log_prob = pi.log_prob(action)
 
                 # Update transition with last_obs and action for the agent that is about to act
                 rep_idx, rep_t = jax.lax.cond(
