@@ -72,9 +72,7 @@ class HeuristicPolicyOrderUpToPPOTraining(HeuristicPolicyPPOTraining):
     def _apply(self, policy_params, obs, rng):
         # Apply should get you an action
         tr_action = jnp.clip(
-            policy_params[self.policy_id]
-            - obs.stock.sum(axis=-1)
-            - obs.in_transit.sum(axis=-1),
+            policy_params - obs.stock.sum(axis=-1) - obs.in_transit.sum(axis=-1),
             a_min=0,
         )
         return tr_action
