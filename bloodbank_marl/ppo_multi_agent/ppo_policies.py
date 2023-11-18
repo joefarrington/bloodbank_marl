@@ -116,7 +116,7 @@ class HeuristicPolicyPriorityMatchPPOTraining(HeuristicPolicyPPOTraining):
         ) * jnp.where(priorities >= 0, 1, 0)
         tr_action = jax.lax.select(
             jnp.any(in_stock_and_compatible),
-            tr_action.at[priorities[in_stock_and_compatible.argmax()]].set(1.0),
+            tr_action.at[priorities[..., in_stock_and_compatible.argmax()]].set(1.0),
             tr_action,
         )
         return tr_action
