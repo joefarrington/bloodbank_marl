@@ -10,6 +10,15 @@ wandb:
 plot_policies: False
 
 training:
+  num_envs: 10
   policy_to_train: 0
   num_steps: ${replenishment.num_steps}
   heuristic_params: 0
+  total_timesteps: 500
+
+replenishment:
+  num_steps: 10
+  num_minibatches: 1
+
+test_evaluator:
+  num_rollouts: 5

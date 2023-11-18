@@ -13,6 +13,9 @@ from flax import struct
 from bloodbank_marl.utils.gymnax_fitness import make
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
 
+# We want tr_action to be a float (because for rep raw action is sample from Gaussian)
+# We want action to be integer array (or single int)
+
 
 class HeuristicPolicyPPOTraining:
     def __init__(
@@ -30,7 +33,7 @@ class HeuristicPolicyPPOTraining:
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
 
     def apply(self, policy_params, obs, rng):
-        tr_action = self._apply(policy_params, obs, rng)
+        tr_action = self._apply(policy_params[self.policy_id], obs, rng)
         action = self._postprocess_action(obs, tr_action)
         return action
 
@@ -38,7 +41,7 @@ class HeuristicPolicyPPOTraining:
         raise NotImplementedError
 
     def apply_for_training(self, policy_params, obs, rng):
-        tr_action = self._apply(policy_params, obs, rng)
+        tr_action = self._apply(policy_params[self.policy_id], obs, rng)
         action = self._postprocess_action(obs, tr_action)
         return action, tr_action, 0.0, 0.0
 
@@ -53,7 +56,7 @@ class HeuristicPolicyPPOTraining:
         raise NotImplementedError
 
     def _postprocess_action(self, obs, tr_action):
-        return tr_action.astype(int)
+        return tr_action.astype(jnp.int32)
 
     def _sample_action(self, pi, rng):
         raise NotImplementedError
@@ -94,10 +97,10 @@ class HeuristicPolicyExactMatchPPOTraining(HeuristicPolicyPPOTraining):
     def _apply(self, policy_params, obs, rng):
         # Apply should get you an action
         total_stock_by_product = obs.stock.sum(axis=-1)
-        tr_action = jnp.zeros_like(total_stock_by_product)
+        tr_action = jnp.zeros_like(total_stock_by_product, dtype=jnp.float32)
         tr_action = jax.lax.select(
             total_stock_by_product[obs.request_type] > 0,
-            tr_action.at[obs.request_type].set(1),
+            tr_action.at[obs.request_type].set(1.0),
             tr_action,
         )
         return tr_action
@@ -107,14 +110,15 @@ class HeuristicPolicyPriorityMatchPPOTraining(HeuristicPolicyPPOTraining):
     def _apply(self, policy_params, obs, rng):
         # Apply should get you an action
         total_stock_by_product = obs.stock.sum(axis=-1)
-        tr_action = jnp.zeros_like(total_stock_by_product)
+        tr_action = jnp.zeros_like(total_stock_by_product, dtype=jnp.float32)
         rt = obs.request_type
+        priorities = jax.lax.dynamic_index_in_dim(policy_params, rt, 0)
         in_stock_and_compatible = jnp.where(
-            total_stock_by_product[policy_params[rt]] > 0, 1, 0
-        ) * jnp.where(policy_params[rt] >= 0, 1, 0)
+            total_stock_by_product[priorities] > 0, 1, 0
+        ) * jnp.where(priorities >= 0, 1, 0)
         tr_action = jax.lax.select(
             jnp.any(in_stock_and_compatible),
-            tr_action.at[policy_params[rt][in_stock_and_compatible.argmax()]].set(1),
+            tr_action.at[priorities[in_stock_and_compatible.argmax()]].set(1.0),
             tr_action,
         )
         return tr_action

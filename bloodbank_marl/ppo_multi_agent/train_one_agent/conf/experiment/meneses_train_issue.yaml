@@ -10,6 +10,17 @@ wandb:
 plot_policies: False
 
 training:
+  num_envs: 10
   policy_to_train: 1
   num_steps: ${issuing.num_steps}
   heuristic_params: [50.,50.,50.,50.,50.,50.,50.,50.] # Placeholder order up to values
+  total_timesteps: 5000
+
+replenishment:
+  num_steps: 2
+
+issuing:
+  num_steps: 100
+
+test_evaluator:
+  num_rollouts: 5
