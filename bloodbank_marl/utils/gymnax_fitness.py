@@ -1,7 +1,6 @@
 # Taken from our original implementation in jupyter notebook
 # multiagent_demo/20230821_jax_demorr_marl_evosax_fitness.ipynb
 # TODO: Put in a link to the general evosax gymnax fitness class
-# TODO Make more general, some elements of this are specific to the DeMoor environment
 
 import jax
 import chex
@@ -63,7 +62,6 @@ class GymnaxFitness(object):
         test: bool = False,
         n_devices: Optional[int] = None,
         num_warmup_days: int = 0,  # TODO: Arguments from here down are new, may want to input another way
-        max_warmup_steps: int = 1500,
         gamma: float = 0.99,
     ):
         self.env_name = env_name
@@ -101,7 +99,6 @@ class GymnaxFitness(object):
 
         # Warmup and discounting parameters - newly added and to decide best way to track
         self.num_warmup_days = num_warmup_days
-        self.max_warmup_steps = max_warmup_steps
         self.gamma = gamma
 
     def set_apply_fn(self, network_apply, carry_init=None):
@@ -151,24 +148,31 @@ class GymnaxFitness(object):
         rng_reset, rng_episode = jax.random.split(rng_input)
         obs, state = self.env.reset(rng_reset, self.env_params)
 
-        def warmup_step(state_input, tmp):
+        def warmup_step(state_input):
             # New method added to handle warmup
-            obs, state, rng = state_input
+            obs, state, _, rng = state_input
             rng, rng_step, rng_net = jax.random.split(rng, 3)
             action = self.network(policy_params, obs, rng=rng_net)
             next_o, next_s, reward, truncation, termination, info = self.env.step(
                 rng_step, state, action, self.env_params
             )
             warmup_done = jax.lax.ge(state.day, self.num_warmup_days)
+            # TODO: We can probably get rid of the next few lines when using the while loop
             state = jax.tree_map(
                 lambda x, y: jnp.where(warmup_done, x, y), state, next_s
             )
             obs = jax.tree_map(lambda x, y: jnp.where(warmup_done, x, y), obs, next_o)
-            carry, y = [obs, state, rng], []
-            return carry, y
+            carry = (obs, state, warmup_done, rng)
+            return carry
 
-        def policy_step(state_input, tmp):
+        def cond_fn_warmup(carry):
+            """Condition for warmup loop."""
+            obs, state, warmup_done, rng = carry
+            return jax.lax.bitwise_not(warmup_done)
+
+        def policy_step(state_input):
             """lax.scan compatible step transition in jax env."""
+            # TODO: We can probably simplify some of this when using the while loop
             (
                 obs,
                 state,
@@ -210,22 +214,39 @@ class GymnaxFitness(object):
                 new_cum_info,
                 new_valid_mask,
             ]
-            y = [new_valid_mask]
-            return carry, y
+            return carry
+
+        def cond_fn_policy_step(carry):
+            """Condition for warmup loop."""
+            (
+                next_o,
+                next_s,
+                policy_params,
+                rng,
+                cum_reward,
+                cum_return,
+                cum_info,
+                valid_mask,
+            ) = carry
+            # When all are equal to 0, we are done
+            return jax.lax.bitwise_and(
+                jnp.any(jax.lax.gt(valid_mask, 0)),
+                jax.lax.lt(next_s.step, self.num_env_steps),
+            )
 
         # Run the warmup period
-        carry_out, _ = jax.lax.scan(
+        carry_out = jax.lax.while_loop(
+            cond_fn_warmup,
             warmup_step,
-            [
+            (
                 obs,
                 state,
+                False,
                 rng_episode,
-            ],
-            (),
-            self.max_warmup_steps,
+            ),
         )
 
-        obs, state, rng_episode = carry_out
+        obs, state, rng_episode, warmup_done = carry_out
         rng_reset, rng_episode = jax.random.split(rng_input)
         state = self.env.end_of_warmup_reset(rng_reset, state, self.env_params)
 
@@ -235,7 +256,8 @@ class GymnaxFitness(object):
         valid_mask = jnp.ones(self.env.num_agents, dtype=jnp_int)
 
         # Scan over episode step loop
-        carry_out, scan_out = jax.lax.scan(
+        carry_out = jax.lax.while_loop(
+            cond_fn_policy_step,
             policy_step,
             [
                 obs,
@@ -247,11 +269,9 @@ class GymnaxFitness(object):
                 cum_info,
                 valid_mask,
             ],
-            (),
-            self.num_env_steps,
         )
         # Return the sum of rewards accumulated by agent in episode rollout
-        ep_mask = scan_out
+        # ep_mask = scan_out
         cum_reward = carry_out[-4].squeeze()  # Not discounted, one per agent
         cum_return = carry_out[
             -3
@@ -265,4 +285,4 @@ class GymnaxFitness(object):
             kpis, self.env_params
         )
         cum_return = cum_return + target_breached_penalty
-        return cum_return, cum_infos, kpis, jnp.array(ep_mask)
+        return cum_return, cum_infos, kpis, None  # jnp.array(ep_mask)
