@@ -571,6 +571,11 @@ class MenesesPerishableEnv(MarlEnvironment):
             low=0, high=self.max_order_quantities + 1, shape=(self.n_products,)
         )
 
+    def action_padding(self, agent_id: int):
+        """Padding required for each agent"""
+        # Action space for both agents is the same, no padding
+        return 0
+
     def observation_space(self, params: EnvParams, agent_id: int = 1):
         """Observation space of the agent with id `agent_id`. For now, both the same"""
         return spaces.Box(

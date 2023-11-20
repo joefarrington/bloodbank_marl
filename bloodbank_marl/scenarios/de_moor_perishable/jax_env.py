@@ -387,9 +387,9 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
 
     def num_actions(self, agent_id: int) -> int:
         """Number of actions possible in environment for agent with id `agent_id`."""
-        # NOTE: We use this to get the output dim of the policy network
-        # Therefore, same for both agents, the maximum of the two
-        return self.action_space(self.default_params, agent_id).n
+        rep = self.max_order_quantity + 1
+        issue = self.max_useful_life + 1
+        return jax.lax.switch(agent_id, [lambda x: rep, lambda x: issue], None)
 
     def action_space(self, params: EnvParams, agent_id: int):
         """Action space of the agent with id `agent_id`"""
@@ -398,6 +398,17 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         # And then enforce using action masking in agents and clipping in steps
         max_action = jnp.maximum(self.max_order_quantity, self.max_useful_life)
         return spaces.Discrete(max_action + 1)
+
+    def action_padding(self, agent_id: int):
+        """Padding required for each agent"""
+
+        rep = jnp.clip(
+            self.max_useful_life - self.max_order_quantity, a_min=0, a_max=None
+        )
+        issue = jnp.clip(
+            self.max_order_quantity - self.max_useful_life, a_min=0, a_max=None
+        )
+        return int(jax.lax.select(agent_id == 0, rep, issue))
 
     def observation_space(self, params: EnvParams, agent_id: int = 1) -> spaces.Box:
         """Observation space of the agent with id `agent_id`. For now, both the same"""
@@ -491,7 +502,7 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         order = jnp.clip(action, a_min=0, a_max=self.max_order_quantity)
         infos = infos.replace(
             orders=infos.orders.at[:].add(order),
-            order_placed=infos.orders.at[:].add(
+            order_placed=infos.order_placed.at[:].add(
                 jax.lax.cond(order > 0, lambda: 1, lambda: 0)
             ),
         )

@@ -32,7 +32,11 @@ class FlaxRepPolicy:
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.replace(**env_params)
-        self.model = model_class(n_actions=env.num_actions(policy_id), **model_kwargs)
+        self.model = model_class(
+            n_actions=env.num_actions(policy_id),
+            action_pad=env.action_padding(policy_id),
+            **model_kwargs,
+        )
 
     def get_params(self, rng):
         env, _ = make(self.env_name, **self.env_kwargs)
@@ -75,7 +79,11 @@ class FlaxMultiProductRepPolicy(FlaxRepPolicy):
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.replace(**env_params)
-        self.model = model_class(n_actions=env.num_actions(policy_id), **model_kwargs)
+        self.model = model_class(
+            n_actions=env.num_actions(policy_id),
+            action_pad=env.action_padding(policy_id),
+            **model_kwargs,
+        )
         self.clip_min = clip_min
         self.clip_max = clip_max
         self.max_order_quantities = env.max_order_quantities
@@ -114,6 +122,7 @@ class FlaxMultiProductOrderUpToRepPolicy(FlaxMultiProductRepPolicy):
 class RepDiscreteMLP(nn.Module):
     n_hidden: int
     n_actions: int
+    action_pad: int = 0
 
     @nn.compact
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
@@ -121,6 +130,7 @@ class RepDiscreteMLP(nn.Module):
         x = nn.Dense(self.n_hidden)(x)
         x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
+        x = jnp.hstack([x, jnp.zeros((x.shape[:-1] + (self.action_pad,)))])
         x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
         x = jnp.argmax(x, axis=-1)
         return x
@@ -129,9 +139,11 @@ class RepDiscreteMLP(nn.Module):
 class RepMultiProductMLP(nn.Module):
     n_hidden: int
     n_actions: int
+    action_pad: int = 0
 
     @nn.compact
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
+        # x = obs.stock.sum(axis=-1) # Alternative is just have total number of stock per product
         x = obs.obs
         x = nn.Dense(self.n_hidden)(x)
         x = nn.relu(x)
