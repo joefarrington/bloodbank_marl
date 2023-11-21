@@ -752,12 +752,18 @@ def main(cfg):
         lambda x: jnp.array([x]), output["runner_state"][1].params
     )
     policy_params = {0: rep_params, 1: issue_params}
-    eval_output = fitness.rollout(
+    fitness, cum_infos, kpis = fitness.rollout(
         jax.random.PRNGKey(cfg.evaluation_seed), policy_params
     )
-    print(f"Mean return on eval episodes: {eval_output[0].mean()}")
-    wandb.log({"return_mean": eval_output[0].mean()})
-    wandb.log({"return_std": eval_output[0].std()})
+    print(f"Mean return on eval episodes: {fitness.mean()}")
+    wandb.log({"eval/return_mean": fitness[0].mean()})
+    wandb.log({"eval/return_std": fitness[0].std()})
+    test_kpis = {
+        f"eval/{k}": v.mean(axis=-1)
+        for k, v in kpis.items()
+        if k in cfg.environment.kpis_log_eval
+    }
+    wandb.log(test_kpis)
 
     if config["plot_policies"]:
         plot_policies(policy_rep, policy_issue, policy_params)

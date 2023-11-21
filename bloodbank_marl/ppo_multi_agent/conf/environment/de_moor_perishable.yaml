@@ -7,3 +7,7 @@ env_kwargs:
 env_params: {}
 num_warmup_days: 100
 gamma: 0.99
+kpis_log_eval:
+  - service_level_%
+  - wastage_%
+  - holding

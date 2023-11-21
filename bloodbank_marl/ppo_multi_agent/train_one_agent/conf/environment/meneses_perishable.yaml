@@ -10,3 +10,10 @@ env_kwargs:
 env_params: {}
 num_warmup_days: 0
 gamma: 1.0
+kpis_log_eval:
+  - mean_total_order
+  - service_level_%
+  - expiries_%
+  - mean_holding
+  - exact_match_%
+  - mean_age_at_transfusion

@@ -6,3 +6,4 @@ defaults:
 training:
   policy_to_train: 0
   num_steps: ${replenishment.num_steps}
+  total_timesteps: 1e6
