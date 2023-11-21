@@ -11,7 +11,7 @@ python = ">=3.10,<3.12"
 orbax-checkpoint = "^0.3.5"
 orbax-export = "^0.0.3"
 hydra-core = "^1.3.2"
-distrax = "^0.1.4"
+distrax = {git = "https://github.com/deepmind/distrax.git"}
 gymnax = "^0.0.6"
 flax = "^0.7.2"
 pandas = "^2.0.3"
@@ -21,10 +21,12 @@ scipy = "^1.11.2"
 evosax = "^0.1.4"
 gymnasium = "^0.29.1"
 pettingzoo = "^1.24.0"
-seaborn = "^0.12.2"
+seaborn = "0.13.0"
 numpyro = "^0.13.0"
 optuna = "^3.3.0"
 wandb = "^0.15.12"
+jax-tqdm = "^0.1.1"
+plotly = "^5.18.0"
 
 [tool.poetry.group.jax.dependencies]
 jax = {extras = ["cuda12_pip"], version = "^0.4.14", source = "jax"}
@@ -33,8 +35,6 @@ jaxlib = {version = "^0.4.14", source = "jaxlib"}
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.0.0"
 black = "^22.12.0"
-tensorboard-plugin-profile = "^2.14.0"
-tensorflow-cpu = "^2.14.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.1.3"
