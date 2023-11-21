@@ -128,7 +128,7 @@ class EnvParams:
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
         max_expiry_target: float = 1.0,
         min_service_level_target: float = 0.0,
-        target_kpi_breach_penalty: float = 1e10,
+        target_kpi_breach_penalty: float = 0, # No penalty for now
         max_days_in_episode: int = 365,
         max_steps_in_episode: int = 1e10,
         gamma: float = 1.0,
