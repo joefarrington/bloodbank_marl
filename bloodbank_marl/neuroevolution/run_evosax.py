@@ -97,9 +97,9 @@ def main(cfg):
 
         log_to_wandb = {
             "Generation": gen,
-            "gen_1": log["log_gen_1"][gen],
-            "gen_mean": log["log_gen_mean"][gen],
-            "top_1": log["log_top_1"][gen],
+            "train/gen_1": log["log_gen_1"][gen],
+            "train/gen_mean": log["log_gen_mean"][gen],
+            "train/top_1": log["log_top_1"][gen],
         }
 
         if gen % cfg.evosax.evaluate_every_k_gens == 0:
@@ -108,8 +108,8 @@ def main(cfg):
             test_fitness = test_evaluator.rollout(rng_eval, reshaped_test_params)[
                 0
             ].mean(axis=-1)
-            log_to_wandb["top_1_test"] = test_fitness[0]
-            log_to_wandb["mean_params_test"] = test_fitness[1]
+            log_to_wandb["eval/top_1"] = test_fitness[0]
+            log_to_wandb["eval/mean_params"] = test_fitness[1]
 
         wandb.log(log_to_wandb)
     # NOTE: Training is quick so for now just checkpoint at the end and re-run if needed
