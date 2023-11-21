@@ -208,18 +208,19 @@ class EnvInfo:
         return {
             "mean_order_by_product": self.orders[0, :] / self.day_counter[0],
             "service_level_%_by_pt_blood_group": (
-                self.demand[0, :] - self.shortages[0, :]
+                (self.demand[0, :] - self.shortages[0, :]) * 100
             )
             / self.demand[0, :],
-            "expiries_%_by_product": (self.expiries[0, :]) / self.orders[0, :],
+            "expiries_%_by_product": ((self.expiries[0, :]) * 100) / self.orders[0, :],
             "mean_holding_by_product": self.holding[0, :]
             / jnp.expand_dims(self.day_counter[0], -1),
             "mean_age_at_transfusion_by_pt_blood_group": self._calculate_mean_age_at_transfusion_by_pt_blood_group(),
             "exact_match_%_by_pt_blood_group": self._calculate_exact_match_pc_by_pt_blood_group(),
             "mean_total_order": jnp.sum(self.orders[0, :]) / self.day_counter[0],
-            "service_level_%": jnp.sum(self.demand[0, :] - self.shortages[0, :])
+            "service_level_%": (jnp.sum(self.demand[0, :] - self.shortages[0, :]) * 100)
             / jnp.sum(self.demand[0, :]),
-            "expiries_%": jnp.sum(self.expiries[0, :]) / jnp.sum(self.orders[0, :]),
+            "expiries_%": (jnp.sum(self.expiries[0, :]) * 100)
+            / jnp.sum(self.orders[0, :]),
             "mean_holding": jnp.sum(self.holding[0, :]) / self.day_counter[0],
             "exact_match_%": self._calculate_exact_match_pc(),
             "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(),
@@ -249,12 +250,12 @@ class EnvInfo:
             jnp.arange(self.allocations[0].shape[0]),
         ]
         total_allocated_by_request_type = self.allocations[0].sum(axis=(-2, -1))
-        return exact_matches_by_request_type / total_allocated_by_request_type
+        return (exact_matches_by_request_type * 100) / total_allocated_by_request_type
 
     def _calculate_exact_match_pc(self):
         exact_matches = jnp.trace(self.allocations[0].sum(axis=-1))
         total_allocated = jnp.sum(self.allocations[0])
-        return exact_matches / total_allocated
+        return (exact_matches * 100) / total_allocated
 
     def _calculate_mean_age_at_transfusion_by_pt_blood_group(self):
         ages = jnp.arange(self.allocations[0].shape[2])

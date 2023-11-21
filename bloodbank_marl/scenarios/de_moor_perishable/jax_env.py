@@ -122,8 +122,9 @@ class EnvInfo:
         """Calculate KPIs from cumulative info for the replenishment agent"""
 
         return {
-            "service_level_%": (self.demand[0] - self.shortages[0]) / self.demand[0],
-            "wastage_%": self.expiries[0] / self.orders[0],
+            "service_level_%": ((self.demand[0] - self.shortages[0]) * 100)
+            / self.demand[0],
+            "wastage_%": (self.expiries[0] * 100) / self.orders[0],
             "holding": self.holding[0] / self.day_counter[0],
         }
 
