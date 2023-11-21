@@ -1,3 +1,7 @@
+defaults:
+  - algorithm_additional_config/multi_agent/policies/replenishment: torch_action_mask
+  - algorithm_additional_config/multi_agent/policies/issuing: torch_action_mask
+
 wandb:
   project: "demoor_rllib_example"
 
@@ -28,21 +32,6 @@ algorithm_additional_config:
   fault_tolerance: {}
   framework: torch
   multi_agent:
-    policies:
-      replenishment:
-        _target_: ray.rllib.policy.policy.PolicySpec
-        config:
-          _target_: ray.rllib.algorithms.ppo.PPOConfig.overrides
-          model:
-            custom_model: "TorchActionMaskModel"
-          gamma: 0.8
-      issuing:
-        _target_: ray.rllib.policy.policy.PolicySpec
-        config:
-          _target_: ray.rllib.algorithms.ppo.PPOConfig.overrides
-          model:
-            custom_model: "TorchActionMaskModel"
-          gamma: 0.8
     policies_to_train: ["replenishment", "issuing"]
   offline_data: {}
   python_environment: {}

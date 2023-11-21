@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+- override /algorithm_additional_config/multi_agent/policies/replenishment: spolicy
+
+algorithm_additional_config:
+  multi_agent:
+    policies_to_train: ["issuing"]

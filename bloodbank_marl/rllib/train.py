@@ -46,11 +46,13 @@ def main(hydra_cfg):
                     hydra_cfg.algorithm_additional_config.multi_agent.policies.replenishment,
                     observation_space=example_env.observation_space("replenishment"),
                     action_space=example_env.action_space("replenishment"),
+                    _convert_="partial",
                 ),
                 "issuing": hydra.utils.instantiate(
                     hydra_cfg.algorithm_additional_config.multi_agent.policies.issuing,
                     observation_space=example_env.observation_space("issuing"),
                     action_space=example_env.action_space("issuing"),
+                    _convert_="partial",
                 ),
             },
             policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id,

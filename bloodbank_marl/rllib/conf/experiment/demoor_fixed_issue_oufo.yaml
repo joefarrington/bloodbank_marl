@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+- override /algorithm_additional_config/multi_agent/policies/issuing: oufo
+
+algorithm_additional_config:
+  multi_agent:
+    policies_to_train: ["replenishment"]

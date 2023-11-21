@@ -66,3 +66,44 @@ class TorchActionMaskModel(TorchModelV2, nn.Module):
 
     def value_function(self):
         return self.internal_model.value_function()
+
+
+class TorchDictObsSpaceModel(TorchModelV2, nn.Module):
+    """PyTorch model when we want to use the Dict elements of a space"""
+
+    def __init__(
+        self,
+        obs_space,
+        action_space,
+        num_outputs,
+        model_config,
+        name,
+        **kwargs,
+    ):
+        orig_space = getattr(obs_space, "original_space", obs_space)
+        assert (
+            isinstance(orig_space, gymnasium.spaces.Dict)
+            and "observations" in orig_space.spaces
+        )
+
+        TorchModelV2.__init__(
+            self, obs_space, action_space, num_outputs, model_config, name, **kwargs
+        )
+        nn.Module.__init__(self)
+
+        self.internal_model = TorchFC(
+            orig_space["observations"],
+            action_space,
+            num_outputs,
+            model_config,
+            name + "_internal",
+        )
+
+    def forward(self, input_dict, state, seq_lens):
+        # Compute the unmasked logits.
+        logits, _ = self.internal_model({"obs": input_dict["obs"]["observations"]})
+
+        return logits, state
+
+    def value_function(self):
+        return self.internal_model.value_function()

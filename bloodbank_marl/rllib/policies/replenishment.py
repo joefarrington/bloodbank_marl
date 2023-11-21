@@ -21,5 +21,7 @@ class SPolicy(DictObsSpacePolicy):
         # This relies on the dict obs space we're currently using
         # We don't use the action mask here, we assume an action output by
         # this policy is valid
-        stock_on_hand_and_in_transit = obs["stock"].sum() + obs["in_transit"].sum()
+        stock_on_hand_and_in_transit = obs["stock"].sum(axis=-1) + obs[
+            "in_transit"
+        ].sum(axis=-1)
         return np.clip(self.S - stock_on_hand_and_in_transit, 0, None)
