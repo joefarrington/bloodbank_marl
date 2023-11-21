@@ -1,5 +1,5 @@
 env_name: "DeMoorPerishable"
-num_env_steps: 5000
+num_env_steps: 1e6 # Much longer than episode expected to be
 num_rollouts: 200
 env_kwargs:
   max_useful_life: 2
@@ -8,5 +8,8 @@ env_kwargs:
 env_params:
   max_days_in_episode: 365
 num_warmup_days: 100
-max_warmup_steps: 1500
 gamma: 0.99
+kpis_log_eval:
+  - service_level_%
+  - wastage_%
+  - holding

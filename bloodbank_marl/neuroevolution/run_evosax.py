@@ -108,10 +108,21 @@ def main(cfg):
             fitness, cum_infos, kpis = test_evaluator.rollout(
                 rng_eval, reshaped_test_params
             )
-            test_fitness = fitness.mean(axis=-1)
-            log_to_wandb["eval/top_1"] = test_fitness[0]
-            log_to_wandb["eval/mean_params"] = test_fitness[1]
-            print(kpis)
+            test_fitness_mean = fitness.mean(axis=-1)
+            test_fitness_std = fitness.std(axis=-1)
+            # NOTE: Mean KPIs assume single value per rollout (vs others that
+            # are by product type etc; so we specifiy in config which ones should
+            # be used here)
+            test_kpis = {
+                k: v.mean(axis=-1)
+                for k, v in kpis.items()
+                if k in cfg.environment.kpis_log_eval
+            }
+            for idx, p in enumerate(["top_1", "mean_params"]):
+                log_to_wandb[f"eval/{p}/return_mean"] = test_fitness_mean[idx]
+                log_to_wandb[f"eval/{p}/return_std"] = test_fitness_std[idx]
+                for k, v in test_kpis.items():
+                    log_to_wandb[f"eval/{p}/{k}"] = v[idx]
 
         wandb.log(log_to_wandb)
     # NOTE: Training is quick so for now just checkpoint at the end and re-run if needed
