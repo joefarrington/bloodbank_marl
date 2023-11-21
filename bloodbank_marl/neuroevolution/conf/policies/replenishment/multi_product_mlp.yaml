@@ -1,0 +1,13 @@
+_target_: bloodbank_marl.policies.replenishment.FlaxMultiProductRepPolicy
+model_class:
+  _target_: hydra.utils.get_class
+  path: bloodbank_marl.policies.replenishment.RepMultiProductMLP
+model_kwargs:
+  n_hidden: 64
+policy_id: 0
+env_name: ${environment.env_name}
+env_kwargs: ${environment.env_kwargs}
+env_params: ${environment.env_params}
+clip_min: -1
+clip_max: 1
+min_order_quantity: 0

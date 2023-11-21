@@ -34,6 +34,7 @@ evosax:
     _target_: orbax.checkpoint.CheckpointManagerOptions
     max_to_keep: 1
     create: True
+    
 
 train_evaluator:
   _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
@@ -45,7 +46,6 @@ train_evaluator:
   test: False
   n_devices:
   num_warmup_days: ${environment.num_warmup_days}
-  max_warmup_steps: ${environment.max_warmup_steps}
   gamma: ${environment.gamma}
 
 test_evaluator:
@@ -58,7 +58,6 @@ test_evaluator:
   test: True
   n_devices:
   num_warmup_days: ${environment.num_warmup_days}
-  max_warmup_steps: ${environment.max_warmup_steps}
   gamma: ${environment.gamma}
 
 policies:

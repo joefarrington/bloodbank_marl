@@ -80,9 +80,9 @@ class GymnaxFitness(object):
         self.env_params = self.env_params.replace(**env_params)
 
         if num_env_steps is None:
-            self.num_env_steps = self.env_params.max_steps_in_episode
+            self.num_env_steps = int(self.env_params.max_steps_in_episode)
         else:
-            self.num_env_steps = num_env_steps
+            self.num_env_steps = int(num_env_steps)
         self.steps_per_member = self.num_env_steps * num_rollouts
 
         ## TODO: Rewrite to make dicts with entries for each agent

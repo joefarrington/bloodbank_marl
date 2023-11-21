@@ -23,6 +23,7 @@ from bloodbank_marl.utils.gymnax_fitness import make
 class DiscreteActorCritic(nn.Module):
     n_actions: int
     n_hidden: int = 64
+    action_pad: int = 0
     activation: str = "tanh"
 
     @nn.compact
@@ -44,6 +45,9 @@ class DiscreteActorCritic(nn.Module):
             self.n_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(actor_mean)
         # Apply action masking to logits
+        actor_mean = jnp.hstack(
+            [actor_mean, jnp.zeros((actor_mean.shape[:-1] + (self.action_pad,)))]
+        )
         actor_mean = actor_mean + jnp.where(obs.action_mask == 0, -1e8, 0.0)
         pi = distrax.Categorical(logits=actor_mean)
 
@@ -65,6 +69,7 @@ class DiscreteActorCritic(nn.Module):
 class ContinuousActorCritic(nn.Module):
     n_actions: int
     n_hidden: int = 64
+    action_pad: int = 0  # Not currently used
     activation: str = "tanh"
 
     @nn.compact
@@ -103,9 +108,11 @@ class ContinuousActorCritic(nn.Module):
         return pi, jnp.squeeze(critic, axis=-1)
 
 
+# # TODO MAybe rename this multiproduct?
 class DiscreteIssuingActorCritic(nn.Module):
     n_actions: int
     n_hidden: int = 64
+    action_pad: int = 0
     activation: str = "tanh"
 
     @nn.compact

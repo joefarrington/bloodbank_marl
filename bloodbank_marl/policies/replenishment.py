@@ -300,7 +300,7 @@ class SPolicy(HeuristicPolicy):
     ) -> List[str]:
         """Get the row names for the policy parameters - these are the names of the different levels of a
         given paramter, e.g. for different days of the week or different products"""
-        if env_name == "MenesesPerishable" or "MenesesPerishableGymnax":
+        if env_name in ["MenesesPerishable", "MenesesPerishableGymnax"]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
         else:
             return []

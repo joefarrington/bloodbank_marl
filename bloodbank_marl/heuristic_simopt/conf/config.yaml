@@ -34,20 +34,18 @@ train_evaluator:
   test: False
   n_devices:
   num_warmup_days: ${environment.num_warmup_days}
-  max_warmup_steps: ${environment.max_warmup_steps}
   gamma: ${environment.gamma}
 
 test_evaluator:
   _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
   env_name: ${environment.env_name}
   num_env_steps: ${environment.num_env_steps}
-  num_rollouts: 1000
+  num_rollouts: 10000
   env_kwargs: ${environment.env_kwargs}
   env_params: ${environment.env_params}
   test: True
   n_devices:
   num_warmup_days: ${environment.num_warmup_days}
-  max_warmup_steps: ${environment.max_warmup_steps}
   gamma: ${environment.gamma}
 
 

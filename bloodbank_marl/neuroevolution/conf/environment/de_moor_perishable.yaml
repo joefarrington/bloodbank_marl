@@ -5,7 +5,8 @@ env_kwargs:
   max_useful_life: 2
   lead_time: 1
   max_order_quantity: 10
-env_params: {}
+env_params:
+  max_days_in_episode: 365
 num_warmup_days: 100
 max_warmup_steps: 1500
 gamma: 0.99

@@ -44,7 +44,6 @@ test_evaluator:
   test: True
   n_devices:
   num_warmup_days: ${environment.num_warmup_days}
-  max_warmup_steps: ${environment.max_warmup_steps}
   gamma: ${environment.gamma}
 
 

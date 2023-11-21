@@ -139,7 +139,10 @@ class FlaxStochasticPolicy:
         self.env_params = default_env_params.replace(**env_params)
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
         self.n_actions = int(env.num_actions(policy_id))
-        self.model = model_class(n_actions=self.n_actions, **model_kwargs)
+        self.action_pad = int(env.action_padding(policy_id))
+        self.model = model_class(
+            n_actions=self.n_actions, action_pad=self.action_pad, **model_kwargs
+        )
 
     def apply(self, policy_params, obs, rng):
         # Apply should get you an action
@@ -241,7 +244,11 @@ class FlaxMultiProductStochasticRepPolicy(FlaxStochasticPolicy):
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.replace(**env_params)
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
-        self.model = model_class(n_actions=env.num_actions(policy_id), **model_kwargs)
+        self.n_actions = env.num_actions(policy_id)
+        self.action_pad = env.action_padding(policy_id)
+        self.model = model_class(
+            n_actions=self.n_actions, action_pad=self.action_pad, **model_kwargs
+        )
         self.clip_min = clip_min
         self.clip_max = clip_max
         self.max_order_quantities = env.max_order_quantities

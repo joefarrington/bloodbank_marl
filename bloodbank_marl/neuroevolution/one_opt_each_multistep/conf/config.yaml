@@ -1,0 +1,124 @@
+wandb:
+  init:
+    project: "es_demoor_fit_both_sep_strategies"
+
+evosax:
+  num_generations: 75
+  n_rep_updates: 1
+  n_issue_updates: 1
+  evaluate_every_k_gens: 5
+  seed: 10
+  
+  issuing:
+    strategy:
+      _target_: evosax.OpenES
+      popsize: 150
+      opt_name: "adam"
+      lrate_init: 0.4
+      sigma_init: 0.2
+
+  replenishment:
+    strategy:
+      _target_: evosax.OpenES
+      popsize: 150
+      opt_name: "adam"
+      lrate_init: 0.4
+      sigma_init: 0.2
+
+  fitness_shaper:
+    _target_: evosax.FitnessShaper
+    maximize: True
+
+  logging:
+    _target_: evosax.utils.ESLog
+    num_generations: ${evosax.num_generations}
+    top_k: 5
+    maximize: ${evosax.fitness_shaper.maximize}
+
+  checkpoint_options:
+    _target_: orbax.checkpoint.CheckpointManagerOptions
+    max_to_keep: 1
+    create: True
+
+environment:
+  env_name: "DeMoorPerishable"
+  num_env_steps: 5000
+  num_rollouts: 200
+  env_kwargs:
+    max_useful_life: 2
+    lead_time: 1
+    max_order_quantity: 10
+  env_params: {}
+  num_warmup_days: 100
+  max_warmup_steps: 1500
+  gamma: 0.99
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${environment.num_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
+
+test_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: 10000
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: True
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  max_warmup_steps: ${environment.max_warmup_steps}
+  gamma: ${environment.gamma}
+
+
+policies:
+  optimize:
+    - 0
+    - 1
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  replenishment:
+    #_target_: bloodbank_marl.policies.common.FixedPolicy
+    #policy_function:
+    #  _target_: hydra.utils.get_method
+    #  path: bloodbank_marl.policies.replenishment.order_up_to
+    #policy_params: 10
+    _target_: bloodbank_marl.policies.replenishment.FlaxRepPolicy
+    policy_class:
+      _target_: hydra.utils.get_class
+      path: bloodbank_marl.policies.replenishment.RepMLP
+    policy_kwargs:
+      n_hidden: 64
+    policy_id: 0
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+  issuing:
+    #_target_: bloodbank_marl.policies.common.FixedPolicy
+    #policy_function:
+    #  _target_: hydra.utils.get_method
+    #  path: bloodbank_marl.policies.issuing.issue_fifo
+    #policy_params: 12
+    _target_: bloodbank_marl.policies.issuing.FlaxIssuePolicy
+    policy_class: 
+      _target_: hydra.utils.get_class
+      path: bloodbank_marl.policies.issuing.IssueMLP
+    policy_id: 1
+    policy_kwargs:
+      n_hidden: 64
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+
+
+
+
