@@ -143,7 +143,6 @@ def make_train(fixed_config):
         fixed_config["environment"]["env_name"],
         **fixed_config["environment"]["env_kwargs"],
     )
-    # default_obs, _ = env.reset(jax.random.PRNGKey(1), env_params)
     env = LogWrapper(env)
 
     def train(hp_config, rng):
@@ -157,17 +156,6 @@ def make_train(fixed_config):
                 / fixed_config["NUM_UPDATES"]
             )
             return hp_config.LR * frac
-
-        # INIT NETWORK
-        # network = ActorCritic(
-        #    env.action_space(env_params).n,
-        #    num_hidden_units=fixed_config["NUM_HIDDEN_UNITS"],
-        #    num_hidden_layers=fixed_config["NUM_HIDDEN_LAYERS"],
-        #    activation=fixed_config["ACTIVATION"],
-        # )
-        # rng, _rng = jax.random.split(rng)
-        # init_x = jnp.zeros(env.observation_space(env_params).shape)
-        # network_params = network.init(_rng, init_x)
 
         policy = hydra.utils.instantiate(fixed_config["policies"]["replenishment"])
         rng, _rng = jax.random.split(rng)
@@ -433,35 +421,6 @@ def main(cfg):
     log_losses(fixed_config, output["metrics"])
     log_episode_metrics(fixed_config, output["metrics"])
 
-    # returns = np.array(
-    #    outs["metrics"]["returned_episode_returns"].mean(-1).reshape(cfg.n_seeds, -1)
-    # )
-    # for i in range(returns.shape[1]):
-    #    log_to_wandb = {
-    #        "mean_returned_episode_returns": returns[:, i].mean(),
-    #    }
-    #    # Note that the times on these logs will be off, but that's not really important
-    #    wandb.log(log_to_wandb)
-
-    ### Evaluate deterministic policy on new rollouts ###
-    # env, env_params = DeMoorPerishableGymnax(), DeMoorPerishableGymnax().default_params
-    # network = ActorCritic(
-    #    env.action_space(env_params).n,
-    #    num_hidden_units=fixed_config["NUM_HIDDEN_UNITS"],
-    #    num_hidden_layers=fixed_config["NUM_HIDDEN_LAYERS"],
-    #    activation=fixed_config["ACTIVATION"],
-    # )
-    # network_forward = partial(deterministic_fwd, network=network)
-    # rw = RolloutWrapper(
-    #    model_forward=network_forward,
-    #    env_id="DeMoorPerishable",
-    #    num_env_steps=365,
-    #    env_kwargs={},
-    #    env_params={},
-    #    num_burnin_steps=100,
-    #    return_info=False,
-    # )
-
     policy = hydra.utils.instantiate(cfg.policies.replenishment)
     test_evaluator = hydra.utils.instantiate(cfg.test_evaluator)
     test_evaluator.set_apply_fn(policy.apply)  # _deterministic
@@ -475,30 +434,6 @@ def main(cfg):
     for k, v in kpis.items():
         if k in cfg.environment.kpis_log_eval:
             log_to_wandb[f"eval/{k}"] = v.mean(axis=-1)
-
-    # test_rollout_results = test_evaluator.population_rollout(
-    #    jax.random.split(rng_eval, cfg.n_eval_episodes), policy_params
-    # )
-    # print(test_rollout_results["info"].keys())
-
-    # log_to_wandb = {}
-    # overall_metrics = [
-    #    "mean_total_order",
-    #    "service_level_%",
-    #    "expiries_%",
-    #    "mean_holding",
-    #    "exact_match_%",
-    #    "mean_age_at_transfusion",
-    #    "unmet_demand_units",
-    #    "expired_units",
-    # ]
-    # kpis = jax.vmap(jax.vmap((test_evaluator.env.calculate_kpis)))(
-    #    test_rollout_results["info"]
-    # )
-    # for metric in overall_metrics:
-    #    mean_metric = kpis[f"{metric}"].mean(axis=1)
-    #    log_to_wandb[f"eval/{metric}"] = mean_metric
-    # log_to_wandb["eval/mean_return"] = test_rollout_results["cum_return"].mean(axis=1)
 
     wandb.log(log_to_wandb)
 
