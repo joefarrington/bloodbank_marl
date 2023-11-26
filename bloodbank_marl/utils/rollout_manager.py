@@ -103,7 +103,7 @@ class RolloutManager(object):
                 cum_info,
             )
 
-        def warmup_step(state_input, _):
+        def warmup_step(state_input):
             """lax.scan compatible warm-upstep transition in jax env."""
             obs, state, rng = state_input
             rng, rng_step, rng_net = jax.random.split(rng, 3)
@@ -122,14 +122,15 @@ class RolloutManager(object):
             state, obs = self.batch_warmup_state_update(
                 state, obs, next_o, next_s, warmup_done
             )
-            carry = [
+            carry = (
                 obs,
                 state,
+                warmup_done,
                 rng,
-            ]
-            return carry, None
+            )
+            return carry
 
-        def policy_step(state_input, _):
+        def policy_step(state_input):
             """lax.scan compatible step transition in jax env."""
             obs, state, rng, cum_reward, cum_return, cum_info, valid_mask = state_input
             rng, rng_step, rng_net = jax.random.split(rng, 3)
@@ -155,7 +156,7 @@ class RolloutManager(object):
             new_valid_mask = valid_mask.at[
                 jnp.arange(num_envs), next_o.agent_id
             ].multiply(1 - agent_done)
-            carry = [
+            carry = (
                 next_o,
                 next_s,
                 rng,
@@ -163,24 +164,39 @@ class RolloutManager(object):
                 new_cum_return,
                 new_cum_info,
                 new_valid_mask,
-            ]  # [new_valid_mask]
+            )  # [new_valid_mask]
 
-            return carry, None
+            return carry
+
+        def cond_fn_warmup(carry):
+            """Condition for warmup loop."""
+            obs, state, warmup_done, rng = carry
+            return jax.lax.bitwise_not(warmup_done)
+
+        def cond_fn_policy_step(carry):
+            """Condition for warmup loop."""
+            (
+                next_o,
+                next_s,
+                rng,
+                cum_reward,
+                cum_return,
+                cum_info,
+                valid_mask,
+            ) = carry
+            # When all are equal to 0, we are done
+            return jax.lax.bitwise_and(
+                jnp.any(jax.lax.gt(valid_mask, 0)),
+                jax.lax.lt(next_s.step, self.num_env_steps),
+            )
 
         # Run the warmup period
-        carry_out, _ = jax.lax.scan(
-            warmup_step,
-            [
-                obs,
-                state,
-                rng_episode,
-            ],
-            (),
-            self.max_warmup_steps,
+        carry_out = jax.lax.while_loop(
+            cond_fn_warmup, warmup_step, (obs, state, False, rng_episode)
         )
 
         # Use the state and obs from end of warm-up period but reset other stuff in the state (reward, info etc).
-        obs, state, rng_episode = carry_out
+        obs, state, warmup_done, rng_episode = carry_out
         rng_reset, rng_episode = jax.random.split(rng_input)
         state = self.batch_end_of_warmup_reset(
             jax.random.split(rng_reset, num_envs), state
@@ -192,11 +208,10 @@ class RolloutManager(object):
         valid_mask = jnp.ones((num_envs, self.env.num_agents), dtype=jnp_int)
 
         # Scan over episode step loop
-        carry_out, _ = jax.lax.scan(
+        carry_out = jax.lax.while_loop(
+            cond_fn_policy_step,
             policy_step,
-            [obs, state, rng_episode, cum_reward, cum_return, cum_info, valid_mask],
-            (),
-            self.env_params.max_steps_in_episode,
+            (obs, state, rng_episode, cum_reward, cum_return, cum_info, valid_mask),
         )
         cum_info = carry_out[-2]
         cum_return = carry_out[-3].squeeze()
