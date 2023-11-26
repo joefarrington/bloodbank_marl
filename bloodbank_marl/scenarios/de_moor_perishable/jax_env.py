@@ -204,6 +204,12 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
         self.possible_agents = agent_names
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
         self.num_agents = len(agent_names)
+        self.issuing_action_mask_pad = int(
+            jnp.clip(self.max_order_quantity - self.max_useful_life, 0, None)
+        )
+        self.replenishment_action_mask_pad = int(
+            jnp.clip(self.max_useful_life - self.max_order_quantity, 0, None)
+        )
 
     @property
     def default_params(self) -> EnvParams:
@@ -353,7 +359,10 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
 
     def _get_replenishment_mask(self, state: EnvState, params: EnvParams) -> chex.Array:
         """Get action mask for replenishment agent."""
-        return jnp.ones(self.max_order_quantity + 1, dtype=jnp.int32)
+        base_mask = jnp.ones(self.max_order_quantity + 1, dtype=jnp.int32)
+        return jnp.hstack(
+            [base_mask, jnp.zeros(self.replenishment_action_mask_pad, dtype=jnp.int32)]
+        )
 
     def _get_issuing_mask(self, state: EnvState, params: EnvParams) -> chex.Array:
         """Get action mask for issuing agent."""
@@ -364,7 +373,8 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
                 jnp.array([1]),
                 base_mask,
                 jnp.zeros(
-                    self.max_order_quantity - self.max_useful_life, dtype=jnp.int32
+                    self.issuing_action_mask_pad,
+                    dtype=jnp.int32,
                 ),
             ]
         )
