@@ -128,9 +128,9 @@ class EnvParams:
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
         max_expiry_target: float = 1.0,
         min_service_level_target: float = 0.0,
-        target_kpi_breach_penalty: float = 0, # No penalty for now
+        target_kpi_breach_penalty: float = 0,  # No penalty for now
         max_days_in_episode: int = 365,
-        max_steps_in_episode: int = 1e10,
+        max_steps_in_episode: int = 1e6,
         gamma: float = 1.0,
     ):
         return cls(
@@ -583,7 +583,7 @@ class MenesesPerishableEnv(MarlEnvironment):
             low=0,
             high=jnp.hstack(
                 [
-                    1e10,
+                    1e6,
                     self.n_products,
                     jnp.repeat(self.max_order_quantities, self.lead_time - 1),
                     jnp.repeat(self.max_order_quantities, self.max_useful_life),
@@ -619,53 +619,53 @@ class MenesesPerishableEnv(MarlEnvironment):
                     dtype=jnp.int32,
                 ),
                 "request_time": spaces.Box(
-                    low=0, high=1e10, shape=(1,), dtype=jnp.float32
+                    low=0, high=1e6, shape=(1,), dtype=jnp.float32
                 ),
                 "request_type": spaces.Discete(self.n_products),
                 "agent_id": spaces.Discete(self.num_agents),
                 "cumulative_rewards": spaces.Box(
-                    low=0, high=1e10, shape=(self.num_agents,), dtype=jnp.int32
+                    low=0, high=1e6, shape=(self.num_agents,), dtype=jnp.int32
                 ),
                 "infos": spaces.Dict(
                     {
                         "demand": spaces.Box(
                             low=0,
-                            high=1e10,
+                            high=1e6,
                             shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "shortages": spaces.Box(
                             low=0,
-                            high=1e10,
+                            high=1e6,
                             shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "expiries": spaces.Box(
                             low=0,
-                            high=1e10,
+                            high=1e6,
                             shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "holding": spaces.Box(
                             low=0,
-                            high=1e10,
+                            high=1e6,
                             shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "allocations": spaces.Box(
                             low=0,
-                            high=1e10,
+                            high=1e6,
                             shape=(self.num_agents, self.n_products, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "orders": spaces.Box(
                             low=0,
-                            high=1e10,
+                            high=1e6,
                             shape=(self.num_agents, self.n_products),
                             dtype=jnp.int32,
                         ),
                         "order_placed": spaces.Box(
-                            low=0, high=1e10, shape=(self.num_agents,), dtype=jnp.int32
+                            low=0, high=1e6, shape=(self.num_agents,), dtype=jnp.int32
                         ),  # Expect to be binary as expect more than one request per day
                     }
                 ),

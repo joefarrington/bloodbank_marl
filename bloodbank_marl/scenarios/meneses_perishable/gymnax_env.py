@@ -4,6 +4,7 @@
 # Currently a lot quicker than the multiagent env, so much better for testing "fixed" issuing policies like exact match
 # and fixed priority.
 
+
 import gymnax
 from gymnax.environments import environment, spaces
 import jax
@@ -24,6 +25,8 @@ import matplotlib.pyplot as plt
 
 # TODO THink about best way to have default issuing policy, and use config to specify another
 # exact_match = FixedPolicy(exact_match_policy, None, {})
+
+# TODO: Look again at the KPI penalty, was causing problems with the multiagent env
 
 # TODO: Decide where to specify n_products and how to get it into default params
 n_products = 8
@@ -121,8 +124,8 @@ class EnvParams:
         max_expiry_pc_target: float = 100.0,  # Effectively no limit by default
         min_service_level_pc_target: float = 0.0,  # Effectively no limit by default
         min_exact_match_pc_target: float = 0.0,  # Effectively no limit by default
-        target_kpi_breach_penalty: float = 1e10,
-        max_steps_in_episode: int = 1e10,
+        target_kpi_breach_penalty: float = 0.0,  # Set penalty to 0 for now, was having issue with this
+        max_steps_in_episode: int = 365,  # By default, we run for a year
         gamma: float = 1.0,
     ):
         return cls(
@@ -148,13 +151,15 @@ class EnvParams:
 class EnvObs:
     stock: chex.Array
     in_transit: chex.Array
+    action_mask: chex.Array
 
     @property
     def obs(self):
+        batch_dims = self.in_transit.shape[:-2]
         return jnp.hstack(
             [
-                self.in_transit.reshape(-1),
-                self.stock.reshape(-1),
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
             ]
         )
 
@@ -184,8 +189,8 @@ class MenesesPerishableGymnax(environment.Environment):
         n_products: int = 8,
         max_useful_life: int = 35,
         lead_time: int = 1,
-        max_order_quantities: list = [500] * 8,
-        max_demand: int = 500,
+        max_order_quantities: list = [100] * 8,
+        max_demand: int = 100,
         issuing_policy=None,  # TODO: For now, set as None
     ):
         super().__init__()
@@ -199,6 +204,28 @@ class MenesesPerishableGymnax(environment.Environment):
     @property
     def default_params(self) -> EnvParams:
         return EnvParams.create_env_params()
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(
+        self,
+        key: chex.PRNGKey,
+        state: EnvState,
+        action: Union[int, float],
+        params: Optional[EnvParams] = None,
+    ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
+        """Performs step transitions in the environment."""
+        # Use default env parameters if no others specified
+        if params is None:
+            params = self.default_params
+        key, key_reset = jax.random.split(key)
+        obs_st, state_st, reward, done, info = self.step_env(key, state, action, params)
+        obs_re, state_re = self.reset_env(key_reset, params)
+        # Auto-reset environment based on termination
+        state = jax.tree_map(
+            lambda x, y: jax.lax.select(done, x, y), state_re, state_st
+        )
+        obs = jax.tree_map(lambda x, y: jax.lax.select(done, x, y), obs_re, obs_st)
+        return obs, state, reward, done, info
 
     def step_env(
         self,
@@ -242,7 +269,7 @@ class MenesesPerishableGymnax(environment.Environment):
             0,
             self.max_demand,
         )
-        info["total_demand"] = remaining_demand
+        # info["total_demand"] = remaining_demand
 
         # Sample the product types for demand
         request_types = distrax.Categorical(probs=params.product_probabilities).sample(
@@ -272,7 +299,7 @@ class MenesesPerishableGymnax(environment.Environment):
         ).sum()  # Sum allocations over ages because sub cost just based on types
         info["shortages"] = shortages
         info["allocations"] = allocations
-        info["demand_by_pt_blood_group"] = shortages + allocations.sum(axis=(-2, -1))
+        info["demand"] = shortages + allocations.sum(axis=(-2, -1))
 
         # Age stock and calculate expiries
         # Calculate wastage costs
@@ -311,8 +338,10 @@ class MenesesPerishableGymnax(environment.Environment):
         )  # TODO Add in the other elements
         done = self.is_terminal(state, params)
 
+        info["day_counter"] = 1  # Used when we are accumulating infos for KPIs
+
         return (
-            lax.stop_gradient(self.get_obs(state).obs),
+            lax.stop_gradient(self.get_obs(state)),
             lax.stop_gradient(state),
             reward,
             done,
@@ -330,12 +359,17 @@ class MenesesPerishableGymnax(environment.Environment):
             in_transit=jnp.zeros((self.n_products, max(self.lead_time, 1))),
             step=0,
         )
-        return self.get_obs(state).obs, state
+        return self.get_obs(state), state
 
     def get_obs(self, state: EnvState) -> chex.Array:
         """Applies observation function to state."""
         # If lead time is 0 or 1, nothing to include in obs
-        return EnvObs(stock=state.stock, in_transit=state.in_transit[:, 1:])
+        # Simple action masking, for now can always order each product
+        return EnvObs(
+            stock=state.stock,
+            in_transit=state.in_transit[:, 1:],
+            action_mask=jnp.ones((self.n_products,)),
+        )
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
         """Check whether state transition is terminal."""
@@ -354,7 +388,7 @@ class MenesesPerishableGymnax(environment.Environment):
     @property
     def num_actions(self) -> int:
         """Number of actions possible in environment."""
-        raise NotImplementedError
+        return self.n_products
 
     def action_space(self, params: EnvParams):
         """Action space of the environment."""
@@ -475,9 +509,9 @@ class MenesesPerishableGymnax(environment.Environment):
         )
         return d.sample(seed=key)
 
+    """
     @classmethod
     def calculate_kpis(cls, info: Dict) -> Dict[str, float]:
-        """Calculate KPIs for each rollout, using the output of a rollout from RolloutWrapper"""
         mean_demand_by_pt_blood_group = info["demand_by_pt_blood_group"].mean(axis=-2)
         mean_order_by_product = info["orders"].mean(axis=-2)
         service_level_pc_by_pt_blood_group = (
@@ -531,7 +565,7 @@ class MenesesPerishableGymnax(environment.Environment):
 
     @classmethod
     def _calculate_exact_match_pc_by_pt_blood_group(cls, info: Dict) -> chex.Array:
-        """Calculate the exact match percentage by product type and blood group"""
+
         n_groups = info["allocations"].shape[-2]
         exact_matches_by_pt_blood_group = info["allocations"].sum(axis=(-4, -1))[
             jnp.arange(n_groups), jnp.arange(n_groups)
@@ -543,7 +577,7 @@ class MenesesPerishableGymnax(environment.Environment):
 
     @classmethod
     def _calculate_exact_match_pc(cls, info: Dict) -> float:
-        """Calculate the exact match percentage"""
+
         exact_matches = jnp.trace(
             info["allocations"].sum(axis=(-4, -1)),
             axis1=-2,
@@ -556,7 +590,7 @@ class MenesesPerishableGymnax(environment.Environment):
     def _calculate_mean_age_at_transfusion_by_pt_blood_group(
         cls, info: Dict
     ) -> chex.Array:
-        """Calculate the mean age at transfusion by patient blood group (i.e. irrespective of what they were allocated)"""
+
         # TODO: We might also want to do this by product type
         ages = jnp.arange(info["allocations"].shape[-1])
         age_weighted_allocations = (
@@ -568,14 +602,14 @@ class MenesesPerishableGymnax(environment.Environment):
 
     @classmethod
     def _calculate_mean_age_at_transfusion(cls, info: Dict) -> float:
-        """Calculate the mean age at transfusion"""
+
         ages = jnp.arange(info["allocations"].shape[-1])
         age_weighted_allocations = info["allocations"].sum(axis=(-4, -3, -2)) * ages
         return jnp.sum(age_weighted_allocations) / jnp.sum(info["allocations"])
 
     @classmethod
     def calculate_target_kpi_penalty(self, kpis: Dict, params: EnvParams) -> float:
-        """Calculate the penalty for breaching the target KPIs"""
+
         # TODO Might want to do some rounding here/use jnp.close etc when aiming for
         # 100% service level or 0% expriries for example to avoid issues with floating
         # point precision
@@ -597,3 +631,123 @@ class MenesesPerishableGymnax(environment.Environment):
         )
 
         return expiry_penalty + service_level_penalty + exact_match_penalty
+    """
+
+    @property
+    def empty_infos(self) -> Dict[str, Union[chex.Array, float, int]]:
+        return {
+            "allocations": jnp.zeros(
+                (self.n_products, self.n_products, self.max_useful_life)
+            ),
+            "cumulative_gamma": 1.0,
+            "day_counter": 0,
+            "demand": jnp.zeros((self.n_products,)),
+            "expiries": jnp.zeros((self.n_products,)),
+            "holding": jnp.zeros((self.n_products,)),
+            "orders": jnp.zeros((self.n_products,)),
+            "shortages": jnp.zeros((self.n_products,)),
+        }
+
+    # NOTE: New function to support a gymnax env with KPIs using a gymnax fitness object instead of a rollout manager
+    # Key difference is that we accumulate KPIs as we go along instead of at the end
+    # This should simplif things/make consistent with how we deal with the MARL env
+    def calculate_kpis(
+        self, cum_info: Dict[str, Union[chex.Array, float]]
+    ) -> Dict[str, Union[chex.Array, float]]:
+        """Calculate KPIs based on the info recorded by the replenishment agent, with id 0"""
+        return {
+            "mean_order_by_product": cum_info["orders"] / cum_info["day_counter"],
+            "service_level_%_by_pt_blood_group": (
+                (cum_info["demand"] - cum_info["shortages"]) * 100
+            )
+            / cum_info["demand"],
+            "expiries_%_by_product": ((cum_info["expiries"]) * 100)
+            / cum_info["orders"],
+            "mean_holding_by_product": cum_info["holding"] / cum_info["day_counter"],
+            "mean_age_at_transfusion_by_pt_blood_group": self._calculate_mean_age_at_transfusion_by_pt_blood_group(
+                cum_info
+            ),
+            "exact_match_%_by_pt_blood_group": self._calculate_exact_match_pc_by_pt_blood_group(
+                cum_info
+            ),
+            "mean_total_order": jnp.sum(cum_info["orders"]) / cum_info["day_counter"],
+            "service_level_%": (
+                jnp.sum(cum_info["demand"] - cum_info["shortages"]) * 100
+            )
+            / jnp.sum(cum_info["demand"]),
+            "expiries_%": (jnp.sum(cum_info["expiries"]) * 100)
+            / jnp.sum(cum_info["orders"]),
+            "mean_holding": jnp.sum(cum_info["holding"]) / cum_info["day_counter"],
+            "exact_match_%": self._calculate_exact_match_pc(cum_info),
+            "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(
+                cum_info
+            ),
+        }
+
+    @classmethod
+    def calculate_target_kpi_penalty(
+        cls, kpis: Dict[str, Union[chex.Array, float]], params
+    ):
+        # TODO Might want to do some rounding here/use jnp.close etc when aiming for
+        # 100% service level or 0% expriries for example to avoid issues with floating
+        # point precision
+        expiry_penalty = (
+            jnp.where(kpis["expiries_%"] > params.max_expiry_pc_target, 1, 0)
+            * -params.target_kpi_breach_penalty
+        )
+
+        service_level_penalty = (
+            jnp.where(
+                kpis["service_level_%"] < params.min_service_level_pc_target, 1, 0
+            )
+            * -params.target_kpi_breach_penalty
+        )
+
+        matching_penalty = jnp.where(
+            kpis["exact_match_%"] < params.min_exact_match_pc_target, 1, 0
+        )
+
+        return expiry_penalty + service_level_penalty + matching_penalty
+
+    def _calculate_exact_match_pc_by_pt_blood_group(
+        self, cum_info: Dict[str, Union[chex.Array, float]]
+    ) -> chex.Array:
+        exact_matches_by_request_type = cum_info["allocations"].sum(axis=-1)[
+            jnp.arange(cum_info["allocations"].shape[0]),
+            jnp.arange(cum_info["allocations"].shape[0]),
+        ]
+        total_allocated_by_request_type = cum_info["allocations"].sum(axis=(-2, -1))
+        return (exact_matches_by_request_type * 100) / total_allocated_by_request_type
+
+    def _calculate_exact_match_pc(
+        self, cum_info: Dict[str, Union[chex.Array, float]]
+    ) -> chex.Array:
+        exact_matches = jnp.trace(cum_info["allocations"].sum(axis=-1))
+        total_allocated = jnp.sum(cum_info["allocations"])
+        return (exact_matches * 100) / total_allocated
+
+    def _calculate_mean_age_at_transfusion_by_pt_blood_group(
+        self, cum_info: Dict[str, Union[chex.Array, float]]
+    ) -> chex.Array:
+        ages = jnp.arange(cum_info["allocations"].shape[2])
+        age_weighted_allocations = cum_info["allocations"] * ages[None, None, :]
+        total_age_per_request_type = age_weighted_allocations.sum(axis=(-2, -1))
+        total_allocated_per_request_type = jnp.sum(
+            cum_info["allocations"], axis=(-2, -1)
+        )
+        return total_age_per_request_type / total_allocated_per_request_type
+
+    def _calculate_mean_age_at_transfusion(
+        self, cum_info: Dict[str, Union[chex.Array, float]]
+    ) -> chex.Array:
+        ages = jnp.arange(cum_info["allocations"].shape[2])
+        age_weighted_allocations = cum_info["allocations"] * ages[None, None, :]
+        return jnp.sum(age_weighted_allocations) / jnp.sum(cum_info["allocations"])
+
+    def end_of_warmup_reset(
+        self, key: chex.PRNGKey, state: EnvState, params: EnvParams
+    ):
+        """Run at end of warmup period to partially reset State"""
+        _, state_reset = self.reset(key, params)
+        # We want to keep the stock on hand and in transit, but reset everything else
+        return state_reset.replace(stock=state.stock, in_transit=state.in_transit)

@@ -1,0 +1,56 @@
+defaults:
+  - policies/replenishment: multi_product_stochastic_total_order_up_to_mlp
+  - policies/issuing: priority_match
+  - environment: meneses_gymnax
+  - _self_
+
+wandb:
+  init:
+    project: "ppo_single_agent_meneses"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    # Search paths assume that run_optuna_simopt.py will be run from simopt/
+    - file://../conf
+
+seed: 10
+eval_seed: 456
+n_seeds: 1 # This is how many repeats of training?
+
+# Remember we can change these, but can't vmap over changes (probably)
+fixed_config:
+  NUM_ENVS: 200
+  NUM_STEPS: 20
+  TOTAL_TIMESTEPS: 1e4
+  UPDATE_EPOCHS: 4
+  NUM_MINIBATCHES: 20
+  #ENV_NAME: ${environment.env_name}
+  #ACTIVATION: "tanh"
+  ANNEAL_LR: False # Not sure about this one
+  #NUM_HIDDEN_UNITS: 64
+  #NUM_HIDDEN_LAYERS: 2
+  environment: ${environment}
+  policies: ${policies}
+
+hp_config:
+  LR: 1e-4
+  GAMMA: 0.95
+  GAE_LAMBDA: 0.95
+  CLIP_EPS: 0.2
+  ENT_COEF: 0.01
+  VF_COEF: 0.5
+  MAX_GRAD_NORM: 0.5
+
+test_evaluator:
+  _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: 365
+  num_rollouts: 500
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: True
+  n_devices:
+  num_warmup_days: 100
+  gamma: ${environment.gamma}

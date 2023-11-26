@@ -1,0 +1,10 @@
+_target_: bloodbank_marl.meneses_single_agent_eval.ppo.policies.replenishment.FlaxMultiProductStochasticOrderUpToRepPolicy
+model_class:
+    _target_: hydra.utils.get_class
+    path: bloodbank_marl.ppo_multi_agent.ppo_models.ContinuousActorCritic
+model_kwargs:
+    activation: "tanh"
+policy_id: 0
+env_name: ${environment.env_name}
+env_kwargs: ${environment.env_kwargs}
+env_params: ${environment.env_params}

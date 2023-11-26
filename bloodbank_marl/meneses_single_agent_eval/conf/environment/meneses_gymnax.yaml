@@ -2,3 +2,11 @@ env_name: MenesesPerishableGymnax
 env_params: {}
 env_kwargs:
   issuing_policy: ${policies.issuing}
+gamma: 1.0
+kpis_log_eval:
+  - mean_total_order
+  - service_level_%
+  - expiries_%
+  - mean_holding
+  - exact_match_%
+  - mean_age_at_transfusion
