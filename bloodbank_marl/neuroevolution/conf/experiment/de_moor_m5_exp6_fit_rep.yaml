@@ -1,10 +1,10 @@
 # @package _global_
 defaults:
-  - override /policies/replenishment: discrete_mlp
+  - override /policies/issuing: oufo
 
 wandb:
   init:
-    project: bbm_neuro_de_moor_perishable_m5_exp6_fit_both_discrete_mlp
+    project: bbm_neuro_de_moor_perishable_m5_exp6_fit_rep
 
 environment:
   env_kwargs:
@@ -15,4 +15,3 @@ environment:
 policies:
   optimize:
     - 0 # replenishment
-    - 1 # issuing

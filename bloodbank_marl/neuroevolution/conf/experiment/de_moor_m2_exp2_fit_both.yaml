@@ -9,3 +9,8 @@ environment:
     max_useful_life: 2
     lead_time: 1
     max_order_quantity: 10
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing

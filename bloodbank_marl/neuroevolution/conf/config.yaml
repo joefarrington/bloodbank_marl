@@ -61,9 +61,6 @@ test_evaluator:
   gamma: ${environment.gamma}
 
 policies:
-  optimize:
-    - 0 # replenishment
-    - 1 # issuing
   policy_manager:
     _target_: bloodbank_marl.policies.policy_manager.PolicyManager
 
