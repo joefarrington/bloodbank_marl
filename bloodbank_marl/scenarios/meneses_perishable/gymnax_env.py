@@ -656,6 +656,8 @@ class MenesesPerishableGymnax(environment.Environment):
     ) -> Dict[str, Union[chex.Array, float]]:
         """Calculate KPIs based on the info recorded by the replenishment agent, with id 0"""
         return {
+            "mean_demand_by_pt_blood_group": cum_info["demand"]
+            / cum_info["day_counter"],
             "mean_order_by_product": cum_info["orders"] / cum_info["day_counter"],
             "service_level_%_by_pt_blood_group": (
                 (cum_info["demand"] - cum_info["shortages"]) * 100
@@ -675,8 +677,10 @@ class MenesesPerishableGymnax(environment.Environment):
                 jnp.sum(cum_info["demand"] - cum_info["shortages"]) * 100
             )
             / jnp.sum(cum_info["demand"]),
+            "unmet_demand_units": jnp.sum(cum_info["shortages"]),
             "expiries_%": (jnp.sum(cum_info["expiries"]) * 100)
             / jnp.sum(cum_info["orders"]),
+            "expired_units": jnp.sum(cum_info["expiries"]),
             "mean_holding": jnp.sum(cum_info["holding"]) / cum_info["day_counter"],
             "exact_match_%": self._calculate_exact_match_pc(cum_info),
             "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(

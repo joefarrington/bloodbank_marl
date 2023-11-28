@@ -104,10 +104,10 @@ class RolloutWrapper(object):
                 valid_mask,
             ) = state_input
             # NOTE: CONVENIENCE ADDED FOR NOW
-            rc_obs = EnvObs(stock=state.stock, in_transit=state.in_transit[:, 1:])
+            # rc_obs = EnvObs(stock=state.stock, in_transit=state.in_transit[:, 1:])
             rng, rng_step, rng_net = jax.random.split(rng, 3)
             if self.model_forward is not None:
-                action = self.model_forward(policy_params, rc_obs, rng_net)
+                action = self.model_forward(policy_params, obs, rng_net)
             else:
                 action = self.env.action_space(self.env_params).sample(rng_net)
             next_obs, next_state, reward, done, info = self.env.step(
@@ -186,10 +186,10 @@ class RolloutWrapper(object):
         # Extract the discounted sum of rewards accumulated by agent in episode rollout
         cum_return = carry_out[-2]
 
-        output["obs"] = obs[start_idx:stop_idx]
+        output["obs"] = obs.obs[start_idx:stop_idx]
         output["action"] = action[start_idx:stop_idx]
         output["reward"] = reward[start_idx:stop_idx]
-        output["next_obs"] = next_obs[start_idx:stop_idx]
+        output["next_obs"] = next_obs.obs[start_idx:stop_idx]
         output["done"] = done[start_idx:stop_idx]
         output["cum_return"] = cum_return
 
@@ -231,10 +231,10 @@ class RolloutWrapper(object):
                 valid_mask,
             ) = state_input
             # NOTE: CONVENIENCE ADDED FOR NOW
-            rc_obs = EnvObs(stock=state.stock, in_transit=state.in_transit[:, 1:])
+            # rc_obs = EnvObs(stock=state.stock, in_transit=state.in_transit[:, 1:])
             rng, rng_step, rng_net = jax.random.split(rng, 3)
             if self.model_forward is not None:
-                action = self.model_forward(policy_params, rc_obs, rng_net)
+                action = self.model_forward(policy_params, obs, rng_net)
             else:
                 action = self.env.action_space(self.env_params).sample(rng_net)
             next_obs, next_state, reward, done, info = self.env.step(

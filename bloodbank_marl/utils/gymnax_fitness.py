@@ -24,6 +24,7 @@ from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import (
     MenesesPerishableGymnax,
 )
 
+
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
 
