@@ -1,7 +1,7 @@
 defaults:
   - environment: demoor_m2
   - policies/replenishment: s_policy
-  - policies/issuing: fifo
+  - policies/issuing: oufo
   - _self_
 
 wandb:
