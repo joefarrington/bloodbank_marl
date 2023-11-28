@@ -1,7 +1,7 @@
-_target_: bloodbank_marl.ppo_multi_agent.ppo_policies.FlaxStochasticPolicy
+_target_: bloodbank_marl.policies.common.FlaxStochasticMAPolicy
 model_class:
   _target_: hydra.utils.get_class
-  path: bloodbank_marl.ppo_multi_agent.ppo_models.DiscreteActorCritic
+  path: bloodbank_marl.policies.models.flax_stochastic.DiscreteActorCritic
 model_kwargs:
   activation: "tanh"
 policy_id: 0
