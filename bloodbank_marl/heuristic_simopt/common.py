@@ -8,7 +8,7 @@ from optuna.study import Study
 import jax.numpy as jnp
 import numpy as np
 import chex
-from bloodbank_marl.policies.replenishment import HeuristicPolicy
+from bloodbank_marl.policies.common import HeuristicPolicy
 import logging
 from math import inf
 import jax
