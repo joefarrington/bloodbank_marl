@@ -16,6 +16,7 @@ from bloodbank_marl.utils.yaml import to_yaml, from_yaml
 from bloodbank_marl.utils.single_agent_rollout_manager import RolloutWrapper
 from bloodbank_marl.policies.replenishment import HeuristicPolicy
 import wandb
+from bloodbank_marl.utils.single_agent_gymnax_fitness import GymnaxFitness
 from bloodbank_marl.utils.gymnax_fitness import make
 import omegaconf
 
@@ -77,8 +78,8 @@ def grid_search_space_from_config(
 def simopt_grid_sampler(
     cfg: DictConfig,
     policy: HeuristicPolicy,
-    rollout_wrapper: RolloutWrapper,
-    rng_eval: chex.PRNGKey,
+    train_evaluator: GymnaxFitness,
+    rng_fit: chex.PRNGKey,
     initial_policy_params: Optional[Dict[str, int]] = None,
 ) -> Study:
     """Run simulation optimization using Optuna's GridSampler to propose parameter values"""
@@ -122,19 +123,21 @@ def simopt_grid_sampler(
             )
         policy_params = jnp.array(policy_params)
         log.info(f"Round {i}: Simulating rollouts")
-        rollout_results = rollout_wrapper.population_rollout_return_only(
-            rng_eval, policy_params
-        )
+        # rollout_results = rollout_wrapper.population_rollout_return_only(
+        #    rng_eval, policy_params
+        # )
+        fitness, cum_infos, kpis = train_evaluator.rollout(rng_fit, policy_params)
+
         log.info(f"Round {i}: Processing results")
-        objectives = rollout_results["cum_return"].mean(axis=(-2, -1))
+        objectives = fitness.mean(axis=-1)
 
         for idx in range(num_parallel_trials):
             try:
                 study.tell(trials[idx], objectives[idx])
             except RuntimeError:
                 break
-        # Override rollout_results; helps to avoid GPU OOM error on larger problems
-        rollout_results = 0
+        # NOTE Removed this now using gymnax fitness Override rollout_results; helps to avoid GPU OOM error on larger problems
+        # rollout_results = 0
         log.info(
             f"Round {i} complete. Best params: {study.best_params}, mean return: {study.best_value:.4f}"
         )
@@ -145,8 +148,8 @@ def simopt_grid_sampler(
 def simopt_other_sampler(
     cfg: DictConfig,
     policy: HeuristicPolicy,
-    rollout_wrapper: RolloutWrapper,
-    rng_eval: chex.PRNGKey,
+    train_evaluator: GymnaxFitness,
+    rng_fit: chex.PRNGKey,
     initial_policy_params: Optional[Dict[str, int]] = None,
 ) -> Study:
     """Run simulation optimization using an Optuna sampler other than GridSampler to propose parameter values"""
@@ -184,17 +187,15 @@ def simopt_other_sampler(
             )
         policy_params = jnp.array(policy_params)
         log.info(f"Round {i}: Simulating rollouts")
-        rollout_results = rollout_wrapper.population_rollout_return_only(
-            rng_eval, policy_params
-        )
+        fitness, cum_infos, kpis = train_evaluator.rollout(rng_fit, policy_params)
         log.info(f"Round {i}: Processing results")
-        objectives = rollout_results["cum_return"].mean(axis=(-2, -1))
+        objectives = fitness.mean(axis=-1)
 
         for idx in range(cfg.param_search.max_parallel_trials):
             study.tell(trials[idx], objectives[idx])
 
-        # Override rollout_results; helps to avoid GPU OOM error on larger problems
-        rollout_results = 0
+        # NOTE Removed this now using gymnax fitness Override rollout_results; helps to avoid GPU OOM error on larger problems
+        # rollout_results = 0
         log.info(
             f"Round {i} complete. Best params: {study.best_params}, mean return: {study.best_value:.4f}"
         )
@@ -225,13 +226,13 @@ def main(cfg: DictConfig) -> None:
 
     rep_policy = hydra.utils.instantiate(cfg.policies.replenishment)
     print(rep_policy.param_names)
-    rollout_wrapper = hydra.utils.instantiate(
-        cfg.rollout_wrapper,
-        model_forward=rep_policy.apply,
-    )
-    rng_eval = jax.random.split(
-        jax.random.PRNGKey(cfg.param_search.seed), cfg.param_search.num_rollouts
-    )
+    # rollout_wrapper = hydra.utils.instantiate(
+    #    cfg.rollout_wrapper,
+    #    model_forward=rep_policy.apply,
+    # )
+    train_evaluator = hydra.utils.instantiate(cfg.train_evaluator)
+    train_evaluator.set_apply_fn(rep_policy.apply)
+    rng_fit = jax.random.PRNGKey(cfg.param_search.seed)
 
     # Initial policy params
     initial_policy_params = omegaconf.OmegaConf.to_container(
@@ -241,11 +242,11 @@ def main(cfg: DictConfig) -> None:
 
     if cfg.param_search.sampler._target_ == "optuna.samplers.GridSampler":
         study = simopt_grid_sampler(
-            cfg, rep_policy, rollout_wrapper, rng_eval, initial_policy_params
+            cfg, rep_policy, train_evaluator, rng_fit, initial_policy_params
         )
     else:
         study = simopt_other_sampler(
-            cfg, rep_policy, rollout_wrapper, rng_eval, initial_policy_params
+            cfg, rep_policy, train_evaluator, rng_fit, initial_policy_params
         )
 
     trials_df = study.trials_dataframe()
@@ -265,61 +266,40 @@ def main(cfg: DictConfig) -> None:
     best_params = np.array([v for v in study.best_params.values()]).reshape(
         rep_policy.params_shape
     )
+
     # Run evaluation for best policy, including computing kpis
-    rollout_wrapper = hydra.utils.instantiate(
-        cfg.evaluation.rollout_wrapper, model_forward=rep_policy.apply, return_info=True
-    )
-    rng_eval = jax.random.split(
-        jax.random.PRNGKey(cfg.evaluation.seed), cfg.evaluation.num_rollouts
-    )
-    policy_params = jnp.array(best_params)
-    batch_results = rollout_wrapper.batch_rollout(rng_eval, policy_params)
+    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
+    test_evaluator.set_apply_fn(rep_policy.apply)
+    policy_params = jnp.array([best_params])
+    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
+    fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, policy_params)
 
     log.info(f"Calcuting metrics.")
-
-    env, env_params = make(cfg.environment.env_name, **cfg.environment.env_params)
-    kpis = jax.vmap(env.calculate_kpis)(batch_results["info"])
-
-    # TODO Avoid having to hardcode the different metrics here
-    group_metrics = [
-        "mean_demand_by_pt_blood_group",
-        "mean_order_by_product",
-        "service_level_%_by_pt_blood_group",
-        "expiries_%_by_product",
-        "mean_holding_by_product",
-        "mean_age_at_transfusion_by_pt_blood_group",
-        "exact_match_%_by_pt_blood_group",
-    ]
-
-    overall_metrics = [
-        "mean_total_order",
-        "service_level_%",
-        "expiries_%",
-        "mean_holding",
-        "exact_match_%",
-        "mean_age_at_transfusion",
-        "unmet_demand_units",
-        "expired_units",
-    ]
+    group_metrics = cfg.environment.vector_kpis_to_log
+    overall_metrics = cfg.environment.scalar_kpis_to_log
 
     # TODO Avoid having to hardcode the product types here
     types = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
     # Create a dataframe of KPIs by type and log to W&B as a table
     df = pd.DataFrame()
     for m in group_metrics:
-        df = pd.concat([df, pd.DataFrame(kpis[m].mean(axis=0).reshape(1, -1))], axis=0)
-        df = pd.concat([df, pd.DataFrame(kpis[m].std(axis=0).reshape(1, -1))], axis=0)
+        df = pd.concat(
+            [df, pd.DataFrame(kpis[m].mean(axis=(0, 1)).reshape(1, -1))], axis=0
+        )
+        df = pd.concat(
+            [df, pd.DataFrame(kpis[m].std(axis=(0, 1)).reshape(1, -1))], axis=0
+        )
     df.columns = types
     row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
     df.insert(loc=0, column="metric", value=row_labels)
-    wandb.log({"group_metrics": wandb.Table(dataframe=df)})
+    wandb.log({"dval/group_metrics": wandb.Table(dataframe=df)})
 
     # Log aggregate metrics to W&B, plus return
     for m in overall_metrics:
-        wandb.run.summary[f"{m}_mean"] = kpis[m].mean()
-        wandb.run.summary[f"{m}_std"] = kpis[m].std()
-    wandb.run.summary["return_mean"] = batch_results["cum_return"].mean()
-    wandb.run.summary["return_std"] = batch_results["cum_return"].std()
+        wandb.run.summary[f"eval/{m}_mean"] = kpis[m].mean()
+        wandb.run.summary[f"eval/{m}_std"] = kpis[m].std()
+    wandb.run.summary["eval/return_mean"] = fitness.mean()
+    wandb.run.summary["eval/return_std"] = fitness.std()
     log.info(f"Done.")
 
 
