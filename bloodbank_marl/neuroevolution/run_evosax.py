@@ -1,7 +1,8 @@
 import bloodbank_marl
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness, make
-from bloodbank_marl.policies.replenishment import FlaxRepPolicy
+
+# from bloodbank_marl.policies.replenishment import FlaxRepPolicy
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
@@ -40,13 +41,13 @@ def main(cfg):
     # 0 is the id for replenishment
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
     if 0 in cfg.policies.optimize:
-        rep_params = policy_rep.get_params(rng_rep)
+        rep_params = policy_rep.get_initial_params(rng_rep)
         policy_params[0] = rep_params
 
     # 1 is the id for issuing policy
     policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
     if 1 in cfg.policies.optimize:
-        issue_params = policy_issue.get_params(rng_issue)
+        issue_params = policy_issue.get_initial_params(rng_issue)
         policy_params[1] = issue_params
 
     policies = [policy_rep.apply, policy_issue.apply]

@@ -1,10 +1,10 @@
-_target_: bloodbank_marl.policies.issuing.FlaxIssuePolicy
+_target_: bloodbank_marl.policies.common.FlaxMAPolicy
 model_class: 
   _target_: hydra.utils.get_class
-  path: bloodbank_marl.policies.issuing.IssueDiscreteMLP
-policy_id: 1
+  path: bloodbank_marl.policies.models.flax_deterministic.IssueDiscreteMLP
 model_kwargs:
   n_hidden: 64
+policy_id: 1
 env_name: ${environment.env_name}
 env_kwargs: ${environment.env_kwargs}
 env_params: ${environment.env_params}

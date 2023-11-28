@@ -16,4 +16,7 @@ policies:
   optimize:
     - 1 # issuing
   replenishment:
-    policy_params: 10
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [10]

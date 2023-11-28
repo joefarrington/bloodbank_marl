@@ -19,3 +19,8 @@ evosax:
 
 test_evaluator:
   num_rollouts: 50
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing

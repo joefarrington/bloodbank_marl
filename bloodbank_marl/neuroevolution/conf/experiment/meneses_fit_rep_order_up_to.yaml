@@ -23,5 +23,3 @@ test_evaluator:
 policies:
   optimize:
     - 0 # replenishment
-  issuing:
-    policy_params: 0
