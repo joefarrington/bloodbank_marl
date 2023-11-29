@@ -25,8 +25,6 @@ import pandas as pd
 # Enable logging
 log = logging.getLogger(__name__)
 
-# TODO: Add rep policy as part of config
-
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg):
@@ -39,7 +37,7 @@ def main(cfg):
     rng = jax.random.PRNGKey(cfg.evosax.seed)
     rng, rng_rep = jax.random.split(rng, 2)
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
-    policy_params = policy_rep.get_params(rng_rep)
+    policy_params = policy_rep.get_initial_params(rng_rep)
 
     param_reshaper = ParameterReshaper(policy_params)
     test_param_reshaper = ParameterReshaper(policy_params, n_devices=1)
