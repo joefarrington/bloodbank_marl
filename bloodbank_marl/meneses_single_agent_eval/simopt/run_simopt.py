@@ -14,7 +14,7 @@ import gymnax
 import chex
 from bloodbank_marl.utils.yaml import to_yaml, from_yaml
 from bloodbank_marl.utils.single_agent_rollout_manager import RolloutWrapper
-from bloodbank_marl.policies.replenishment import HeuristicPolicy
+from bloodbank_marl.policies.common import HeuristicPolicy
 import wandb
 from bloodbank_marl.utils.single_agent_gymnax_fitness import GymnaxFitness
 from bloodbank_marl.utils.gymnax_fitness import make
@@ -274,7 +274,6 @@ def main(cfg: DictConfig) -> None:
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
     fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, policy_params)
 
-    log.info(f"Calcuting metrics.")
     group_metrics = cfg.environment.vector_kpis_to_log
     overall_metrics = cfg.environment.scalar_kpis_to_log
 
@@ -292,7 +291,7 @@ def main(cfg: DictConfig) -> None:
     df.columns = types
     row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
     df.insert(loc=0, column="metric", value=row_labels)
-    wandb.log({"dval/group_metrics": wandb.Table(dataframe=df)})
+    wandb.log({"eval/group_metrics": wandb.Table(dataframe=df)})
 
     # Log aggregate metrics to W&B, plus return
     for m in overall_metrics:

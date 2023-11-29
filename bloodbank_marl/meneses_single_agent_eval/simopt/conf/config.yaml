@@ -1,7 +1,7 @@
 defaults:
-  - policies/replenishment: s_policy
+  - policies/replenishment: heuristic_order_up_to
   - policies/replenishment_policy_params: Cp # Let's say we'll start with the current policy, BUT one parameter is outside the range
-  - policies/issuing: priority_match
+  - policies/issuing: heuristic_priority_match
   - environment: meneses_gymnax
   - _self_
 
