@@ -28,6 +28,8 @@ from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import EnvObs
 # TODO: Need to think carefully about logging if we are vmapping over some config inputs
 # Which this is sort of designed to handle (as as per the HPConfig class)
 
+# NOTE: Eval currently NOT deterministic because getting odd results
+
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -159,9 +161,7 @@ def make_train(fixed_config):
 
         policy = hydra.utils.instantiate(fixed_config["policies"]["replenishment"])
         rng, _rng = jax.random.split(rng)
-        policy_params = {
-            0: policy.get_initial_params(_rng)
-        }  # 1 agent will have policyID 0
+        policy_params = policy.get_initial_params(_rng)
 
         if fixed_config["ANNEAL_LR"]:
             tx = optax.chain(
@@ -218,9 +218,7 @@ def make_train(fixed_config):
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, rng = runner_state
             # _, last_val = network.apply(train_state.params, last_obs)
-            _, last_val = policy.model.apply(
-                train_state.params[policy.policy_id], last_obs
-            )
+            _, last_val = policy.model.apply(train_state.params, last_obs)
 
             def _calculate_gae(traj_batch, last_val):
                 def _get_advantages(gae_and_next_value, transition):
@@ -422,17 +420,19 @@ def main(cfg):
     log_episode_metrics(fixed_config, output["metrics"])
 
     policy = hydra.utils.instantiate(cfg.policies.replenishment)
-    test_evaluator = hydra.utils.instantiate(cfg.test_evaluator)
-    test_evaluator.set_apply_fn(policy.apply)  # _deterministic
+    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
+    test_evaluator.set_apply_fn(
+        policy.apply
+    )  # TODO: Currently getting weird results when this is _deterministic
     policy_params = output["runner_state"][0].params
-    rng_eval = jax.random.PRNGKey(cfg.eval_seed)
+    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
     fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, policy_params)
 
     log_to_wandb = {}
     log_to_wandb[f"eval/return_mean"] = fitness.mean(axis=-1)
     log_to_wandb[f"eval/return_std"] = fitness.std(axis=-1)
     for k, v in kpis.items():
-        if k in cfg.environment.kpis_log_eval:
+        if k in cfg.environment.scalar_kpis_to_log:
             log_to_wandb[f"eval/{k}"] = v.mean(axis=-1)
 
     wandb.log(log_to_wandb)

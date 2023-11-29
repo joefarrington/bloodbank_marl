@@ -1,6 +1,6 @@
 defaults:
-  - policies/replenishment: multi_product_stochastic_total_order_up_to_mlp
-  - policies/issuing: priority_match
+  - policies/replenishment: multi_product_stochastic_mlp
+  - policies/issuing: heuristic_priority_match
   - environment: meneses_gymnax
   - _self_
 
@@ -16,7 +16,6 @@ hydra:
     - file://../conf
 
 seed: 10
-eval_seed: 456
 n_seeds: 1 # This is how many repeats of training?
 
 # Remember we can change these, but can't vmap over changes (probably)
@@ -43,14 +42,16 @@ hp_config:
   VF_COEF: 0.5
   MAX_GRAD_NORM: 0.5
 
-test_evaluator:
-  _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
-  env_name: ${environment.env_name}
-  num_env_steps: 365
-  num_rollouts: 500
-  env_kwargs: ${environment.env_kwargs}
-  env_params: ${environment.env_params}
-  test: True
-  n_devices:
-  num_warmup_days: 100
-  gamma: ${environment.gamma}
+evaluation: 
+  seed: 456
+  test_evaluator:
+    _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: 365
+    num_rollouts: 500
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: 100
+    gamma: ${environment.gamma}

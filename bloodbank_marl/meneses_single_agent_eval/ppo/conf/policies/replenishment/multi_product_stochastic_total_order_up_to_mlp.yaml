@@ -1,10 +1,9 @@
-_target_: bloodbank_marl.meneses_single_agent_eval.ppo.policies.replenishment.FlaxMultiProductStochasticOrderUpToRepPolicy
+_target_: bloodbank_marl.policies.replenishment.flax_nn.gymnax_stochastic.FlaxStochasticMultiProductOrderUpToRepPolicy
 model_class:
     _target_: hydra.utils.get_class
-    path: bloodbank_marl.meneses_single_agent_eval.ppo.policies.replenishment.ContinuousTotalActorCritic
+    path: # TODO: Create a new version of the model/something else that calculates total stock per product
 model_kwargs:
     activation: "tanh"
-policy_id: 0
 env_name: ${environment.env_name}
 env_kwargs: ${environment.env_kwargs}
 env_params: ${environment.env_params}
