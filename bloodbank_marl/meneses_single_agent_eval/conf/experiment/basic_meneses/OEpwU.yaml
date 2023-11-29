@@ -4,3 +4,7 @@ defaults:
   - override /policies/replenishment_policy_params: OEpwU
 
 exp_name: OEpwU
+
+evaluation:
+  test_evaluator:
+    num_warmup_days: 0

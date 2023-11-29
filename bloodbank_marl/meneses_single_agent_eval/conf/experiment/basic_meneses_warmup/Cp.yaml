@@ -2,9 +2,6 @@
 
 defaults:
   - override /policies/replenishment_policy_params: Cp
-  - override /policies/issuing: priority_match
+  - override /policies/issuing: heuristic_priority_match
 
 exp_name: Cp_warmup
-
-rollout_wrapper:
-  num_burnin_steps: 100

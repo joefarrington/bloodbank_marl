@@ -1,7 +1,7 @@
 defaults:
-  - policies/replenishment: s_policy
-  - policies/replenishment_policy_params: Ap
-  - policies/issuing: exact_match
+  - policies/replenishment: heuristic_order_up_to
+  - policies/replenishment_policy_params: OEp
+  - policies/issuing: heuristic_exact_match
   - environment: meneses_gymnax
   - _self_
 
@@ -13,15 +13,17 @@ hydra:
   job:
     chdir: True
 
-rollout_wrapper:
-  _target_: bloodbank_marl.utils.single_agent_rollout_manager.RolloutWrapper
-  env_id: ${environment.env_name}
-  num_env_steps: 365
-  env_kwargs: ${environment.env_kwargs}
-  env_params: ${environment.env_params}
-  num_burnin_steps: 0
-  return_info: True
 
 evaluation:
   seed: 123
-  num_rollouts: 1000
+  test_evaluator:
+    _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 1000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}

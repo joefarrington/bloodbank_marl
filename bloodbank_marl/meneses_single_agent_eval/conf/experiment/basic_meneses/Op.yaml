@@ -2,6 +2,10 @@
 
 defaults:
   - override /policies/replenishment_policy_params: Op
-  - override /policies/issuing: priority_match
+  - override /policies/issuing: heuristic_priority_match
 
 exp_name: Op
+
+evaluation:
+  test_evaluator:
+    num_warmup_days: 0
