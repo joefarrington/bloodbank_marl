@@ -16,12 +16,13 @@ from functools import partial
 
 
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
-from bloodbank_marl.policies import replenishment, issuing, policy_manager, common
+from bloodbank_marl.policies import policy_manager
 from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness
 from bloodbank_marl.utils.rollout_manager import RolloutManager
 from bloodbank_marl.utils.gymnax_wrappers import LogEnvState, LogWrapper, LogInfo
-from bloodbank_marl.ppo_multi_agent.ppo_models import DiscreteActorCritic
-from bloodbank_marl.ppo_multi_agent.ppo_policies import FlaxStochasticPolicy
+
+# from bloodbank_marl.ppo_multi_agent.ppo_models import DiscreteActorCritic
+# from bloodbank_marl.ppo_multi_agent.ppo_policies import FlaxStochasticPolicy
 import flax.linen as nn
 import numpy as np
 import optax
@@ -695,11 +696,11 @@ def main(cfg):
     training_params = jax.tree_util.tree_map(
         lambda x: jnp.array([x]), output["runner_state"][0].params
     )
-    heuristic_params = jnp.array([cfg.training["heuristic_params"]])
+    # heuristic_params = jnp.array([cfg.training["heuristic_params"]])
 
     policy_params = {
         cfg.training["policy_to_train"]: training_params,
-        1 - cfg.training["policy_to_train"]: heuristic_params,
+        # 1 - cfg.training["policy_to_train"]: heuristic_params,
     }
 
     fitness, cum_infos, kpis = fitness.rollout(
