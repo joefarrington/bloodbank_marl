@@ -1,0 +1,5 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: multi_product_total_order_up_to_mlp
+  - override /policies/issuing: heuristic_exact_match

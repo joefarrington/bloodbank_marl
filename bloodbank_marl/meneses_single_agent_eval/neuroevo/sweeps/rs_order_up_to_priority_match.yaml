@@ -1,0 +1,33 @@
+program: ../run_evosax.py
+method: bayes
+metric:
+  name: eval/mean_params/return_mean
+  goal: maximize
+parameters:
+  evosax.strategy.lrate_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  evosax.strategy.sigma_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  policies.replenishment.model_kwargs.n_hidden:
+    distribution: q_uniform
+    min: 32
+    max: 256
+    q: 32
+  environment.env_kwargs.max_order_quantities:
+    distribution: q_uniform
+    min: 20
+    max: 100
+    q: 5
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=rs_order_up_to_priority_match
+
+  

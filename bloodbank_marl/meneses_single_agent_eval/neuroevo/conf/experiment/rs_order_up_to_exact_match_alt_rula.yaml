@@ -1,0 +1,21 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_gymnax
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: heuristic_exact_match
+
+evosax:
+  num_generations: 150
+
+environment:
+  env_kwargs:
+    max_order_quantities: 50
+  env_params:
+    age_on_arrival_distribution_probs: 
+      _target_: jax.numpy.array
+      object: [0.5, 0.2, 0.3]
+
+wandb:
+  init:
+    project: "rs_gymnax_neuro_exact_match_alt_rula"

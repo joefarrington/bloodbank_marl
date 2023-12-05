@@ -6,7 +6,7 @@ defaults:
 
 wandb:
   init:
-    project: "meneses_single_agent_neuro"
+    project: "meneses_gymnax_neuro"
 
 hydra:
   job:
@@ -18,13 +18,13 @@ hydra:
 evosax:
   num_generations: 100
   num_train_rollouts: 50
-  num_test_rollouts: 100
+  num_test_rollouts: 1000
   evaluate_every_k_gens: 10
   seed: 10
   
   strategy:
     _target_: evosax.OpenES
-    popsize: 150
+    popsize: 50
     opt_name: "adam"
     lrate_init: 0.08
     sigma_init: 0.08
