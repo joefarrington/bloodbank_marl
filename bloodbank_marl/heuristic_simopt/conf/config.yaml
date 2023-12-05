@@ -1,7 +1,7 @@
 defaults:
   - environment: demoor_m2
-  - policies/replenishment: s_policy
-  - policies/issuing: oufo
+  - policies/replenishment: heuristic_order_up_to
+  - policies/issuing: heuristic_oufo
   - _self_
 
 wandb:
