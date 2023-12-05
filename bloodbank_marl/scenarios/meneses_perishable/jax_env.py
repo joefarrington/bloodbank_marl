@@ -19,6 +19,8 @@ jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
 n_products = 8
 
+# TODO: Gymnax versions has an exact match target as well, should add that here.
+
 # NOTE: The is for PRBCs, remember platelets are different
 action_mask_per_request_type = np.array(
     [
@@ -126,9 +128,10 @@ class EnvParams:
         ],
         max_substitution_cost: float = 1340,
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
-        max_expiry_target: float = 1.0,
-        min_service_level_target: float = 0.0,
-        target_kpi_breach_penalty: float = 0,  # No penalty for now
+        max_expiry_pc_target: float = 100.0,  # No limit by default
+        min_service_level_pc_target: float = 0.0,  # No limit by default
+        min_exact_match_pc_target: float = 0.0,
+        target_kpi_breach_penalty: float = 0.0,  # No penalty for now
         max_days_in_episode: int = 365,
         max_steps_in_episode: int = 1e6,
         gamma: float = 1.0,
@@ -144,8 +147,9 @@ class EnvParams:
             jnp.array(holding_costs),
             jnp.array(substitution_cost_ratios) * max_substitution_cost,
             jnp.array(action_mask_per_request_type),
-            max_expiry_target,
-            min_service_level_target,
+            max_expiry_pc_target,
+            min_service_level_pc_target,
+            min_exact_match_pc_target,
             target_kpi_breach_penalty,
             max_days_in_episode,
             max_steps_in_episode,
@@ -234,15 +238,23 @@ class EnvInfo:
         # 100% service level or 0% expriries for example to avoid issues with floating
         # point precision
         expiry_penalty = (
-            jnp.where(kpis["expiries_%"] > params.max_expiry_target, 1, 0)
+            jnp.where(kpis["expiries_%"] > params.max_expiry_pc_target, 1, 0)
             * -params.target_kpi_breach_penalty
         )
 
         service_level_penalty = (
-            jnp.where(kpis["service_level_%"] < params.min_service_level_target, 1, 0)
+            jnp.where(
+                kpis["service_level_%"] < params.min_service_level_pc_target, 1, 0
+            )
             * -params.target_kpi_breach_penalty
         )
-        return expiry_penalty + service_level_penalty
+
+        matching_penalty = (
+            jnp.where(kpis["exact_match_%"] < params.min_exact_match_pc_target, 1, 0)
+            * -params.target_kpi_breach_penalty
+        )
+
+        return expiry_penalty + service_level_penalty + matching_penalty
 
     def _calculate_exact_match_pc_by_pt_blood_group(self):
         exact_matches_by_request_type = self.allocations[0].sum(axis=-1)[
