@@ -1,5 +1,5 @@
 defaults:
-  - policies/replenishment: multi_product_stochastic_mlp
+  - policies/replenishment: multi_product_stochastic_total_order_up_to_mlp
   - policies/issuing: heuristic_priority_match
   - environment: meneses_gymnax
   - _self_
@@ -22,20 +22,16 @@ n_seeds: 1 # This is how many repeats of training?
 fixed_config:
   NUM_ENVS: 200
   NUM_STEPS: 20
-  TOTAL_TIMESTEPS: 1e4
+  TOTAL_TIMESTEPS: 1e7
   UPDATE_EPOCHS: 4
   NUM_MINIBATCHES: 20
-  #ENV_NAME: ${environment.env_name}
-  #ACTIVATION: "tanh"
   ANNEAL_LR: False # Not sure about this one
-  #NUM_HIDDEN_UNITS: 64
-  #NUM_HIDDEN_LAYERS: 2
   environment: ${environment}
   policies: ${policies}
 
 hp_config:
   LR: 1e-4
-  GAMMA: 0.95
+  GAMMA: 0.90
   GAE_LAMBDA: 0.95
   CLIP_EPS: 0.2
   ENT_COEF: 0.01

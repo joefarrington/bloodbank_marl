@@ -421,9 +421,7 @@ def main(cfg):
 
     policy = hydra.utils.instantiate(cfg.policies.replenishment)
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
-    test_evaluator.set_apply_fn(
-        policy.apply
-    )  # TODO: Currently getting weird results when this is _deterministic
+    test_evaluator.set_apply_fn(policy.apply_deterministic)
     policy_params = output["runner_state"][0].params
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
     fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, policy_params)
