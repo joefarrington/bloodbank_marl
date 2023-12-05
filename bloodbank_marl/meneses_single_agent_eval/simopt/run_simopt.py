@@ -23,6 +23,8 @@ import omegaconf
 # Enable logging
 log = logging.getLogger(__name__)
 
+# TODO: Log to W&B during fitting?
+
 
 def param_search_bounds_from_config(
     cfg: DictConfig, policy: HeuristicPolicy
@@ -199,6 +201,9 @@ def simopt_other_sampler(
         log.info(
             f"Round {i} complete. Best params: {study.best_params}, mean return: {study.best_value:.4f}"
         )
+        best_params = np.array([v for v in study.best_params.values()]).reshape(
+            policy.params_shape
+        )
         # Perform early stopping starting on the second round
         if i > 1:
             if study.best_params == best_params_last_round:
@@ -225,7 +230,6 @@ def main(cfg: DictConfig) -> None:
     run = wandb.init(**wandb_config["wandb"]["init"], config=wandb_config)
 
     rep_policy = hydra.utils.instantiate(cfg.policies.replenishment)
-    print(rep_policy.param_names)
     # rollout_wrapper = hydra.utils.instantiate(
     #    cfg.rollout_wrapper,
     #    model_forward=rep_policy.apply,
@@ -238,8 +242,6 @@ def main(cfg: DictConfig) -> None:
     initial_policy_params = omegaconf.OmegaConf.to_container(
         cfg.policies.replenishment_policy_params
     )
-    print(initial_policy_params)
-
     if cfg.param_search.sampler._target_ == "optuna.samplers.GridSampler":
         study = simopt_grid_sampler(
             cfg, rep_policy, train_evaluator, rng_fit, initial_policy_params

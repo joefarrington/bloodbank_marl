@@ -1,0 +1,87 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: heuristic_S_day_of_week
+  - override /policies/issuing: heuristic_exact_match
+  - override /environment: rs_gymnax
+
+wandb:
+  init:
+    project: "rs_multiproduct_gymnax_simopt"
+
+# Just some initial values to start with
+policies:
+  replenishment_policy_params:
+    S_Mon_O-: 4
+    S_Mon_O+: 19
+    S_Mon_A-: 3
+    S_Mon_A+: 17
+    S_Mon_B-: 1
+    S_Mon_B+: 5
+    S_Mon_AB-: 1
+    S_Mon_AB+: 2
+    S_Tue_O-: 4
+    S_Tue_O+: 19
+    S_Tue_A-: 3
+    S_Tue_A+: 17
+    S_Tue_B-: 1
+    S_Tue_B+: 5
+    S_Tue_AB-: 1
+    S_Tue_AB+: 2
+    S_Wed_O-: 4
+    S_Wed_O+: 19
+    S_Wed_A-: 3
+    S_Wed_A+: 17
+    S_Wed_B-: 1
+    S_Wed_B+: 5
+    S_Wed_AB-: 1
+    S_Wed_AB+: 2
+    S_Thu_O-: 4
+    S_Thu_O+: 19
+    S_Thu_A-: 3
+    S_Thu_A+: 17
+    S_Thu_B-: 1
+    S_Thu_B+: 5
+    S_Thu_AB-: 1
+    S_Thu_AB+: 2
+    S_Fri_O-: 4
+    S_Fri_O+: 19
+    S_Fri_A-: 3
+    S_Fri_A+: 17
+    S_Fri_B-: 1
+    S_Fri_B+: 5
+    S_Fri_AB-: 1
+    S_Fri_AB+: 2
+    S_Sat_O-: 4
+    S_Sat_O+: 19
+    S_Sat_A-: 3
+    S_Sat_A+: 17
+    S_Sat_B-: 1
+    S_Sat_B+: 5
+    S_Sat_AB-: 1
+    S_Sat_AB+: 2
+    S_Sun_O-: 4
+    S_Sun_O+: 19
+    S_Sun_A-: 3
+    S_Sun_A+: 17
+    S_Sun_B-: 1
+    S_Sun_B+: 5
+    S_Sun_AB-: 1
+    S_Sun_AB+: 2
+
+param_search:
+  sampler:
+    _target_: optuna.samplers.NSGAIISampler
+    population_size: 100
+  max_parallel_trials: 100
+  max_iterations: 200
+  num_rollouts: 100
+  seed: 10
+  search_bounds:
+    all_params:
+      low: 0
+      high: 50
+  early_stopping_rounds: 100
+
+
+
