@@ -2,7 +2,7 @@
 
 wandb:
   init:
-    project: de_moor_perishable_m2_exp2_fit_both
+    project: bbm_neuro_de_moor_perishable_m2_exp2_fit_both
 
 environment:
   env_kwargs:
