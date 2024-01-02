@@ -27,6 +27,9 @@ jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
 # TODO: Create base class for multiagent JAX env and inherit from that
 
+# NOTE: Temporarily effectively got rid of action masking by always setting # issuing action mask to 1
+# except for padding.
+
 
 # TODO: Consider if gamma goes here
 @struct.dataclass
@@ -366,7 +369,9 @@ class DeMoorPerishableMAJAX(MarlEnvironment):
 
     def _get_issuing_mask(self, state: EnvState, params: EnvParams) -> chex.Array:
         """Get action mask for issuing agent."""
-        base_mask = jnp.where(state.stock > 0, 1, 0)
+        base_mask = jnp.ones_like(
+            state.stock, dtype=jnp.int32
+        )  # jnp.where(state.stock > 0, 1, 0)
         # Issuing nothing (action 0) always allowed, then one action per age if in stock, then pad with zeros
         return jnp.hstack(
             [
