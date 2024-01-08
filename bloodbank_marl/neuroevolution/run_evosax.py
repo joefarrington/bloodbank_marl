@@ -16,8 +16,85 @@ import orbax
 import wandb
 import hydra
 import omegaconf
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # TODO We could subclass the logger or find another way to log the KPIs (especially for the best current params)
+
+
+def plot_policies(policy_rep, policy_issue, policy_params, params_label="mean_params"):
+    # For simplicity, redefine here without incluing in_transit
+    # because for the simple example we can plot there is no in-transit
+    # ANd having it with no shape causes problems
+    @struct.dataclass
+    class EnvObs:
+        agent_id: int  # Following Tianhou;
+        stock: chex.Array
+        in_transit: chex.Array
+        action_mask: chex.Array
+
+        @property
+        def obs(self):
+            return jnp.hstack([self.stock])
+
+    stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
+    in_transit = jnp.array([1] * 121).reshape(121, 1)[
+        :, 1:
+    ]  # Doing this, should get the empty array we expect
+    agent_id = jnp.array([1] * 121).reshape(121, 1)
+    action_mask = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] * 121).reshape(121, 11)
+    all_obs = EnvObs(
+        stock=stock, agent_id=agent_id, action_mask=action_mask, in_transit=in_transit
+    )
+
+    rep_actions = jax.vmap(
+        jax.vmap(policy_rep.apply_deterministic, in_axes=(0, None, None)),
+        in_axes=(None, 0, None),
+    )(policy_params, all_obs, jax.random.PRNGKey(1))
+    rep_df = pd.DataFrame(
+        {
+            "age_1": all_obs.stock[:, 0],
+            "age_2": all_obs.stock[:, 1],
+            "action": rep_actions.reshape(-1),
+        }
+    )
+    rep_df = rep_df.pivot(columns="age_2", index="age_1", values="action").sort_index(
+        ascending=False
+    )
+    fig, ax = plt.subplots(figsize=(5, 5))
+    rep_heatmap = sns.heatmap(
+        rep_df, annot=True, cmap="Greens_r", vmax=5, square=True, ax=ax
+    )
+    wandb.log({f"rep/policy_plot/{params_label}": wandb.Image(rep_heatmap)})
+
+    # Different action mask for issuing
+    action_mask = jnp.hstack(
+        [jnp.ones((121, 1)), jnp.where(stock > 0, 1, 0), jnp.zeros((121, 8))]
+    )
+    all_obs = EnvObs(
+        stock=stock, agent_id=agent_id, action_mask=action_mask, in_transit=in_transit
+    )
+
+    issue_actions = jax.vmap(
+        jax.vmap(policy_issue.apply_deterministic, in_axes=(0, None, None)),
+        in_axes=(None, 0, None),
+    )(policy_params, all_obs, jax.random.PRNGKey(1))
+    issue_df = pd.DataFrame(
+        {
+            "age_1": all_obs.stock[:, 0],
+            "age_2": all_obs.stock[:, 1],
+            "action": issue_actions.reshape(-1),
+        }
+    )
+    issue_df = issue_df.pivot(
+        columns="age_2", index="age_1", values="action"
+    ).sort_index(ascending=False)
+    fig, ax = plt.subplots(figsize=(5, 5))
+    issue_heatmap = sns.heatmap(
+        issue_df, annot=True, cmap="Greens_r", vmax=5, square=True, ax=ax
+    )
+    wandb.log({f"issue/policy_plot/{params_label}": wandb.Image(issue_heatmap)})
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -126,6 +203,17 @@ def main(cfg):
                     log_to_wandb[f"eval/{p}/{k}"] = v[idx]
 
         wandb.log(log_to_wandb)
+
+    # TEMP: Plotting policies
+
+    policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
+    policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
+    policy_params_mean = test_param_reshaper.reshape(jnp.array([mean_params]))
+    policy_params_top_1 = test_param_reshaper.reshape(jnp.array([best_params]))
+    if cfg["plot_policies"]:
+        plot_policies(policy_rep, policy_issue, policy_params_mean, "mean_params")
+        plot_policies(policy_rep, policy_issue, policy_params_top_1, "top_1")
+
     # NOTE: Training is quick so for now just checkpoint at the end and re-run if needed
     ckpt = {
         "state": state,

@@ -8,6 +8,8 @@ wandb:
   init:
     project: "bloodbank_marl_neuroevolution_default"
 
+plot_policies: False
+
 evosax:
   num_generations: 100
   evaluate_every_k_gens: 10
@@ -19,6 +21,8 @@ evosax:
     opt_name: "adam"
     lrate_init: 0.08
     sigma_init: 0.08
+    lrate_limit: ${evosax.strategy.lrate_init}
+    sigma_limit: ${evosax.strategy.sigma_init}
 
   fitness_shaper:
     _target_: evosax.FitnessShaper

@@ -17,11 +17,19 @@ parameters:
     min: 32
     max: 256
     q: 32
+  policies.issuing.model_kwargs.n_hidden:
+    distribution: q_uniform
+    min: 32
+    max: 256
+    q: 32
+
+# Overriding the wandbname, we are not doing issuing action masking in the env so want to differentiate in wandb
 
 command:
   - ${env}
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=de_moor_m5_exp6_fit_rep
+  - +experiment=de_moor_m2_exp2_fit_both 
+  - wandb.init.project=bbm_neuro_de_moor_perishable_m2_exp2_fit_both_no_issue_am
   

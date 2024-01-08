@@ -23,5 +23,5 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=de_moor_m5_exp6_fit_rep
+  - +experiment=de_moor_m2_exp2_fit_rep
   
