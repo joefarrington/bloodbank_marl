@@ -116,9 +116,18 @@ def main(cfg):
 
     policy_params = {}
     # 0 is the id for replenishment
+
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
     if 0 in cfg.policies.optimize:
-        rep_params = policy_rep.get_initial_params(rng_rep)
+        if cfg.policies.pretrained.replenishment.enable:
+            rep_cpm = hydra.utils.instantiate(
+                cfg.policies.pretrained.replenishment.checkpoint_manager
+            )
+            rep_params = rep_cpm.restore(
+                cfg.policies.pretrained.replenishment.checkpoint_id
+            )["trained_params"]
+        else:
+            rep_params = policy_rep.get_initial_params(rng_rep)
         policy_params[0] = rep_params
 
     # 1 is the id for issuing policy

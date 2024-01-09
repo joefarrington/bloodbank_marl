@@ -1,0 +1,35 @@
+# @package _global_
+defaults:
+  - override /policies/replenishment: discrete_mlp
+
+wandb:
+  init:
+    project: bbm_neuro_de_moor_perishable_m2_exp2_fit_both_discrete_mlp_rep_pretrained
+
+plot_policies: True
+
+environment:
+  env_kwargs:
+    max_useful_life: 2
+    lead_time: 1
+    max_order_quantity: 10
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing
+  pretrained:
+    replenishment:
+      enable: True
+      checkpoint_id: 0
+      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/draft_notebooks/rep_cpts
+      checkpoint_manager:
+        _target_: orbax.checkpoint.CheckpointManager
+        directory: ${policies.pretrained.replenishment.checkpoint_dir}
+        checkpointers:
+          _target_: orbax.checkpoint.PyTreeCheckpointer
+        options:
+          _target_: orbax.checkpoint.CheckpointManagerOptions
+          max_to_keep: 1
+          create: True
+      

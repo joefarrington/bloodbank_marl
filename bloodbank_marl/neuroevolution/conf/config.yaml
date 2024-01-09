@@ -67,6 +67,11 @@ test_evaluator:
 policies:
   policy_manager:
     _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  pretrained:
+    replenishment:
+      enable: False
+    issuing:
+      enable: False
 
 
 
