@@ -24,5 +24,5 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=de_moor_m2_exp2_fit_both_discrete_mlp_rep_pretrained
+  - +experiment=de_moor_m2_exp6_fit_both_discrete_mlp_rep_pretrained
   

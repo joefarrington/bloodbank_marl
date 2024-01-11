@@ -115,8 +115,8 @@ def main(cfg):
         raise ValueError("No policies to optimize")
 
     policy_params = {}
-    # 0 is the id for replenishment
 
+    # 0 is the id for replenishment
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
     if 0 in cfg.policies.optimize:
         if cfg.policies.pretrained.replenishment.enable:
@@ -133,7 +133,15 @@ def main(cfg):
     # 1 is the id for issuing policy
     policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
     if 1 in cfg.policies.optimize:
-        issue_params = policy_issue.get_initial_params(rng_issue)
+        if cfg.policies.pretrained.issuing.enable:
+            issue_cpm = hydra.utils.instantiate(
+                cfg.policies.pretrained.issuing.checkpoint_manager
+            )
+            issue_params = issue_cpm.restore(
+                cfg.policies.pretrained.issuing.checkpoint_id
+            )["trained_params"]
+        else:
+            issue_params = policy_issue.get_initial_params(rng_issue)
         policy_params[1] = issue_params
 
     policies = [policy_rep.apply, policy_issue.apply]
