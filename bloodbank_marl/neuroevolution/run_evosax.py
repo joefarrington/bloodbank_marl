@@ -19,7 +19,6 @@ import omegaconf
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from bloodbank_marl.utils.evosax import preprocess_openes_config
 
 # TODO We could subclass the logger or find another way to log the KPIs (especially for the best current params)
 
