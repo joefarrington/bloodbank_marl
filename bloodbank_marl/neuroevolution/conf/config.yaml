@@ -21,9 +21,19 @@ evosax:
     opt_name: "adam"
     lrate_init: 0.08
     sigma_init: 0.08
-    lrate_limit: ${evosax.strategy.lrate_init}
-    sigma_limit: ${evosax.strategy.sigma_init}
-
+    sigma_decay: 1.0
+    lrate_decay: 1.0
+    lrate_limit:
+      _target_: operator.mul
+      _args_:
+        - ${evosax.strategy.lrate_init}
+        - 0.01
+    sigma_limit:
+      _target_: operator.mul
+      _args_:
+        - ${evosax.strategy.sigma_init}
+        - 0.01
+  
   fitness_shaper:
     _target_: evosax.FitnessShaper
     maximize: True
@@ -39,7 +49,6 @@ evosax:
     max_to_keep: 1
     create: True
     
-
 train_evaluator:
   _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
   env_name: ${environment.env_name}
