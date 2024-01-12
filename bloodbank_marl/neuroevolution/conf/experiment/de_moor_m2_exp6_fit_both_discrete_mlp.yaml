@@ -4,7 +4,7 @@ defaults:
 
 wandb:
   init:
-    project: bbm_neuro_de_moor_perishable_m2_exp5_fit_both_discrete_mlp
+    project: bbm_neuro_de_moor_perishable_m2_exp6_fit_both_discrete_mlp
 
 plot_policies: False
 

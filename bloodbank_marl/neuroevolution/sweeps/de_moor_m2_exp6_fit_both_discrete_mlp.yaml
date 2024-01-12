@@ -12,7 +12,8 @@ parameters:
     distribution: log_uniform_values
     min: 0.005
     max: 0.5
-  policies.replenishment.model_kwargs.n_hidden:
+  # We know from pretrained version that 64 is good for replenishment
+  policies.issuing.model_kwargs.n_hidden:
     distribution: q_uniform
     min: 32
     max: 256
@@ -23,5 +24,5 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=de_moor_m2_exp5_fit_rep_discrete_mlp
+  - +experiment=de_moor_m2_exp6_fit_both_discrete_mlp
   
