@@ -24,6 +24,10 @@ import hydra
 import omegaconf
 from bloodbank_marl.utils.gymnax_fitness import make
 from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import EnvObs
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 
 # TODO: Need to think carefully about logging if we are vmapping over some config inputs
 # Which this is sort of designed to handle (as as per the HPConfig class)
@@ -388,6 +392,51 @@ def log_episode_metrics(fixed_config, metrics):
     wandb.log({"train/mean_completed_return": rew_fig})
 
 
+# Specifically used for DeMoor m=2, L=1
+
+
+def plot_policy(policy_rep, policy_params):
+    # For simplicity, redefine here without incluing in_transit
+    # because for the simple example we can plot there is no in-transit
+    # ANd having it with no shape causes problems
+    @struct.dataclass
+    class EnvObs:
+        stock: chex.Array
+        in_transit: chex.Array
+        action_mask: chex.Array
+
+        @property
+        def obs(self):
+            return jnp.hstack([self.stock])
+
+    stock = jnp.array([[i, j] for i in range(0, 11) for j in range(0, 11)])
+    in_transit = jnp.array([1] * 121).reshape(121, 1)[
+        :, 1:
+    ]  # Doing this, should get the empty array we expect
+    action_mask = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] * 121).reshape(121, 11)
+    all_obs = EnvObs(stock=stock, action_mask=action_mask, in_transit=in_transit)
+
+    rep_actions = jax.vmap(
+        jax.vmap(policy_rep.apply_deterministic, in_axes=(0, None, None)),
+        in_axes=(None, 0, None),
+    )(policy_params, all_obs, jax.random.PRNGKey(1))
+    rep_df = pd.DataFrame(
+        {
+            "age_1": all_obs.stock[:, 0],
+            "age_2": all_obs.stock[:, 1],
+            "action": rep_actions.reshape(-1),
+        }
+    )
+    rep_df = rep_df.pivot(columns="age_2", index="age_1", values="action").sort_index(
+        ascending=False
+    )
+    fig, ax = plt.subplots(figsize=(5, 5))
+    rep_heatmap = sns.heatmap(
+        rep_df, annot=True, cmap="Greens_r", vmax=5, square=True, ax=ax
+    )
+    wandb.log({"rep/policy_plot": wandb.Image(rep_heatmap)})
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg):
     wandb_config = omegaconf.OmegaConf.to_container(
@@ -434,6 +483,9 @@ def main(cfg):
             log_to_wandb[f"eval/{k}"] = v.mean(axis=-1)
 
     wandb.log(log_to_wandb)
+
+    if cfg["plot_policy"]:
+        plot_policy(policy, policy_params)
 
 
 if __name__ == "__main__":
