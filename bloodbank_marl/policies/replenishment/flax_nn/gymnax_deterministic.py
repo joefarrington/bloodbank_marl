@@ -18,6 +18,16 @@ import pandas as pd
 from bloodbank_marl.policies.common import FlaxPolicy
 
 
+class FlaxOrderUpToRepPolicy(FlaxPolicy):
+    def _postprocess_action(self, obs, tr_action):
+        S = tr_action
+        return jnp.clip(
+            S - obs.stock.sum(axis=-1) - obs.in_transit.sum(axis=-1),
+            a_min=0,
+            a_max=None,
+        ).astype(jnp.int32)
+
+
 class FlaxMultiProductRepPolicy(FlaxPolicy):
     def __init__(
         self,
