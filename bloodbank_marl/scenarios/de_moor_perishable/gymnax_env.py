@@ -1,10 +1,18 @@
+# Originally from https://github.com/joefarrington/viso_jax/blob/main/viso_jax/scenarios/de_moor_perishable/environment.py
+# Rewrote the method for calculating the KPIs
+# Added an EnvObs class, and action mask
+# Added ameneded step function to use EnvObs
+# Added end of warmup reset function
+# Added calculate target KPI penalty
+
 import jax
 import jax.numpy as jnp
 from gymnax.environments import environment, spaces
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Union, Optional, List, Dict
 import chex
 from flax import struct
 import numpyro
+from functools import partial
 
 
 @struct.dataclass
@@ -57,6 +65,23 @@ class EnvParams:
         )
 
 
+@struct.dataclass
+class EnvObs:
+    stock: chex.Array
+    in_transit: chex.Array
+    action_mask: chex.Array
+
+    @property
+    def obs(self):
+        batch_dims = self.in_transit.shape[:-2]
+        return jnp.hstack(
+            [
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
+            ]
+        )
+
+
 # Avoid warnings by using standard int based on whether
 # double precision is enabled or not
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
@@ -79,6 +104,28 @@ class DeMoorPerishableGymnax(environment.Environment):
     @property
     def default_params(self) -> EnvParams:
         return EnvParams.create_env_params()
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(
+        self,
+        key: chex.PRNGKey,
+        state: EnvState,
+        action: Union[int, float],
+        params: Optional[EnvParams] = None,
+    ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
+        """Performs step transitions in the environment."""
+        # Use default env parameters if no others specified
+        if params is None:
+            params = self.default_params
+        key, key_reset = jax.random.split(key)
+        obs_st, state_st, reward, done, info = self.step_env(key, state, action, params)
+        obs_re, state_re = self.reset_env(key_reset, params)
+        # Auto-reset environment based on termination
+        state = jax.tree_map(
+            lambda x, y: jax.lax.select(done, x, y), state_re, state_st
+        )
+        obs = jax.tree_map(lambda x, y: jax.lax.select(done, x, y), obs_re, obs_st)
+        return obs, state, reward, done, info
 
     def step_env(
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
@@ -144,6 +191,8 @@ class DeMoorPerishableGymnax(environment.Environment):
             {
                 "discount": self.discount(state, params),
                 "cumulative_gamma": cumulative_gamma,
+                "day_counter": 1,
+                "order": action,
                 "demand": demand,
                 "shortage": shortage,
                 "holding": holding,
@@ -165,7 +214,11 @@ class DeMoorPerishableGymnax(environment.Environment):
 
     def get_obs(self, state: EnvState) -> chex.Array:
         """Applies observation function to state."""
-        return jnp.array([*state.in_transit, *state.stock])
+        return EnvObs(
+            stock=state.stock,
+            in_transit=state.in_transit,
+            action_mask=jnp.ones((self.max_order_quantity + 1,)),
+        )
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
         """Check whether state is terminal."""
@@ -228,17 +281,7 @@ class DeMoorPerishableGymnax(environment.Environment):
     def observation_space(self, params: EnvParams) -> spaces.Box:
         """Observation space of the environment."""
         # [O, X], in_transit and in_stock, stock ages left to right
-        if params is None:
-            params = self.default_params
-        obs_len = self.max_useful_life + self.lead_time - 1
-        low = jnp.array([0] * obs_len)
-        high = jnp.array([self.max_order_quantity] * obs_len)
-        return spaces.Box(
-            low,
-            high,
-            (obs_len,),
-            dtype=jnp_int,
-        )
+        raise NotImplementedError
 
     def state_space(self, params: EnvParams) -> spaces.Dict:
         """State space of the environment."""
@@ -256,18 +299,44 @@ class DeMoorPerishableGymnax(environment.Environment):
             }
         )
 
-    @classmethod
-    def calculate_kpis(cls, rollout_results: Dict) -> Dict[str, float]:
-        """Calculate KPIs for each rollout, using the output of a rollout from RolloutWrapper"""
-        service_level = (
-            rollout_results["info"]["demand"] - rollout_results["info"]["shortage"]
-        ).sum(axis=-1) / rollout_results["info"]["demand"].sum(axis=-1)
-        wastage = rollout_results["info"]["expiries"].sum(axis=-1) / rollout_results[
-            "action"
-        ].sum(axis=(-1))
-        holding_units = rollout_results["info"]["holding"].mean(axis=-1)
+    @property
+    def empty_infos(self) -> Dict[str, Union[chex.Array, float, int]]:
         return {
-            "service_level_%": service_level * 100,
-            "wastage_%": wastage * 100,
-            "holding_units": holding_units,
+            "cumulative_gamma": 1.0,
+            "discount": 0.0,
+            "day_counter": 0,
+            "demand": 0,
+            "expiries": 0,
+            "holding": 0,
+            "order": 0,
+            "shortage": 0,
         }
+
+    @classmethod
+    def calculate_target_kpi_penalty(
+        cls, kpis: Dict[str, Union[chex.Array, float]], params
+    ):
+        # No target KPIs for this environment
+        return 0
+
+    def calculate_kpis(
+        self, cum_info: Dict[str, Union[chex.Array, float]]
+    ) -> Dict[str, Union[chex.Array, float]]:
+        """Calculate KPIs based on the info recorded by the replenishment agent, with id 0"""
+        return {
+            "service_level_%": (
+                jnp.sum(cum_info["demand"] - cum_info["shortage"]) * 100
+            )
+            / jnp.sum(cum_info["demand"]),
+            "wastage_%": (jnp.sum(cum_info["expiries"]) * 100)
+            / jnp.sum(cum_info["order"]),
+            "mean_holding": jnp.sum(cum_info["holding"]) / cum_info["day_counter"],
+        }
+
+    def end_of_warmup_reset(
+        self, key: chex.PRNGKey, state: EnvState, params: EnvParams
+    ):
+        """Run at end of warmup period to partially reset State"""
+        _, state_reset = self.reset(key, params)
+        # We want to keep the stock on hand and in transit, but reset everything else
+        return state_reset.replace(stock=state.stock, in_transit=state.in_transit)

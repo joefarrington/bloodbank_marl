@@ -15,6 +15,8 @@ hydra:
     # Search paths assume that run_optuna_simopt.py will be run from simopt/
     - file://../conf
 
+plot_policy: False
+
 evosax:
   num_generations: 100
   num_train_rollouts: 50
@@ -47,13 +49,13 @@ evosax:
 train_evaluator:
   _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
   env_name: ${environment.env_name}
-  num_env_steps: 90
+  num_env_steps: ${environment.num_env_steps}
   num_rollouts: ${evosax.num_train_rollouts}
   env_kwargs: ${environment.env_kwargs}
   env_params: ${environment.env_params}
   test: False
   n_devices:
-  num_warmup_days: 50
+  num_warmup_days: ${environment.num_warmup_days}
   gamma: ${environment.gamma}
 
 evaluation: 

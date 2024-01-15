@@ -1,0 +1,7 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: single_product_mlp
+  - override /environment: de_moor_perishable_gymnax
+
+plot_policy: True

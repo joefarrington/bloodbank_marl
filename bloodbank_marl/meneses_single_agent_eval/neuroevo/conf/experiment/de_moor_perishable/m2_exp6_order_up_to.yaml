@@ -1,0 +1,9 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: single_product_order_up_to_mlp
+  - override /environment: de_moor_perishable_gymnax
+
+environment:
+  env_kwargs:
+    lead_time: 2

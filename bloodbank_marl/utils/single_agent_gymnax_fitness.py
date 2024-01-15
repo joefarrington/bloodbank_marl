@@ -18,6 +18,9 @@ from evosax.utils import ESLog
 from evosax.problems import GymnaxFitness
 import distrax
 import functools
+from bloodbank_marl.scenarios.de_moor_perishable.gymnax_env import (
+    DeMoorPerishableGymnax,
+)
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.scenarios.meneses_perishable.jax_env import MenesesPerishableEnv
 from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import (
@@ -45,6 +48,11 @@ def make(env_name, **env_kwargs):
         return (
             RSPerishableGymnax(**env_kwargs),
             RSPerishableGymnax().default_params,
+        )
+    elif env_name == "DeMoorPerishableGymnax":
+        return (
+            DeMoorPerishableGymnax(**env_kwargs),
+            DeMoorPerishableGymnax().default_params,
         )
     elif env_name == "DeMoorPerishable":
         return (
