@@ -73,7 +73,7 @@ class EnvObs:
 
     @property
     def obs(self):
-        batch_dims = self.in_transit.shape[:-2]
+        batch_dims = self.in_transit.shape[:-1]
         return jnp.hstack(
             [
                 self.in_transit.reshape(batch_dims + (-1,)),
@@ -217,7 +217,7 @@ class DeMoorPerishableGymnax(environment.Environment):
         return EnvObs(
             stock=state.stock,
             in_transit=state.in_transit,
-            action_mask=jnp.ones((self.max_order_quantity + 1,)),
+            action_mask=jnp.ones((self.max_order_quantity + 1,), dtype=jnp_int),
         )
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> bool:
@@ -331,6 +331,7 @@ class DeMoorPerishableGymnax(environment.Environment):
             "wastage_%": (jnp.sum(cum_info["expiries"]) * 100)
             / jnp.sum(cum_info["order"]),
             "mean_holding": jnp.sum(cum_info["holding"]) / cum_info["day_counter"],
+            "day_count": cum_info["day_counter"],
         }
 
     def end_of_warmup_reset(
