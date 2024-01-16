@@ -171,7 +171,7 @@ class GymnaxFitness(object):
             next_o, next_s, reward, done, info = self.env.step(
                 rng_step, state, action, self.env_params
             )
-            warmup_done = jax.lax.ge(next_s.step, self.num_warmup_days)
+            warmup_done = jax.lax.ge(state.step, self.num_warmup_days)
             # TODO: We can probably get rid of the next few lines when using the while loop
             state = jax.tree_map(
                 lambda x, y: jnp.where(warmup_done, x, y), state, next_s
