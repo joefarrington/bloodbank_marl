@@ -15,28 +15,30 @@ hydra:
     # Search paths assume that run_optuna_simopt.py will be run from simopt/
     - file://../conf
 
-seed: 10
-n_seeds: 1 # This is how many repeats of training?
+training:
+  seed: 10
+  n_seeds: 1 # This is how many repeats of training to run with different seeds
 
 # Remember we can change these, but can't vmap over changes (probably)
 fixed_config:
-  NUM_ENVS: 200
-  NUM_STEPS: 20
-  TOTAL_TIMESTEPS: 1e7
-  UPDATE_EPOCHS: 4
-  NUM_MINIBATCHES: 20
-  ANNEAL_LR: False # Not sure about this one
+  num_envs: 200
+  num_steps: 20
+  total_timesteps: 1e7
+  update_epochs: 4
+  num_minibatches: 20
+  anneal_lr: True
   environment: ${environment}
   policies: ${policies}
 
+# We can vmap over different settings for these if we want
 hp_config:
-  LR: 1e-4
-  GAMMA: 0.90
-  GAE_LAMBDA: 0.95
-  CLIP_EPS: 0.2
-  ENT_COEF: 0.01
-  VF_COEF: 0.5
-  MAX_GRAD_NORM: 0.5
+  lr: 1e-4
+  gamma: 0.90
+  gae_lambda: 0.95
+  clip_eps: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
 
 evaluation: 
   seed: 456

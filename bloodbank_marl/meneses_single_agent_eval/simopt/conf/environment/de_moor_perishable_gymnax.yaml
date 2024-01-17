@@ -12,5 +12,4 @@ scalar_kpis_to_log:
   - service_level_%
   - wastage_%
   - mean_holding
-  - day_count
 vector_kpis_to_log:

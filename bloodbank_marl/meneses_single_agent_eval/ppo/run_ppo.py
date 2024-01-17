@@ -47,13 +47,13 @@ class Transition(NamedTuple):
 
 @struct.dataclass
 class HPConfig:
-    LR: float
-    GAMMA: float
-    GAE_LAMBDA: float
-    CLIP_EPS: float
-    ENT_COEF: float
-    VF_COEF: float
-    MAX_GRAD_NORM: float
+    lr: float
+    gamma: float
+    gae_lambda: float
+    clip_eps: float
+    ent_coef: float
+    vf_coef: float
+    max_grad_norm: float
 
 
 import jax
@@ -136,14 +136,14 @@ class LogWrapper(GymnaxWrapper):
 
 def make_train(fixed_config):
     fixed_config["NUM_UPDATES"] = int(
-        fixed_config["TOTAL_TIMESTEPS"]
-        // fixed_config["NUM_STEPS"]
-        // fixed_config["NUM_ENVS"]
+        fixed_config["total_timesteps"]
+        // fixed_config["num_steps"]
+        // fixed_config["num_envs"]
     )
     fixed_config["MINIBATCH_SIZE"] = int(
-        fixed_config["NUM_ENVS"]
-        * fixed_config["NUM_STEPS"]
-        // fixed_config["NUM_MINIBATCHES"]
+        fixed_config["num_envs"]
+        * fixed_config["num_steps"]
+        // fixed_config["num_minibatches"]
     )
     env, env_params = make(
         fixed_config["environment"]["env_name"],
@@ -157,24 +157,24 @@ def make_train(fixed_config):
                 1.0
                 - (
                     count
-                    // (fixed_config["NUM_MINIBATCHES"] * fixed_config["UPDATE_EPOCHS"])
+                    // (fixed_config["num_minibatches"] * fixed_config["update_epochs"])
                 )
                 / fixed_config["NUM_UPDATES"]
             )
-            return hp_config.LR * frac
+            return hp_config.lr * frac
 
         policy = hydra.utils.instantiate(fixed_config["policies"]["replenishment"])
         rng, _rng = jax.random.split(rng)
         policy_params = policy.get_initial_params(_rng)
 
-        if fixed_config["ANNEAL_LR"]:
+        if fixed_config["anneal_lr"]:
             tx = optax.chain(
-                optax.clip_by_global_norm(hp_config.MAX_GRAD_NORM),
+                optax.clip_by_global_norm(hp_config.max_grad_norm),
                 optax.adam(learning_rate=linear_schedule, eps=1e-5),
             )
         else:
             tx = optax.chain(
-                optax.clip_by_global_norm(hp_config.MAX_GRAD_NORM),
+                optax.clip_by_global_norm(hp_config.max_grad_norm),
                 optax.adam(hp_config.LR, eps=1e-5),
             )
         train_state = TrainState.create(
@@ -185,7 +185,7 @@ def make_train(fixed_config):
 
         # INIT ENV
         rng, _rng = jax.random.split(rng)
-        reset_rng = jax.random.split(_rng, fixed_config["NUM_ENVS"])
+        reset_rng = jax.random.split(_rng, fixed_config["num_envs"])
         obsv, env_state = jax.vmap(env.reset, in_axes=(0, None))(reset_rng, env_params)
 
         # TRAIN LOOP
@@ -205,7 +205,7 @@ def make_train(fixed_config):
 
                 # STEP ENV
                 rng, _rng = jax.random.split(rng)
-                rng_step = jax.random.split(_rng, fixed_config["NUM_ENVS"])
+                rng_step = jax.random.split(_rng, fixed_config["num_envs"])
                 obsv, env_state, reward, done, info = jax.vmap(
                     env.step, in_axes=(0, 0, 0, None)
                 )(rng_step, env_state, action, env_params)
@@ -216,7 +216,7 @@ def make_train(fixed_config):
                 return runner_state, transition
 
             runner_state, traj_batch = jax.lax.scan(
-                _env_step, runner_state, None, fixed_config["NUM_STEPS"]
+                _env_step, runner_state, None, fixed_config["num_steps"]
             )
 
             # CALCULATE ADVANTAGE
@@ -232,10 +232,10 @@ def make_train(fixed_config):
                         transition.value,
                         transition.reward,
                     )
-                    delta = reward + hp_config.GAMMA * next_value * (1 - done) - value
+                    delta = reward + hp_config.gamma * next_value * (1 - done) - value
                     gae = (
                         delta
-                        + hp_config.GAMMA * hp_config.GAE_LAMBDA * (1 - done) * gae
+                        + hp_config.gamma * hp_config.gae_lambda * (1 - done) * gae
                     )
                     return (gae, value), gae
 
@@ -267,7 +267,7 @@ def make_train(fixed_config):
                         # CALCULATE VALUE LOSS
                         value_pred_clipped = traj_batch.value + (
                             value - traj_batch.value
-                        ).clip(-hp_config.CLIP_EPS, hp_config.CLIP_EPS)
+                        ).clip(-hp_config.clip_eps, hp_config.clip_eps)
                         value_losses = jnp.square(value - targets)
                         value_losses_clipped = jnp.square(value_pred_clipped - targets)
                         value_loss = (
@@ -281,8 +281,8 @@ def make_train(fixed_config):
                         loss_actor2 = (
                             jnp.clip(
                                 ratio,
-                                1.0 - hp_config.CLIP_EPS,
-                                1.0 + hp_config.CLIP_EPS,
+                                1.0 - hp_config.clip_eps,
+                                1.0 + hp_config.clip_eps,
                             )
                             * gae
                         )
@@ -292,8 +292,8 @@ def make_train(fixed_config):
 
                         total_loss = (
                             loss_actor
-                            + hp_config.VF_COEF * value_loss
-                            - hp_config.ENT_COEF * entropy
+                            + hp_config.vf_coef * value_loss
+                            - hp_config.ent_coef * entropy
                         )
                         return total_loss, (value_loss, loss_actor, entropy)
 
@@ -307,10 +307,10 @@ def make_train(fixed_config):
                 train_state, traj_batch, advantages, targets, rng = update_state
                 rng, _rng = jax.random.split(rng)
                 batch_size = (
-                    fixed_config["MINIBATCH_SIZE"] * fixed_config["NUM_MINIBATCHES"]
+                    fixed_config["MINIBATCH_SIZE"] * fixed_config["num_minibatches"]
                 )
                 assert (
-                    batch_size == fixed_config["NUM_STEPS"] * fixed_config["NUM_ENVS"]
+                    batch_size == fixed_config["num_steps"] * fixed_config["num_envs"]
                 ), "batch size must be equal to number of steps * number of envs"
                 permutation = jax.random.permutation(_rng, batch_size)
                 batch = (traj_batch, advantages, targets)
@@ -324,7 +324,7 @@ def make_train(fixed_config):
                     lambda x: jnp.reshape(
                         x,
                         [
-                            fixed_config["NUM_MINIBATCHES"],
+                            fixed_config["num_minibatches"],
                             fixed_config["MINIBATCH_SIZE"],
                         ]
                         + list(x.shape[1:]),
@@ -339,7 +339,7 @@ def make_train(fixed_config):
 
             update_state = (train_state, traj_batch, advantages, targets, rng)
             update_state, loss_info = jax.lax.scan(
-                _update_epoch, update_state, None, fixed_config["UPDATE_EPOCHS"]
+                _update_epoch, update_state, None, fixed_config["update_epochs"]
             )
             train_state = update_state[0]
             metric = {
@@ -365,7 +365,7 @@ def make_train(fixed_config):
 def log_losses(fixed_config, metrics):
     for i in range(1, fixed_config["NUM_UPDATES"] + 1):
         # TODO: This isn't env steps, just steps take for training
-        steps = i * fixed_config["NUM_STEPS"] * fixed_config["NUM_ENVS"]
+        steps = i * fixed_config["num_steps"] * fixed_config["num_envs"]
         # TODO: This is just one way to log the losses, can return to and edit later
         log_dict = {}
 
@@ -459,10 +459,10 @@ def main(cfg):
         **omegaconf.OmegaConf.to_container(cfg.hp_config, resolve=True)
     )
     train_vjit = jax.jit(jax.vmap(make_train(fixed_config), in_axes=(None, 0)))
-    rng_train, rng_eval = jax.random.split(jax.random.PRNGKey(cfg.seed), 2)
+    rng_train = jax.random.PRNGKey(cfg.training.seed)
     # NOTE: This is vmapping over n_seeds - i.e. multiple different training runs.
     # Be careful, can use a lot of RAM given size of stuff we have to carry along
-    output = train_vjit(hp_config, jax.random.split(rng_train, cfg.n_seeds))
+    output = train_vjit(hp_config, jax.random.split(rng_train, cfg.training.n_seeds))
 
     # Loop over the output to log
     log_losses(fixed_config, output["metrics"])

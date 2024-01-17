@@ -12,7 +12,7 @@ plot_policies: False
 training:
   num_envs: 40
   seed: 123
-evaluation_seed: 456
+
 replenishment:
   num_envs: ${training.num_envs}
   lr: 2.5e-4
@@ -44,17 +44,19 @@ issuing:
   activation: "tanh"
   anneal_lr: True
 
-test_evaluator:
-  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
-  env_name: ${environment.env_name}
-  num_env_steps: ${environment.num_env_steps}
-  num_rollouts: 10000
-  env_kwargs: ${environment.env_kwargs}
-  env_params: ${environment.env_params}
-  test: True
-  n_devices:
-  num_warmup_days: ${environment.num_warmup_days}
-  gamma: ${environment.gamma}
+evaluation:
+  seed: 456
+  test_evaluator:
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 10000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}
 
 
 

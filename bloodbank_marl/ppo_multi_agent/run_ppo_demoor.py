@@ -736,7 +736,7 @@ def main(cfg):
     log_episode_metrics(config, output["metrics"])
     print("Training complete, starting evaluation")
 
-    fitness = hydra.utils.instantiate(cfg.test_evaluator)
+    fitness = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
 
     policy_rep = hydra.utils.instantiate(cfg.replenishment.policy)
     policy_issue = hydra.utils.instantiate(cfg.issuing.policy)
@@ -754,7 +754,7 @@ def main(cfg):
     )
     policy_params = {0: rep_params, 1: issue_params}
     fitness, cum_infos, kpis = fitness.rollout(
-        jax.random.PRNGKey(cfg.evaluation_seed), policy_params
+        jax.random.PRNGKey(cfg.evaluation.seed), policy_params
     )
     print(f"Mean return on eval episodes: {fitness.mean()}")
     wandb.log({"eval/return_mean": fitness[0].mean()})
