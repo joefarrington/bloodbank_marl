@@ -6,6 +6,7 @@ env_kwargs:
   issuing_policy: ${policies.issuing}
 gamma: 1.0
 scalar_kpis_to_log:
+  - mean_daily_reward
   - mean_total_order
   - service_level_%
   - expiries_%

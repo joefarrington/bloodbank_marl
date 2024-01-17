@@ -283,6 +283,7 @@ class GymnaxFitness(object):
         ].squeeze()  # Discounted, just for replenishment for now; update rollout if we want to use it
         cum_infos = carry_out[-2]
         kpis = self.env.calculate_kpis(cum_infos)
+        kpis["mean_daily_reward"] = cum_reward / cum_infos["day_counter"]
         # This allows us to incorporate a penalty when KPIs are breached over the whole episode
         # Aim to use it to enforce constraints on service level and wastage suggested by Meneses et al (2021)
         # for example on expriries and service level

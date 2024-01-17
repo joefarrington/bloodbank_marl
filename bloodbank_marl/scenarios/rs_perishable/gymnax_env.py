@@ -270,7 +270,7 @@ class RSPerishableGymnax(environment.Environment):
         info = {}
         info["cumulative_gamma"] = cumulative_gamma
         stock, in_transit, weekday = state.stock, state.in_transit, state.weekday
-        
+
         demand_key, type_key, arrival_key = jax.random.split(key, 3)
         # Add the new order to in_transit
         orders = jnp.clip(action, 0, self.max_order_quantities)
@@ -298,9 +298,7 @@ class RSPerishableGymnax(environment.Environment):
         # See note below about weekday index, treated differently here from
         # original Gym RS env for simplicity
         remaining_demand = jnp.clip(
-            jax.random.poisson(
-                demand_key, params.poisson_demand_mean[weekday]
-            ),
+            jax.random.poisson(demand_key, params.poisson_demand_mean[weekday]),
             0,
             self.max_demand,
         )
@@ -611,6 +609,7 @@ class RSPerishableGymnax(environment.Environment):
             "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(
                 cum_info
             ),
+            "mean_daily_reward": cum_info["reward"] / cum_info["day_counter"],
         }
 
     @classmethod
