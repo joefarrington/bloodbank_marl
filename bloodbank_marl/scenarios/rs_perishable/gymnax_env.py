@@ -403,10 +403,11 @@ class RSPerishableGymnax(environment.Environment):
         """Applies observation function to state."""
         # If lead time is 0 or 1, nothing to include in obs
         # Simple action masking, for now can always order each product
+        stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
         return EnvObs(
             stock=state.stock[
-                :, 1:
-            ],  # NOTE: Observation made at the end of the day after ageing stock, so first element would always be zero
+                :, stock_start_idx:
+            ],  # NOTE: For L = 0, observation made at the end of the day after ageing stock, and first element would always be zero
             in_transit=state.in_transit[:, 1:],
             weekday=state.weekday,
             action_mask=jnp.ones((self.n_products,)),
@@ -424,7 +425,7 @@ class RSPerishableGymnax(environment.Environment):
     @property
     def name(self) -> str:
         """Environment name."""
-        return "MenesesPerishableGymnax"
+        return "RSPerishableGymnax"
 
     @property
     def num_actions(self) -> int:
