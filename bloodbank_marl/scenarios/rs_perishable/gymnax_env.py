@@ -269,7 +269,8 @@ class RSPerishableGymnax(environment.Environment):
         cumulative_gamma = self.cumulative_gamma(state, params)
         info = {}
         info["cumulative_gamma"] = cumulative_gamma
-        stock, in_transit = state.stock, state.in_transit
+        stock, in_transit, weekday = state.stock, state.in_transit, state.weekday
+        
         demand_key, type_key, arrival_key = jax.random.split(key, 3)
         # Add the new order to in_transit
         orders = jnp.clip(action, 0, self.max_order_quantities)
@@ -294,11 +295,11 @@ class RSPerishableGymnax(environment.Environment):
         fixed_order_cost = -params.fixed_order_cost * order_placed
 
         # Sample total demand for the day
-        # NOTE: As in prev version of this - we make decision on, say Sunday eve then arrives first thing Monday morning
-        # So demand to same for the step when weekday in the state is Sunday is Monday's demand.
+        # See note below about weekday index, treated differently here from
+        # original Gym RS env for simplicity
         remaining_demand = jnp.clip(
             jax.random.poisson(
-                demand_key, params.poisson_demand_mean[(state.weekday + 1) % 7]
+                demand_key, params.poisson_demand_mean[weekday]
             ),
             0,
             self.max_demand,
@@ -366,12 +367,18 @@ class RSPerishableGymnax(environment.Environment):
             params,
         )
 
+        # NOTE: In prev version of RS - we make decision on, say Sunday eve then arrives first thing Monday morning
+        # So demand to same for the step when weekday in the state is Sunday is Monday's demand
+        # Here, for simplicity, we just assume observation point is first thing in the morning,
+        # So if the weekday in the state is Monday (0) then we sample demand for Monday
+        # Basically, we update weekday just before a replenishment step instead of at the very beginned of the step
+
         # Update the state
         state = EnvState(
             stock=stock,
             in_transit=in_transit,
             step=state.step + 1,
-            weekday=(state.weekday + 1) % 7,
+            weekday=(weekday + 1) % 7,
         )  # TODO Add in the other elements
         done = self.is_terminal(state, params)
 

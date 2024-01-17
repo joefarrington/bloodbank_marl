@@ -87,6 +87,7 @@ class EnvParams:
     shortage_costs: chex.Array
     wastage_costs: chex.Array
     holding_costs: chex.Array
+    initial_weekday: int # 0 Monday, 6, Sunday, -1 random on each reset
     # For now, we assume that subsitution cost increases by 1/8
     # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
     # then it is the wost and so should be 7/8)
@@ -122,6 +123,7 @@ class EnvParams:
         holding_costs: List[float] = [130] * n_products,
         substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
         max_substitution_cost: float = 3250,
+        initial_weekday: int = 0, # Start on Monday morning; equiv to starting on Sunday evening before
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
         max_expiry_pc_target: float = 100.0,  # No limit by default
         min_service_level_pc_target: float = 0.0,  # No limit by default
@@ -141,6 +143,7 @@ class EnvParams:
             jnp.array(wastage_costs),
             jnp.array(holding_costs),
             jnp.array(substitution_cost_ratios) * max_substitution_cost,
+            initial_weekday,
             jnp.array(action_mask_per_request_type),
             max_expiry_pc_target,
             min_service_level_pc_target,
@@ -422,7 +425,7 @@ class RSPerishableEnv(MarlEnvironment):
         )
 
         # Select the next agent
-        # If no remainine demand, next agent is replenishment (agent_id 0)
+        # If no remaining demand, next agent is replenishment (agent_id 0)
         next_agent_id = jax.lax.cond(
             state.request_time >= state.day + 1, lambda: 0, lambda: 1
         )
@@ -475,13 +478,13 @@ class RSPerishableEnv(MarlEnvironment):
         self, key: chex.PRNGKey, params: EnvParams
     ) -> Tuple[EnvObs, EnvState]:
         """Environment-specific reset."""
-
-        # TODO: Enable weekday to be set randomly as we did for Mirjalili?
+        key, weekday_key = jax.random.split(key)
+        initial_weekday = params.initial_weekday if params.initial_weekday >= 0 else jax.random.randint(weekday_key, shape=(), minval=0, maxval=7, dtype=jnp_int)
 
         state = EnvState(
             stock=jnp.zeros((self.n_products, self.max_useful_life), dtype=jnp_int),
             in_transit=jnp.zeros((self.n_products, max(self.lead_time, 1)), dtype=jnp.int32),
-            weekday = 0,
+            weekday = initial_weekday,
             request_time=0.0,
             request_type=0,
             request_intervals=jnp.zeros((self.max_demand,), dtype=jnp.float32),
@@ -749,6 +752,7 @@ class RSPerishableEnv(MarlEnvironment):
         state = state.replace(
             stock=stock,
             in_transit=in_transit,
+            weekday = (state.weekday + 1) % 7,
             infos=infos,
             cumulative_rewards=cumulative_rewards,
             day=state.day + 1,
@@ -789,10 +793,14 @@ class RSPerishableEnv(MarlEnvironment):
             in_transit,
             params,
         )
-
         # Sample the demand for the coming day
+        # NOTE: In prev version of RS - we make decision on, say Sunday eve then arrives first thing Monday morning
+        # So demand to same for the step when weekday in the state is Sunday is Monday's demand
+        # Here, for simplicity, we just assume observation point is first thing in the morning,
+        # So if the weekday in the state is Monday (0) then we sample demand for Monday
+        # Basically, we update weekday just before a replenishment step instead of at the very beginned of the step
         request_intervals = distrax.Gamma(
-            concentration=1, rate=params.poisson_demand_mean
+            concentration=1, rate=params.poisson_demand_mean[state.weekday]
         ).sample(seed=interval_key, sample_shape=(self.max_demand,))
         request_types = distrax.Categorical(probs=params.product_probabilities).sample(
             seed=type_key, sample_shape=(self.max_demand,)
