@@ -18,23 +18,63 @@ from jax import lax
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
 n_products = 8
-
-# TODO: Gymnax versions has an exact match target as well, should add that here.
-
-# NOTE: The is for PRBCs, remember platelets are different
-action_mask_per_request_type = np.array(
+C = 1e10  # invalid substitution cost
+max_useful_life = 3
+# Based on Ensafian et al (2017)
+substitution_cost_ratios = [
+    # Unit O-, O+, A-, A+, B-, B+, AB-, AB+
     [
-        [1, 0, 0, 0, 0, 0, 0, 0],  # O- pt
-        [1, 1, 0, 0, 0, 0, 0, 0],  # O+ pt
-        [1, 0, 1, 0, 0, 0, 0, 0],  # A- pt
-        [1, 1, 1, 1, 0, 0, 0, 0],  # A+ pt
-        [1, 0, 0, 0, 1, 0, 0, 0],  # B- pt
-        [1, 1, 0, 0, 1, 1, 0, 0],  # B+ pt
-        [1, 0, 1, 0, 1, 0, 1, 0],  # AB- pt
-        [1, 1, 1, 1, 1, 1, 1, 1],  # AB+ pt
-    ]
-)
+        0,
+        4 / 8,
+        2 / 8,
+        6 / 8,
+        1 / 8,
+        5 / 8,
+        3 / 8,
+        7 / 8,
+    ],  # O- pt
+    [1 / 8, 0, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 7 / 8, 6 / 8],  # O+ pt
+    [
+        3 / 8,
+        7 / 8,
+        0,
+        4 / 8,
+        2 / 8,
+        6 / 8,
+        1 / 8,
+        5 / 8,
+    ],  # A- pt
+    [7 / 8, 6 / 8, 1 / 8, 0, 5 / 8, 4 / 8, 3 / 8, 2 / 8],  # A+ pt
+    [
+        3 / 8,
+        7 / 8,
+        2 / 8,
+        6 / 8,
+        0,
+        5 / 8,
+        1 / 8,
+        5 / 8,
+    ],  # B- pt
+    [7 / 8, 6 / 8, 5 / 8, 4 / 8, 1 / 8, 0, 3 / 8, 2 / 8],  # B+ pt
+    [3 / 8, 7 / 8, 1 / 8, 5 / 8, 2 / 8, 6 / 8, 0, 4 / 8],  # AB- pt
+    [7 / 8, 6 / 8, 3 / 8, 2 / 8, 5 / 8, 4 / 8, 1 / 8, 0],  # AB+ pt
+]
+# These are from Ensafian et al (2017) - and similar to those in Meneses
+product_probabilities = [
+    0.07,
+    0.38,
+    0.06,
+    0.34,
+    0.02,
+    0.09,
+    0.01,
+    0.03,
+]
 
+
+
+# NOTE: For now, based on Ensafian, all can be issued to all
+action_mask_per_request_type = np.array((n_products, n_products), dtype=np.int32)
 
 # TODO: Recheck all defaults
 @struct.dataclass
@@ -52,8 +92,9 @@ class EnvParams:
     # then it is the wost and so should be 7/8)
     substitution_costs: chex.Array
     action_mask_per_request_type: chex.Array
-    max_expiry_target: float
-    min_service_level_target: float
+    max_expiry_pc_target: float
+    min_service_level_pc_target: float
+    min_exact_match_pc_target: float
     target_kpi_breach_penalty: float
     max_days_in_episode: int
     max_steps_in_episode: int
@@ -62,82 +103,36 @@ class EnvParams:
     @classmethod
     def create_env_params(
         cls,
-        poisson_demand_mean: float = 49.8,
-        product_probabilities: List[float] = [
-            0.08614457,
-            0.36024097,
-            0.08192771,
-            0.36485943,
-            0.0126506,
-            0.0684739,
-            0.00522088,
-            0.02048193,
+        poisson_demand_mean: float = [
+            37.5,
+            37.3,
+            39.2,
+            37.8,
+            40.5,
+            27.2,
+            28.4,
         ],
-        age_on_arrival_distribution_probs: List[float] = [1] + [0] * (35 - 1),
-        fixed_order_costs: float = 0,
-        variable_order_costs: List[float] = [160] * n_products,
-        shortage_costs: List[float] = [1340] * n_products,
-        wastage_costs: List[float] = [130] * n_products,
-        holding_costs: List[float] = [1.1] * n_products,
-        substitution_cost_ratios: List[List[float]] = [
-            # Unit O-, O+, A-, A+, B-, B+, AB-, AB+
-            [
-                0,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-            ],  # O- pt
-            [
-                1 / 8,
-                0,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-            ],  # O+ pt
-            [
-                1 / 8,
-                jnp.inf,
-                0,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-            ],  # A- pt
-            [3 / 8, 2 / 8, 1 / 8, 0, jnp.inf, jnp.inf, jnp.inf, jnp.inf],  # A+ pt
-            [
-                1 / 8,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-                0,
-                jnp.inf,
-                jnp.inf,
-                jnp.inf,
-            ],  # B- pt
-            [3 / 8, 2 / 8, jnp.inf, jnp.inf, 1 / 8, 0, jnp.inf, jnp.inf],  # B+ pt
-            [3 / 8, jnp.inf, 2 / 8, jnp.inf, 1 / 8, jnp.inf, 0, jnp.inf],  # AB- pt
-            [7 / 8, 6 / 8, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 1 / 8, 0],  # AB+ pt
-        ],
-        max_substitution_cost: float = 1340,
+        product_probabilities: List[float] = product_probabilities,
+        age_on_arrival_distribution_probs: List[float] = [1]
+        + [0] * (max_useful_life - 1), # All fresh
+        fixed_order_costs: float = 225.0,
+        variable_order_costs: List[float] = [650] * n_products,
+        shortage_costs: List[float] = [3250] * n_products,
+        wastage_costs: List[float] = [650] * n_products,
+        holding_costs: List[float] = [130] * n_products,
+        substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
+        max_substitution_cost: float = 3250,
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
         max_expiry_pc_target: float = 100.0,  # No limit by default
         min_service_level_pc_target: float = 0.0,  # No limit by default
         min_exact_match_pc_target: float = 0.0,
         target_kpi_breach_penalty: float = 0.0,  # No penalty for now
         max_days_in_episode: int = 365,
-        max_steps_in_episode: int = 1e6,
+        max_steps_in_episode: int = 1e6, # Much higher than expected
         gamma: float = 1.0,
     ):
         return cls(
-            poisson_demand_mean,
+            jnp.array(poisson_demand_mean),
             jnp.array(product_probabilities),
             jnp.array(age_on_arrival_distribution_probs),
             fixed_order_costs,
@@ -286,6 +281,7 @@ class EnvInfo:
 class EnvState:
     stock: chex.Array
     in_transit: chex.Array
+    weekday: chex.Array
     request_time: float  # time of next request
     request_type: int  # type of next request
     request_intervals: chex.Array
@@ -309,6 +305,7 @@ class EnvObs:
     request_type: int
     in_transit: chex.Array
     stock: chex.Array
+    weekday: chex.Array
     action_mask: chex.Array
 
     @property
@@ -330,25 +327,26 @@ class EnvObs:
         cls,
         env_kwargs={
             "agent_names": ["replenishment", "issuing"],
-            "n_products": 8,
-            "max_useful_life": 35,
-            "lead_time": 1,
-            "max_order_quantities": [100] * 8,
+            "n_products": n_products,
+            "max_useful_life": max_useful_life,
+            "lead_time": 0,
+            "max_order_quantities": [50] * 8,
             "max_demand": 100,
         },
         num_actions=None,
         n_steps=1,
-    ):
+    ):  
+        stock_start_idx = jnp.where(env_kwargs["lead_time"] == 0, 1, 0)
         return cls(
             agent_id=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
             time=jnp.zeros(n_steps, dtype=jnp.float32).squeeze(),
             request_type=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
             in_transit=jnp.zeros(
-                (n_steps, env_kwargs["n_products"], env_kwargs["lead_time"] - 1),
+                (n_steps, env_kwargs["n_products"], min(env_kwargs["lead_time"]-1,0)),
                 dtype=jnp.int32,
             ).squeeze(),
             stock=jnp.zeros(
-                (n_steps, env_kwargs["n_products"], env_kwargs["max_useful_life"]),
+                (n_steps, env_kwargs["n_products"], env_kwargs["max_useful_life"]-stock_start_idx),
                 dtype=jnp.int32,
             ).squeeze(),
             action_mask=jnp.zeros(
@@ -356,15 +354,18 @@ class EnvObs:
             ).squeeze(),
         )
 
+    def one_hot_day_of_week(self):
+        return jax.nn.one_hot(self.weekday, 7)
 
-class MenesesPerishableEnv(MarlEnvironment):
+
+class RSPerishableEnv(MarlEnvironment):
     def __init__(
         self,
         agent_names=["replenishment", "issuing"],
-        n_products: int = 8,
-        max_useful_life: int = 35,
-        lead_time: int = 1,
-        max_order_quantities: list = [100] * 8,
+        n_products: int = n_products,
+        max_useful_life: int = max_useful_life,
+        lead_time: int = 0,
+        max_order_quantities: list = [50] * 8,
         max_demand=100,
     ):
         self.n_products = n_products
@@ -377,8 +378,6 @@ class MenesesPerishableEnv(MarlEnvironment):
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
         self.num_agents = len(agent_names)
 
-    # TODO: We can remove unless we want to add a function
-    # because we're customizing them etc
     @property
     def default_params(self) -> EnvParams:
         return EnvParams.create_env_params()
@@ -440,7 +439,7 @@ class MenesesPerishableEnv(MarlEnvironment):
         )
 
         # Check for termination - for now we don't make a distinction between truncation and termination
-        # And either both or noen of the agents are done
+        # And either both or none of the agents are done
         # TODO: Separate termination for each agent? Not necessary for what we're doing.
         trunc = jax.lax.cond(
             jax.lax.bitwise_or(
@@ -477,9 +476,12 @@ class MenesesPerishableEnv(MarlEnvironment):
     ) -> Tuple[EnvObs, EnvState]:
         """Environment-specific reset."""
 
+        # TODO: Enable weekday to be set randomly as we did for Mirjalili?
+
         state = EnvState(
             stock=jnp.zeros((self.n_products, self.max_useful_life), dtype=jnp_int),
-            in_transit=jnp.zeros((self.n_products, self.lead_time), dtype=jnp.int32),
+            in_transit=jnp.zeros((self.n_products, max(self.lead_time, 1)), dtype=jnp.int32),
+            weekday = 0,
             request_time=0.0,
             request_type=0,
             request_intervals=jnp.zeros((self.max_demand,), dtype=jnp.float32),
@@ -516,13 +518,14 @@ class MenesesPerishableEnv(MarlEnvironment):
     def get_obs(self, state: EnvState, params: EnvParams, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
         # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
-
+        stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
         return EnvObs(
             state.agent_id,
             state.time,
             state.request_type,
             state.in_transit[: self.n_products, 1 : self.lead_time],
-            state.stock,
+            state.stock[: self.n_products, stock_start_idx:],
+            state.weekday,
             self._get_action_mask(state, params, agent_id),
         )
 
@@ -568,7 +571,7 @@ class MenesesPerishableEnv(MarlEnvironment):
     @property
     def name(self) -> str:
         """Environment name."""
-        return "MensesesPerishable"
+        return "RSPerishable"
 
     def num_actions(self, agent_id: int) -> int:
         """Number of actions possible in environment for agent with id `agent_id`."""
@@ -630,6 +633,7 @@ class MenesesPerishableEnv(MarlEnvironment):
                     shape=(self.n_products, self.lead_time),
                     dtype=jnp.int32,
                 ),
+                "weekday": spaces.Discrete(7),
                 "request_time": spaces.Box(
                     low=0, high=1e6, shape=(1,), dtype=jnp.float32
                 ),
@@ -706,6 +710,8 @@ class MenesesPerishableEnv(MarlEnvironment):
             state.infos,
             state.cumulative_rewards,
         )
+        key, arrival_key = jax.random.split(key)
+        
         # Age the stock by one day and calculate wastage cost
         expired = stock[: self.n_products, self.max_useful_life - 1]
         wastage_cost = jnp.dot(expired, -params.wastage_costs)
@@ -720,17 +726,18 @@ class MenesesPerishableEnv(MarlEnvironment):
         holding_cost = jnp.dot(holding, -params.holding_costs)
         cumulative_rewards = cumulative_rewards + holding_cost
 
-        # Receive the units ordered lead_time days ago
-        # TODO If lead_time ==0, we wouldn't want to do this
-        # Instead, we'd do a similar procedure immediately after order placed. Would be good to account for this.
-        stock_received = self._sample_ages_on_arrival(
-            key,
-            params.age_on_arrival_distribution_probs,
-            in_transit[: self.n_products, -1],
+        # Receive the order placed L-1 periods ago (i.e. start of this step when L=1) if lead time is >= 1
+        # As part of this, sample from distribution of remaining useful life on arrival
+        # If L=0, then no change here as received just after placed
+        stock, in_transit = jax.lax.cond(
+            self.lead_time > 0,
+            self._receive_order,
+            lambda arrival_key, stock, in_transit, params: (stock, in_transit),
+            arrival_key,
+            stock,
+            in_transit,
+            params,
         )
-        stock = stock + stock_received
-        in_transit = jnp.roll(in_transit, axis=1, shift=1)
-        in_transit = in_transit.at[:n_products, 0].set(0)
 
         infos = infos.replace(
             expiries=infos.expiries.at[: self.num_agents, : self.n_products].add(
@@ -754,7 +761,7 @@ class MenesesPerishableEnv(MarlEnvironment):
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
     ) -> EnvState:
         """Replenishment action step."""
-        interval_key, type_key = jax.random.split(key)
+        interval_key, type_key, arrival_key = jax.random.split(key,3)
 
         stock, in_transit, infos, cumulative_rewards = (
             state.stock,
@@ -769,8 +776,19 @@ class MenesesPerishableEnv(MarlEnvironment):
         variable_order_cost = jnp.dot(orders, -params.variable_order_costs)
         fixed_order_cost = order_placed * -params.fixed_order_costs
         cumulative_rewards = cumulative_rewards + variable_order_cost + fixed_order_cost
-        # TODO: Handle case where lead_time == 0
+
         in_transit = in_transit.at[0 : self.n_products, 0].set(orders)
+        
+        # If L==0, stock recieves immediately, otherwise no change
+        stock, in_transit = jax.lax.cond(
+            self.lead_time == 0,
+            self._receive_order,
+            lambda arrival_key, stock, in_transit, params: (stock, in_transit),
+            arrival_key,
+            stock,
+            in_transit,
+            params,
+        )
 
         # Sample the demand for the coming day
         request_intervals = distrax.Gamma(
@@ -880,6 +898,25 @@ class MenesesPerishableEnv(MarlEnvironment):
         request_interval = state.request_intervals[state.request_idx]
         request_type = state.request_types[state.request_idx]
         return request_interval, request_type
+
+    def _receive_order(
+        self,
+        key: chex.PRNGKey,
+        stock: chex.Array,
+        in_transit: chex.Array,
+        params: EnvParams,
+    ) -> Tuple[chex.Array, chex.Array]:
+        """Receive an order that was placed L-1 periods ago"""
+        stock_received = self._sample_ages_on_arrival(
+            key,
+            params.age_on_arrival_distribution_probs,
+            in_transit[: self.n_products, -1],
+        )
+        stock = stock + stock_received
+        in_transit = jnp.roll(in_transit, axis=1, shift=1)
+        in_transit = in_transit.at[: self.n_products, 0].set(0)
+        return stock, in_transit
+
 
     def _sample_ages_on_arrival(
         self,
