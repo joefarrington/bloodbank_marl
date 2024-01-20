@@ -10,6 +10,7 @@ env_params:
 num_warmup_days: 100
 gamma: 0.99
 kpis_log_eval:
+  - mean_daily_reward
   - service_level_%
   - wastage_%
   - holding

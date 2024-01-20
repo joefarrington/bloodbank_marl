@@ -1,7 +1,7 @@
 defaults:
   - environment: de_moor_perishable
-  - replenishment/policy: one_product_mlp
-  - issuing/policy: one_product_mlp
+  - replenishment/policy: single_product_mlp
+  - issuing/policy: single_product_mlp
   - _self_
 
 wandb:

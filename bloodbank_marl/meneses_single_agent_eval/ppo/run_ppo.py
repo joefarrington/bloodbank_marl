@@ -135,12 +135,12 @@ class LogWrapper(GymnaxWrapper):
 
 
 def make_train(fixed_config):
-    fixed_config["NUM_UPDATES"] = int(
+    fixed_config["num_updates"] = int(
         fixed_config["total_timesteps"]
         // fixed_config["num_steps"]
         // fixed_config["num_envs"]
     )
-    fixed_config["MINIBATCH_SIZE"] = int(
+    fixed_config["minibatch_size"] = int(
         fixed_config["num_envs"]
         * fixed_config["num_steps"]
         // fixed_config["num_minibatches"]
@@ -159,7 +159,7 @@ def make_train(fixed_config):
                     count
                     // (fixed_config["num_minibatches"] * fixed_config["update_epochs"])
                 )
-                / fixed_config["NUM_UPDATES"]
+                / fixed_config["num_updates"]
             )
             return hp_config.lr * frac
 
@@ -175,7 +175,7 @@ def make_train(fixed_config):
         else:
             tx = optax.chain(
                 optax.clip_by_global_norm(hp_config.max_grad_norm),
-                optax.adam(hp_config.LR, eps=1e-5),
+                optax.adam(hp_config.lr, eps=1e-5),
             )
         train_state = TrainState.create(
             apply_fn=policy.apply,
@@ -307,7 +307,7 @@ def make_train(fixed_config):
                 train_state, traj_batch, advantages, targets, rng = update_state
                 rng, _rng = jax.random.split(rng)
                 batch_size = (
-                    fixed_config["MINIBATCH_SIZE"] * fixed_config["num_minibatches"]
+                    fixed_config["minibatch_size"] * fixed_config["num_minibatches"]
                 )
                 assert (
                     batch_size == fixed_config["num_steps"] * fixed_config["num_envs"]
@@ -325,7 +325,7 @@ def make_train(fixed_config):
                         x,
                         [
                             fixed_config["num_minibatches"],
-                            fixed_config["MINIBATCH_SIZE"],
+                            fixed_config["minibatch_size"],
                         ]
                         + list(x.shape[1:]),
                     ),
@@ -355,7 +355,7 @@ def make_train(fixed_config):
 
         runner_state = (train_state, env_state, obsv, _rng)
         runner_state, metric = jax.lax.scan(
-            _update_step, runner_state, None, fixed_config["NUM_UPDATES"]
+            _update_step, runner_state, None, fixed_config["num_updates"]
         )
         return {"runner_state": runner_state, "metrics": metric}
 
@@ -363,7 +363,7 @@ def make_train(fixed_config):
 
 
 def log_losses(fixed_config, metrics):
-    for i in range(1, fixed_config["NUM_UPDATES"] + 1):
+    for i in range(1, fixed_config["num_updates"] + 1):
         # TODO: This isn't env steps, just steps take for training
         steps = i * fixed_config["num_steps"] * fixed_config["num_envs"]
         # TODO: This is just one way to log the losses, can return to and edit later

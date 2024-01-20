@@ -12,6 +12,7 @@ env_params:
 num_warmup_days: 0
 gamma: 1.0
 kpis_log_eval:
+  - mean_daily_reward
   - mean_total_order
   - service_level_%
   - expiries_%

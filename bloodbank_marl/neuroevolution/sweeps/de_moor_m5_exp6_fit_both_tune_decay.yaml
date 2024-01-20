@@ -12,7 +12,16 @@ parameters:
     distribution: log_uniform_values
     min: 0.005
     max: 0.5
-  # Let replenishment be 64, default, for direct comparison to pretrained version
+  evosax.strategy.lrate_decay:
+    distribution: log_uniform_values
+    min: 0.99
+    max: 1.0
+  evosax.strategy.sigma_decay:
+    distribution: log_uniform_values
+    min: 0.99
+    max: 1.0
+  # Try without have to tune size of replenishment hidden layer
+  # So it is analogous to what we did in the discrete_mlp(_rep_pretrained) experiments
   #policies.replenishment.model_kwargs.n_hidden:
   #  distribution: q_uniform
   #  min: 32

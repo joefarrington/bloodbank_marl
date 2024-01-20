@@ -4,6 +4,8 @@ defaults:
   - environment: meneses_gymnax
   - _self_
 
+plot_policy: False
+
 wandb:
   init:
     project: "ppo_single_agent_meneses"
@@ -46,7 +48,7 @@ evaluation:
     _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: 365
-    num_rollouts: 500
+    num_rollouts: 10000
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
     test: True
