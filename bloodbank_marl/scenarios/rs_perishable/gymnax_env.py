@@ -232,6 +232,8 @@ class RSPerishableGymnax(environment.Environment):
         self.max_demand = max_demand
         self._issuing_policy = issuing_policy
 
+        self.stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
+
     @property
     def default_params(self) -> EnvParams:
         return EnvParams.create_env_params()
@@ -352,6 +354,8 @@ class RSPerishableGymnax(environment.Environment):
             + wastage_cost
             + holding_cost
         )
+        # Add to info for using with KPIs
+        # info["reward"] = reward
 
         # Receive the order placed L-1 periods ago (i.e. start of this step when L=1) if lead time is >= 1
         # As part of this, sample from distribution of remaining useful life on arrival
@@ -408,10 +412,10 @@ class RSPerishableGymnax(environment.Environment):
         """Applies observation function to state."""
         # If lead time is 0 or 1, nothing to include in obs
         # Simple action masking, for now can always order each product
-        stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
+
         return EnvObs(
             stock=state.stock[
-                :, stock_start_idx:
+                :, self.stock_start_idx :
             ],  # NOTE: For L = 0, observation made at the end of the day after ageing stock, and first element would always be zero
             in_transit=state.in_transit[:, 1:],
             weekday=state.weekday,
@@ -564,6 +568,7 @@ class RSPerishableGymnax(environment.Environment):
             ),
             "cumulative_gamma": 1.0,
             "day_counter": 0,
+            # "reward": 0.0,
             "demand": jnp.zeros((self.n_products,)),
             "expiries": jnp.zeros((self.n_products,)),
             "holding": jnp.zeros((self.n_products,)),
@@ -609,7 +614,7 @@ class RSPerishableGymnax(environment.Environment):
             "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(
                 cum_info
             ),
-            "mean_daily_reward": cum_info["reward"] / cum_info["day_counter"],
+            # "mean_daily_reward": cum_info["reward"] / cum_info["day_counter"],
         }
 
     @classmethod

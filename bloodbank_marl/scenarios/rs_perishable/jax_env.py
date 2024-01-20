@@ -72,9 +72,9 @@ product_probabilities = [
 ]
 
 
-
 # NOTE: For now, based on Ensafian, all can be issued to all
 action_mask_per_request_type = np.array((n_products, n_products), dtype=np.int32)
+
 
 # TODO: Recheck all defaults
 @struct.dataclass
@@ -87,7 +87,7 @@ class EnvParams:
     shortage_costs: chex.Array
     wastage_costs: chex.Array
     holding_costs: chex.Array
-    initial_weekday: int # 0 Monday, 6, Sunday, -1 random on each reset
+    initial_weekday: int  # 0 Monday, 6, Sunday, -1 random on each reset
     # For now, we assume that subsitution cost increases by 1/8
     # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
     # then it is the wost and so should be 7/8)
@@ -115,7 +115,7 @@ class EnvParams:
         ],
         product_probabilities: List[float] = product_probabilities,
         age_on_arrival_distribution_probs: List[float] = [1]
-        + [0] * (max_useful_life - 1), # All fresh
+        + [0] * (max_useful_life - 1),  # All fresh
         fixed_order_costs: float = 225.0,
         variable_order_costs: List[float] = [650] * n_products,
         shortage_costs: List[float] = [3250] * n_products,
@@ -123,14 +123,14 @@ class EnvParams:
         holding_costs: List[float] = [130] * n_products,
         substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
         max_substitution_cost: float = 3250,
-        initial_weekday: int = 0, # Start on Monday morning; equiv to starting on Sunday evening before
+        initial_weekday: int = 0,  # Start on Monday morning; equiv to starting on Sunday evening before
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
         max_expiry_pc_target: float = 100.0,  # No limit by default
         min_service_level_pc_target: float = 0.0,  # No limit by default
         min_exact_match_pc_target: float = 0.0,
         target_kpi_breach_penalty: float = 0.0,  # No penalty for now
         max_days_in_episode: int = 365,
-        max_steps_in_episode: int = 1e6, # Much higher than expected
+        max_steps_in_episode: int = 1e6,  # Much higher than expected
         gamma: float = 1.0,
     ):
         return cls(
@@ -338,18 +338,26 @@ class EnvObs:
         },
         num_actions=None,
         n_steps=1,
-    ):  
+    ):
         stock_start_idx = jnp.where(env_kwargs["lead_time"] == 0, 1, 0)
         return cls(
             agent_id=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
             time=jnp.zeros(n_steps, dtype=jnp.float32).squeeze(),
             request_type=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
             in_transit=jnp.zeros(
-                (n_steps, env_kwargs["n_products"], min(env_kwargs["lead_time"]-1,0)),
+                (
+                    n_steps,
+                    env_kwargs["n_products"],
+                    min(env_kwargs["lead_time"] - 1, 0),
+                ),
                 dtype=jnp.int32,
             ).squeeze(),
             stock=jnp.zeros(
-                (n_steps, env_kwargs["n_products"], env_kwargs["max_useful_life"]-stock_start_idx),
+                (
+                    n_steps,
+                    env_kwargs["n_products"],
+                    env_kwargs["max_useful_life"] - stock_start_idx,
+                ),
                 dtype=jnp.int32,
             ).squeeze(),
             action_mask=jnp.zeros(
@@ -380,6 +388,7 @@ class RSPerishableEnv(MarlEnvironment):
         self.possible_agents = agent_names
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
         self.num_agents = len(agent_names)
+        self.stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
 
     @property
     def default_params(self) -> EnvParams:
@@ -479,12 +488,20 @@ class RSPerishableEnv(MarlEnvironment):
     ) -> Tuple[EnvObs, EnvState]:
         """Environment-specific reset."""
         key, weekday_key = jax.random.split(key)
-        initial_weekday = params.initial_weekday if params.initial_weekday >= 0 else jax.random.randint(weekday_key, shape=(), minval=0, maxval=7, dtype=jnp_int)
+        initial_weekday = (
+            params.initial_weekday
+            if params.initial_weekday >= 0
+            else jax.random.randint(
+                weekday_key, shape=(), minval=0, maxval=7, dtype=jnp_int
+            )
+        )
 
         state = EnvState(
             stock=jnp.zeros((self.n_products, self.max_useful_life), dtype=jnp_int),
-            in_transit=jnp.zeros((self.n_products, max(self.lead_time, 1)), dtype=jnp.int32),
-            weekday = initial_weekday,
+            in_transit=jnp.zeros(
+                (self.n_products, max(self.lead_time, 1)), dtype=jnp.int32
+            ),
+            weekday=initial_weekday,
             request_time=0.0,
             request_type=0,
             request_intervals=jnp.zeros((self.max_demand,), dtype=jnp.float32),
@@ -521,13 +538,13 @@ class RSPerishableEnv(MarlEnvironment):
     def get_obs(self, state: EnvState, params: EnvParams, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
         # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
-        stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
+
         return EnvObs(
             state.agent_id,
             state.time,
             state.request_type,
             state.in_transit[: self.n_products, 1 : self.lead_time],
-            state.stock[: self.n_products, stock_start_idx:],
+            state.stock[: self.n_products, self.stock_start_idx :],
             state.weekday,
             self._get_action_mask(state, params, agent_id),
         )
@@ -714,7 +731,7 @@ class RSPerishableEnv(MarlEnvironment):
             state.cumulative_rewards,
         )
         key, arrival_key = jax.random.split(key)
-        
+
         # Age the stock by one day and calculate wastage cost
         expired = stock[: self.n_products, self.max_useful_life - 1]
         wastage_cost = jnp.dot(expired, -params.wastage_costs)
@@ -752,7 +769,7 @@ class RSPerishableEnv(MarlEnvironment):
         state = state.replace(
             stock=stock,
             in_transit=in_transit,
-            weekday = (state.weekday + 1) % 7,
+            weekday=(state.weekday + 1) % 7,
             infos=infos,
             cumulative_rewards=cumulative_rewards,
             day=state.day + 1,
@@ -765,7 +782,7 @@ class RSPerishableEnv(MarlEnvironment):
         self, key: chex.PRNGKey, state: EnvState, action: int, params: EnvParams
     ) -> EnvState:
         """Replenishment action step."""
-        interval_key, type_key, arrival_key = jax.random.split(key,3)
+        interval_key, type_key, arrival_key = jax.random.split(key, 3)
 
         stock, in_transit, infos, cumulative_rewards = (
             state.stock,
@@ -782,7 +799,7 @@ class RSPerishableEnv(MarlEnvironment):
         cumulative_rewards = cumulative_rewards + variable_order_cost + fixed_order_cost
 
         in_transit = in_transit.at[0 : self.n_products, 0].set(orders)
-        
+
         # If L==0, stock recieves immediately, otherwise no change
         stock, in_transit = jax.lax.cond(
             self.lead_time == 0,
@@ -924,7 +941,6 @@ class RSPerishableEnv(MarlEnvironment):
         in_transit = jnp.roll(in_transit, axis=1, shift=1)
         in_transit = in_transit.at[: self.n_products, 0].set(0)
         return stock, in_transit
-
 
     def _sample_ages_on_arrival(
         self,
