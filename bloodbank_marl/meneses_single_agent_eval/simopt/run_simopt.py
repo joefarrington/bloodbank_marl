@@ -295,6 +295,13 @@ def main(cfg: DictConfig) -> None:
     df.insert(loc=0, column="metric", value=row_labels)
     wandb.log({"eval/group_metrics": wandb.Table(dataframe=df)})
 
+    # TODO: Put this into config etc
+    if "all_allocations" in kpis:
+        df = pd.DataFrame(
+            kpis["all_allocations"].mean(axis=(0, 1)), columns=types, index=types
+        )
+        wandb.log({"eval/all_allocations": wandb.Table(dataframe=df)})
+
     # Log aggregate metrics to W&B, plus return
     for m in overall_metrics:
         wandb.run.summary[f"eval/{m}_mean"] = kpis[m].mean()
