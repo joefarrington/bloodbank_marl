@@ -74,7 +74,7 @@ substitution_cost_ratios = [
         2 / 8,
         6 / 8,
         0,
-        5 / 8,
+        4 / 8,
         1 / 8,
         5 / 8,
     ],  # B- pt
@@ -118,6 +118,7 @@ class EnvParams:
     # then it is the wost and so should be 7/8)
     substitution_costs: chex.Array
     # TODO: Add in functions to apply penalty for breaching targets
+    initial_weekday: int  # 0 Monday, 6, Sunday, -1 random on each reset
     max_expiry_pc_target: float
     min_service_level_pc_target: float
     min_exact_match_pc_target: float
@@ -147,6 +148,7 @@ class EnvParams:
         holding_costs: List[float] = [130] * n_products,
         substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
         max_substitution_cost: float = 3250,  # Max substitution equal to shortage costs, like Meneses
+        initial_weekday: int = 0,  # Start on Monday morning; equiv to starting on Sunday evening before
         max_expiry_pc_target: float = 100.0,  # Effectively no limit by default
         min_service_level_pc_target: float = 0.0,  # Effectively no limit by default
         min_exact_match_pc_target: float = 0.0,  # Effectively no limit by default
@@ -164,6 +166,7 @@ class EnvParams:
             jnp.array(wastage_costs),
             jnp.array(holding_costs),
             jnp.array(substitution_cost_ratios) * max_substitution_cost,
+            initial_weekday,
             max_expiry_pc_target,
             min_service_level_pc_target,
             min_exact_match_pc_target,
@@ -354,8 +357,13 @@ class RSPerishableGymnax(environment.Environment):
             + wastage_cost
             + holding_cost
         )
-        # Add to info for using with KPIs
-        # info["reward"] = reward
+
+        info["variable_order_cost"] = variable_order_cost
+        info["fixed_order_cost"] = fixed_order_cost
+        info["shortage_cost"] = shortage_cost
+        info["substitution_cost"] = substitution_cost
+        info["wastage_cost"] = wastage_cost
+        info["holding_cost"] = holding_cost
 
         # Receive the order placed L-1 periods ago (i.e. start of this step when L=1) if lead time is >= 1
         # As part of this, sample from distribution of remaining useful life on arrival
@@ -398,13 +406,21 @@ class RSPerishableGymnax(environment.Environment):
         self, key: chex.PRNGKey, params: EnvParams
     ) -> Tuple[chex.Array, EnvState]:
         """Environment-specific reset."""
-        # When lead time is 0, still have one slot to put order into and then immedifately remove from for simplicity
+        key, weekday_key = jax.random.split(key)
+        initial_weekday = jax.lax.select(
+            params.initial_weekday >= 0,
+            params.initial_weekday,
+            jax.random.randint(
+                weekday_key, shape=(), minval=0, maxval=7, dtype=jnp.int32
+            ),
+        )
+        # When lead time is 0, still have one slot to put order into and then immediately remove from for simplicity
         # when using receive order functions
         state = EnvState(
             stock=jnp.zeros((self.n_products, self.max_useful_life)),
             in_transit=jnp.zeros((self.n_products, max(self.lead_time, 1))),
             step=0,
-            weekday=0,
+            weekday=initial_weekday,
         )
         return self.get_obs(state), state
 
@@ -574,6 +590,12 @@ class RSPerishableGymnax(environment.Environment):
             "holding": jnp.zeros((self.n_products,)),
             "orders": jnp.zeros((self.n_products,)),
             "shortages": jnp.zeros((self.n_products,)),
+            "variable_order_cost": 0.0,
+            "fixed_order_cost": 0.0,
+            "shortage_cost": 0.0,
+            "substitution_cost": 0.0,
+            "wastage_cost": 0.0,
+            "holding_cost": 0.0,
         }
 
     # NOTE: New function to support a gymnax env with KPIs using a gymnax fitness object instead of a rollout manager
@@ -586,6 +608,7 @@ class RSPerishableGymnax(environment.Environment):
         return {
             "mean_demand_by_pt_blood_group": cum_info["demand"]
             / cum_info["day_counter"],
+            "mean_total_demand": cum_info["demand"].sum() / cum_info["day_counter"],
             "mean_order_by_product": cum_info["orders"] / cum_info["day_counter"],
             "service_level_%_by_pt_blood_group": (
                 (cum_info["demand"] - cum_info["shortages"]) * 100
@@ -614,7 +637,16 @@ class RSPerishableGymnax(environment.Environment):
             "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(
                 cum_info
             ),
-            # "mean_daily_reward": cum_info["reward"] / cum_info["day_counter"],
+            "mean_variable_order_cost": cum_info["variable_order_cost"]
+            / cum_info["day_counter"],
+            "mean_fixed_order_cost": cum_info["fixed_order_cost"]
+            / cum_info["day_counter"],
+            "mean_shortage_cost": cum_info["shortage_cost"] / cum_info["day_counter"],
+            "mean_substitution_cost": cum_info["substitution_cost"]
+            / cum_info["day_counter"],
+            "mean_wastage_cost": cum_info["wastage_cost"] / cum_info["day_counter"],
+            "mean_holding_cost": cum_info["holding_cost"] / cum_info["day_counter"],
+            "all_allocations": cum_info["allocations"].sum(axis=-1),
         }
 
     @classmethod

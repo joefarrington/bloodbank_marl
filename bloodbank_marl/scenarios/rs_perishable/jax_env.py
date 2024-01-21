@@ -51,7 +51,7 @@ substitution_cost_ratios = [
         2 / 8,
         6 / 8,
         0,
-        5 / 8,
+        4 / 8,
         1 / 8,
         5 / 8,
     ],  # B- pt
@@ -87,12 +87,12 @@ class EnvParams:
     shortage_costs: chex.Array
     wastage_costs: chex.Array
     holding_costs: chex.Array
-    initial_weekday: int  # 0 Monday, 6, Sunday, -1 random on each reset
     # For now, we assume that subsitution cost increases by 1/8
     # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
     # then it is the wost and so should be 7/8)
     substitution_costs: chex.Array
     action_mask_per_request_type: chex.Array
+    initial_weekday: int  # 0 Monday, 6, Sunday, -1 random on each reset
     max_expiry_pc_target: float
     min_service_level_pc_target: float
     min_exact_match_pc_target: float
@@ -123,8 +123,8 @@ class EnvParams:
         holding_costs: List[float] = [130] * n_products,
         substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
         max_substitution_cost: float = 3250,
-        initial_weekday: int = 0,  # Start on Monday morning; equiv to starting on Sunday evening before
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
+        initial_weekday: int = 0,  # Start on Monday morning; equiv to starting on Sunday evening before
         max_expiry_pc_target: float = 100.0,  # No limit by default
         min_service_level_pc_target: float = 0.0,  # No limit by default
         min_exact_match_pc_target: float = 0.0,
@@ -143,8 +143,8 @@ class EnvParams:
             jnp.array(wastage_costs),
             jnp.array(holding_costs),
             jnp.array(substitution_cost_ratios) * max_substitution_cost,
-            initial_weekday,
             jnp.array(action_mask_per_request_type),
+            initial_weekday,
             max_expiry_pc_target,
             min_service_level_pc_target,
             min_exact_match_pc_target,
@@ -226,6 +226,7 @@ class EnvInfo:
             "mean_holding": jnp.sum(self.holding[0, :]) / self.day_counter[0],
             "exact_match_%": self._calculate_exact_match_pc(),
             "mean_age_at_transfusion": self._calculate_mean_age_at_transfusion(),
+            "all_allocations": self.allocations[0].sum(axis=-1),
         }
 
     @classmethod
@@ -488,12 +489,12 @@ class RSPerishableEnv(MarlEnvironment):
     ) -> Tuple[EnvObs, EnvState]:
         """Environment-specific reset."""
         key, weekday_key = jax.random.split(key)
-        initial_weekday = (
-            params.initial_weekday
-            if params.initial_weekday >= 0
-            else jax.random.randint(
-                weekday_key, shape=(), minval=0, maxval=7, dtype=jnp_int
-            )
+        initial_weekday = jax.lax.select(
+            params.initial_weekday >= 0,
+            params.initial_weekday,
+            jax.random.randint(
+                weekday_key, shape=(), minval=0, maxval=7, dtype=jnp.int32
+            ),
         )
 
         state = EnvState(
