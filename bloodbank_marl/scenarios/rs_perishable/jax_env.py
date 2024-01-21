@@ -17,6 +17,10 @@ from jax import lax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
+# NOTE: Differences to single agent version
+# 1) state need to include full max_useful_life, because for issuing actions, all will be available
+# and we need them to have the same dimensions.
+
 n_products = 8
 C = 1e10  # invalid substitution cost
 max_useful_life = 3
@@ -389,7 +393,6 @@ class RSPerishableEnv(MarlEnvironment):
         self.possible_agents = agent_names
         self.agent_ids = {agent_name: i for i, agent_name in enumerate(agent_names)}
         self.num_agents = len(agent_names)
-        self.stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
 
     @property
     def default_params(self) -> EnvParams:
@@ -545,7 +548,7 @@ class RSPerishableEnv(MarlEnvironment):
             state.time,
             state.request_type,
             state.in_transit[: self.n_products, 1 : self.lead_time],
-            state.stock[: self.n_products, self.stock_start_idx :],
+            state.stock[: self.n_products, :],
             state.weekday,
             self._get_action_mask(state, params, agent_id),
         )

@@ -27,6 +27,7 @@ from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import (
     MenesesPerishableGymnax,
 )
 from bloodbank_marl.scenarios.rs_perishable.gymnax_env import RSPerishableGymnax
+from bloodbank_marl.scenarios.rs_perishable.jax_env import RSPerishableEnv
 
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
@@ -44,6 +45,12 @@ def make(env_name, **env_kwargs):
             MenesesPerishableGymnax(**env_kwargs),
             MenesesPerishableGymnax().default_params,
         )
+    elif env_name == "RSPerishable":
+        return (
+            RSPerishableEnv(**env_kwargs),
+            RSPerishableEnv().default_params,
+        )
+
     elif env_name == "RSPerishableGymnax":
         return (
             RSPerishableGymnax(**env_kwargs),

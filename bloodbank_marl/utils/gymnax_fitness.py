@@ -27,6 +27,7 @@ from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import (
     MenesesPerishableGymnax,
 )
 from bloodbank_marl.scenarios.rs_perishable.gymnax_env import RSPerishableGymnax
+from bloodbank_marl.scenarios.rs_perishable.jax_env import RSPerishableEnv
 
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
@@ -44,6 +45,12 @@ def make(env_name, **env_kwargs):
             MenesesPerishableGymnax(**env_kwargs),
             MenesesPerishableGymnax().default_params,
         )
+    elif env_name == "RSPerishable":
+        return (
+            RSPerishableEnv(**env_kwargs),
+            RSPerishableEnv().default_params,
+        )
+
     elif env_name == "RSPerishableGymnax":
         return (
             RSPerishableGymnax(**env_kwargs),
@@ -288,12 +295,17 @@ class GymnaxFitness(object):
         # Return the sum of rewards accumulated by agent in episode rollout
         # ep_mask = scan_out
         cum_reward = carry_out[-4].squeeze()  # Not discounted, one per agent
+
         cum_return = carry_out[
             -3
         ].squeeze()  # Discounted, just for replenishment for now; update rollout if we want to use it
         cum_infos = carry_out[-2]
         kpis = cum_infos.calculate_kpis()
-        kpis["mean_daily_reward"] = cum_reward[0] / cum_infos.day_counter
+
+        # TODO: This is just temporary
+        # kpis["cum_reward_shape"] = cum_reward.shape
+
+        kpis["mean_daily_reward"] = cum_reward[0] / cum_infos.day_counter[0]
         # This allows us to incorporate a penalty when KPIs are breached over the whole episode
         # Aim to use it to enforce constraints on service level and wastage suggested by Meneses et al (2021)
         # for example on expriries and service level
