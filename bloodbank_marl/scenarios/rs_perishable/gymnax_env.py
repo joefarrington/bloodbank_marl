@@ -235,7 +235,7 @@ class RSPerishableGymnax(environment.Environment):
         self.max_demand = max_demand
         self._issuing_policy = issuing_policy
 
-        self.stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
+        # self.stock_start_idx = jnp.where(self.lead_time == 0, 1, 0)
 
     @property
     def default_params(self) -> EnvParams:
@@ -426,13 +426,16 @@ class RSPerishableGymnax(environment.Environment):
 
     def get_obs(self, state: EnvState) -> chex.Array:
         """Applies observation function to state."""
-        # If lead time is 0 or 1, nothing to include in obs
+
         # Simple action masking, for now can always order each product
 
+        # NOTE: For L = 0, observation made at the end of the day after ageing stock, and first element would always be zero
+        # In older work we removed the first element, but we need to keep it in the multi-agent environment for issuing steps
+        # So keep here too for consistency of states between the two versions (e.g. means we should be able to use same NN
+        # replenishment policy on both)
         return EnvObs(
-            stock=state.stock[
-                :, self.stock_start_idx :
-            ],  # NOTE: For L = 0, observation made at the end of the day after ageing stock, and first element would always be zero
+            stock=state.stock,
+            # If lead time is 0 or 1, nothing to include in obs
             in_transit=state.in_transit[:, 1:],
             weekday=state.weekday,
             action_mask=jnp.ones((self.n_products,)),
