@@ -6,12 +6,16 @@ defaults:
   - override /policies/issuing: heuristic_exact_match
 
 evosax:
-  num_generations: 150
+  num_generations: 100
 
 environment:
   env_kwargs:
     max_order_quantities: 50
 
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
 wandb:
   init:
-    project: "rs_gymnax_neuro"
+    project: "rs_gymnax_neuro_exact_match"

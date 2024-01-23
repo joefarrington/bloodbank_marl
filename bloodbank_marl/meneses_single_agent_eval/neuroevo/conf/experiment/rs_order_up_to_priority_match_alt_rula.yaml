@@ -10,7 +10,7 @@ wandb:
     project: "rs_gymnax_neuro_priority_match_alt_rula"
 
 evosax:
-  num_generations: 150
+  num_generations: 100
 
 environment:
   env_kwargs:
@@ -19,6 +19,10 @@ environment:
     age_on_arrival_distribution_probs: 
       _target_: jax.numpy.array
       object: [0.5, 0.2, 0.3]
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
 
 policies:
   issuing:
