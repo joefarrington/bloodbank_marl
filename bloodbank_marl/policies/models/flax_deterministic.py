@@ -48,7 +48,7 @@ class RepMultiProductMLP(nn.Module):
         x = nn.Dense(self.n_hidden)(x)
         x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
-        x = nn.tanh(x)
+        # x = nn.tanh(x)
         return x
 
 

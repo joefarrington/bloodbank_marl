@@ -197,6 +197,15 @@ class EnvObs:
     def one_hot_day_of_week(self):
         return jax.nn.one_hot(self.weekday, 7)
 
+    @classmethod
+    def obs_total_per_product(cls, env_obs):
+        batch_dims = env_obs.in_transit.shape[:-2]
+        inv = env_obs.stock.sum(axis=-1) + env_obs.in_transit.sum(axis=-1)
+        return jnp.hstack([
+                env_obs.weekday.reshape(batch_dims + (1,)),
+                inv.reshape(batch_dims + (-1,)),
+            ]
+        )
 
 @struct.dataclass
 class DemandInfo:

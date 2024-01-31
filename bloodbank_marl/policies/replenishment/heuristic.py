@@ -59,6 +59,8 @@ class SRepPolicy(HeuristicPolicy):
             "RSPerishableGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
+        elif self.env_name == "RSPerishableFourGymnax":
+            return ["O", "A", "B", "AB"]
         else:
             return []
 
@@ -68,7 +70,7 @@ class SRepPolicy(HeuristicPolicy):
             return de_moor_perishable_S_policy
         elif self.env_name == "MenesesPerishable" or "MenesesPerishableGymnax":
             return meneses_perishable_S_policy
-        elif self.env_name == "RSPerishableGymnax":
+        elif self.env_name == "RSPerishableGymnax" or "RSPerishableFourGymnax":
             return rs_perishable_S_policy
         else:
             raise NotImplementedError(
@@ -119,6 +121,8 @@ class sSRepPolicy(SRepPolicy):
             "RSPerishableGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
+        elif self.env_name == "RSPerishableFourGymnax":
+            return ["O", "A", "B", "AB"]
         else:
             return []
 
@@ -170,6 +174,8 @@ class SDayOfWeekRepPolicy(SRepPolicy):
             "RSPerishableGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
+        elif self.env_name == "RSPerishableFourGymnax":
+            return ["O", "A", "B", "AB"]
         else:
             return []
 
