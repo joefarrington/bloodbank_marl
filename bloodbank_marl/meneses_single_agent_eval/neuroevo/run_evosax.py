@@ -115,7 +115,7 @@ def main(cfg):
     es_log = es_logging.initialize()
 
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
-    types = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
+    types = cfg.environment.types
 
     for gen in range(cfg.evosax.num_generations):
         # TODO Do we want to split out eval, or should eval always be on the same set of rollouts?

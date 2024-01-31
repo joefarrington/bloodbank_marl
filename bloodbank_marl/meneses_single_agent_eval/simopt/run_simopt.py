@@ -279,8 +279,7 @@ def main(cfg: DictConfig) -> None:
     group_metrics = cfg.environment.vector_kpis_to_log
     overall_metrics = cfg.environment.scalar_kpis_to_log
 
-    # TODO Avoid having to hardcode the product types here
-    types = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
+    types = cfg.environment.types
     # Create a dataframe of KPIs by type and log to W&B as a table
     df = pd.DataFrame()
     for m in group_metrics:

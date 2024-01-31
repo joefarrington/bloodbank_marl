@@ -5,6 +5,7 @@ env_params: {}
 env_kwargs:
   issuing_policy: ${policies.issuing}
 gamma: 1.0
+types: ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
 scalar_kpis_to_log:
   - mean_total_order
   - service_level_%
