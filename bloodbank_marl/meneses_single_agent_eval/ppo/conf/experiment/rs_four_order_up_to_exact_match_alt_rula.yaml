@@ -7,7 +7,7 @@ defaults:
 
 wandb:
   init:
-    project: "rs_gymnax_ppo_exact_match_alt_rula"
+    project: "rs_four_gymnax_ppo_exact_match_alt_rula"
 
 environment:
   env_kwargs:
