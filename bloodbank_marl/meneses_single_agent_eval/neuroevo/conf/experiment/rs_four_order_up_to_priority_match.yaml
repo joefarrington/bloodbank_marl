@@ -1,0 +1,31 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_gymnax_four
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: heuristic_priority_match
+
+wandb:
+  init:
+    project: "rs_four_gymnax_neuro_priority_match_alt_rula"
+
+evosax:
+  num_generations: 100
+
+environment:
+  env_kwargs:
+    max_order_quantities: 50
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0, 2, 1, 3] # O pt
+        - [1,3,2,0] # A pt
+        - [2,3,1,0] # B pt
+        - [3,1,2,0] # AB pt

@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_gymnax_four
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: heuristic_exact_match
+
+wandb:
+  init:
+    project: "rs_four_gymnax_neuro_exact_match"
+
+evosax:
+  num_generations: 100
+
+environment:
+  env_kwargs:
+    max_order_quantities: 50
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+
