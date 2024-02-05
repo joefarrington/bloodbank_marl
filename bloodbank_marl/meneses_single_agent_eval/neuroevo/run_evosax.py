@@ -82,7 +82,14 @@ def main(cfg):
     rng = jax.random.PRNGKey(cfg.evosax.seed)
     rng, rng_rep = jax.random.split(rng, 2)
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
-    policy_params = policy_rep.get_initial_params(rng_rep)
+
+    if cfg.policies.pretrained.enable:
+        cpm = hydra.utils.instantiate(cfg.policies.pretrained.checkpoint_manager)
+        policy_params = cpm.restore(cfg.policies.pretrained.checkpoint_id)[
+            "trained_params"
+        ]
+    else:
+        policy_params = policy_rep.get_initial_params(rng_rep)
 
     param_reshaper = ParameterReshaper(policy_params)
     test_param_reshaper = ParameterReshaper(policy_params, n_devices=1)
@@ -101,12 +108,19 @@ def main(cfg):
     )
 
     # Strategy and fitness shaper
+
     strategy = hydra.utils.instantiate(
         cfg.evosax.strategy, num_dims=param_reshaper.total_params
     )
     fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
     rng, rng_state_init = jax.random.split(rng, 2)
-    state = strategy.initialize(rng_state_init)
+
+    if cfg.policies.pretrained.enable:
+        state = strategy.initialize(
+            rng_state_init, init_mean=param_reshaper.flatten_single(policy_params)
+        )
+    else:
+        state = strategy.initialize(rng_state_init)
 
     # Logger
     es_logging = hydra.utils.instantiate(
@@ -116,6 +130,51 @@ def main(cfg):
 
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
     types = cfg.environment.types
+
+    # Rollout the pretrained policy to start with
+    if cfg.policies.pretrained.enable:
+        fitness, cum_infos, kpis = test_evaluator.rollout(
+            rng_eval,
+            jax.tree_util.tree_map(lambda x: x.reshape((1,) + x.shape), policy_params),
+        )
+        cum_returns = fitness.mean(axis=1)
+
+        group_metrics = cfg.environment.vector_kpis_to_log
+        overall_metrics = cfg.environment.scalar_kpis_to_log
+        log_to_wandb = {}
+
+        for idx, p in enumerate(["pretrained"]):
+            # Store group metrics in dataframe for W&B Table if we have them
+            if group_metrics is not None:
+                df = pd.DataFrame()
+                for m in group_metrics:
+                    df = pd.concat(
+                        [df, pd.DataFrame(kpis[m][idx].mean(axis=(0)).reshape(1, -1))],
+                        axis=0,
+                    )
+                    df = pd.concat(
+                        [
+                            df,
+                            pd.DataFrame(kpis[m][idx].std(axis=(0)).reshape(1, -1)),
+                        ],
+                        axis=0,
+                    )
+                df.columns = types
+                row_labels = [
+                    f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]
+                ]
+                df.insert(loc=0, column="metric", value=row_labels)
+                wandb.log({f"eval/{p}/group_metrics": wandb.Table(dataframe=df)})
+
+            # Add aggregate metrics and return to dict to be logged to W&B
+            if overall_metrics is not None:
+                for m in overall_metrics:
+                    log_to_wandb[f"eval/{p}/{m}_mean"] = kpis[m][idx].mean()
+                    log_to_wandb[f"eval/{p}/{m}_std"] = kpis[m][idx].std()
+
+            log_to_wandb[f"eval/{p}/return_mean"] = fitness.mean()
+            log_to_wandb[f"eval/{p}/return_std"] = fitness.std()
+        wandb.log(log_to_wandb)
 
     for gen in range(cfg.evosax.num_generations):
         # TODO Do we want to split out eval, or should eval always be on the same set of rollouts?

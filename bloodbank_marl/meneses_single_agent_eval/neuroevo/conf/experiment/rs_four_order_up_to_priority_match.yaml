@@ -7,7 +7,7 @@ defaults:
 
 wandb:
   init:
-    project: "rs_four_gymnax_neuro_priority_match_alt_rula"
+    project: "rs_four_gymnax_neuro_priority_match"
 
 evosax:
   num_generations: 100

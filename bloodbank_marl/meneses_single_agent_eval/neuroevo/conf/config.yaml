@@ -58,6 +58,10 @@ evosax:
     max_to_keep: 1
     create: True
 
+policies:
+  pretrained:
+    enable: False
+
 train_evaluator:
   _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
   env_name: ${environment.env_name}
@@ -83,6 +87,8 @@ evaluation:
     n_devices:
     num_warmup_days: ${environment.num_warmup_days}
     gamma: ${environment.gamma}
+
+
 
 
 
