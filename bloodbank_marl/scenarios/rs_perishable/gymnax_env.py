@@ -148,7 +148,7 @@ class EnvParams:
         holding_costs: List[float] = [130] * n_products,
         substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
         max_substitution_cost: float = 3250,  # Max substitution equal to shortage costs, like Meneses
-        initial_weekday: int = 0,  # Start on Monday morning; equiv to starting on Sunday evening before
+        initial_weekday: int = -1,
         max_expiry_pc_target: float = 100.0,  # Effectively no limit by default
         min_service_level_pc_target: float = 0.0,  # Effectively no limit by default
         min_exact_match_pc_target: float = 0.0,  # Effectively no limit by default
@@ -201,11 +201,13 @@ class EnvObs:
     def obs_total_per_product(cls, env_obs):
         batch_dims = env_obs.in_transit.shape[:-2]
         inv = env_obs.stock.sum(axis=-1) + env_obs.in_transit.sum(axis=-1)
-        return jnp.hstack([
+        return jnp.hstack(
+            [
                 env_obs.weekday.reshape(batch_dims + (1,)),
                 inv.reshape(batch_dims + (-1,)),
             ]
         )
+
 
 @struct.dataclass
 class DemandInfo:

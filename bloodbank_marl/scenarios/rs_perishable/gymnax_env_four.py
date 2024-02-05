@@ -106,7 +106,7 @@ class EnvParams:
         holding_costs: List[float] = [130] * n_products,
         substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
         max_substitution_cost: float = 3250,  # Max substitution equal to shortage costs, like Meneses
-        initial_weekday: int = 0,  # Start on Monday morning; equiv to starting on Sunday evening before
+        initial_weekday: int = -1,  # Start on random weekday
         max_expiry_pc_target: float = 100.0,  # Effectively no limit by default
         min_service_level_pc_target: float = 0.0,  # Effectively no limit by default
         min_exact_match_pc_target: float = 0.0,  # Effectively no limit by default
