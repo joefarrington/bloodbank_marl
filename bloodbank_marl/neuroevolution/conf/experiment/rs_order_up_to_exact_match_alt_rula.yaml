@@ -5,6 +5,10 @@ defaults:
   - override /policies/replenishment: multi_product_order_up_to_mlp
   - override /policies/issuing: exact_match
 
+wandb:
+  init:
+    project: rs_marl_neuroevo_test
+
 environment:
   env_params:
     age_on_arrival_distribution_probs: 
