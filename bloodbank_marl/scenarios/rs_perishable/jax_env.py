@@ -344,7 +344,7 @@ class EnvObs:
         num_actions=None,
         n_steps=1,
     ):
-        stock_start_idx = jnp.where(env_kwargs["lead_time"] == 0, 1, 0)
+        # stock_start_idx = jnp.where(env_kwargs["lead_time"] == 0, 1, 0)
         return cls(
             agent_id=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
             time=jnp.zeros(n_steps, dtype=jnp.float32).squeeze(),
@@ -353,7 +353,7 @@ class EnvObs:
                 (
                     n_steps,
                     env_kwargs["n_products"],
-                    min(env_kwargs["lead_time"] - 1, 0),
+                    max(env_kwargs["lead_time"] - 1, 0),
                 ),
                 dtype=jnp.int32,
             ).squeeze(),
@@ -361,10 +361,11 @@ class EnvObs:
                 (
                     n_steps,
                     env_kwargs["n_products"],
-                    env_kwargs["max_useful_life"] - stock_start_idx,
+                    env_kwargs["max_useful_life"],
                 ),
                 dtype=jnp.int32,
             ).squeeze(),
+            weekday=jnp.zeros(n_steps, dtype=jnp.int32).squeeze(),
             action_mask=jnp.zeros(
                 (n_steps, env_kwargs["n_products"]), dtype=jnp.int32
             ).squeeze(),
