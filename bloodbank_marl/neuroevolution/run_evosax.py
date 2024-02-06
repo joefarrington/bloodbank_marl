@@ -171,13 +171,50 @@ def main(cfg):
     )
     fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
     rng, rng_state_init = jax.random.split(rng, 2)
-    state = strategy.initialize(rng_state_init)
+    if (
+        cfg.policies.pretrained.replenishment.enable
+        or cfg.policies.pretrained.issuing.enable
+    ):
+        state = strategy.initialize(
+            rng_state_init, init_mean=param_reshaper.flatten_single(policy_params)
+        )
+    else:
+        state = strategy.initialize(rng_state_init)
 
     # Logger
     es_logging = hydra.utils.instantiate(
         cfg.evosax.logging, num_dims=param_reshaper.total_params
     )
     log = es_logging.initialize()
+
+    # Start by rolling out the pretrained policy
+    if (
+        cfg.policies.pretrained.replenishment.enable
+        or cfg.policies.pretrained.issuing.enable
+    ):
+        rng, rng_init, rng_ask, rng_train, rng_eval = jax.random.split(rng, 5)
+        log_to_wandb = {}
+        fitness, cum_infos, kpis = test_evaluator.rollout(
+            rng_eval,
+            jax.tree_util.tree_map(lambda x: x.reshape((1,) + x.shape), policy_params),
+        )
+        test_fitness_mean = fitness.mean(axis=-1)
+        test_fitness_std = fitness.std(axis=-1)
+        # NOTE: Mean KPIs assume single value per rollout (vs others that
+        # are by product type etc; so we specifiy in config which ones should
+        # be used here)
+        test_kpis = {
+            k: v.mean(axis=-1)
+            for k, v in kpis.items()
+            if k in cfg.environment.kpis_log_eval
+        }
+        for idx, p in enumerate(["pretrained"]):
+            log_to_wandb[f"eval/{p}/return_mean"] = test_fitness_mean[idx]
+            log_to_wandb[f"eval/{p}/return_std"] = test_fitness_std[idx]
+            for k, v in test_kpis.items():
+                log_to_wandb[f"eval/{p}/{k}"] = v[idx]
+
+        wandb.log(log_to_wandb)
 
     for gen in range(cfg.evosax.num_generations):
         rng, rng_init, rng_ask, rng_train, rng_eval = jax.random.split(rng, 5)
