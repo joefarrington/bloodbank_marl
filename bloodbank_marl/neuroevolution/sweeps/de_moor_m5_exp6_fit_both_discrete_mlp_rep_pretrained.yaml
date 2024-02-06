@@ -6,18 +6,27 @@ metric:
 parameters:
   evosax.strategy.lrate_init:
     distribution: log_uniform_values
-    min: 0.005
+    min: 0.001
     max: 0.5
   evosax.strategy.sigma_init:
     distribution: log_uniform_values
-    min: 0.005
+    min: 0.001
     max: 0.5
+  evosax.strategy.lrate_decay:
+    distribution: log_uniform_values
+    min: 0.99
+    max: 1.0
+  evosax.strategy.sigma_decay:
+    distribution: log_uniform_values
+    min: 0.99
+    max: 1.0
   # No tuning of replenishment n_hidden as already set in pretraining
-  policies.issuing.model_kwargs.n_hidden:
-    distribution: q_uniform
-    min: 32
-    max: 256
-    q: 32
+  # Leave issuing at 64 for now
+  #policies.issuing.model_kwargs.n_hidden:
+  #  distribution: q_uniform
+  #  min: 32
+  #  max: 256
+  #  q: 32
 
 command:
   - ${env}
