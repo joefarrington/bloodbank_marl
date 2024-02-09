@@ -2,6 +2,7 @@ defaults:
   - policies/replenishment: heuristic_order_up_to
   - policies/replenishment_policy_params: Cp # Let's say we'll start with the current policy, BUT one parameter is outside the range
   - policies/issuing: heuristic_priority_match
+  - param_search: nsgaii
   - environment: meneses_gymnax
   - _self_
 
@@ -15,20 +16,6 @@ hydra:
   searchpath:
     # Search paths assume that run_optuna_simopt.py will be run from simopt/
     - file://../conf
-
-param_search:
-  sampler:
-    _target_: optuna.samplers.NSGAIISampler
-    population_size: 50
-  max_parallel_trials: 50
-  max_iterations: 200
-  num_rollouts: 100
-  seed: 10
-  search_bounds:
-    all_params:
-      low: 0
-      high: 100
-  early_stopping_rounds: 10
 
 train_evaluator:
   _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness

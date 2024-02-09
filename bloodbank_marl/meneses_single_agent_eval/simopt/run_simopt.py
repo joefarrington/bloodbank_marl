@@ -239,9 +239,12 @@ def main(cfg: DictConfig) -> None:
     rng_fit = jax.random.PRNGKey(cfg.param_search.seed)
 
     # Initial policy params
-    initial_policy_params = omegaconf.OmegaConf.to_container(
-        cfg.policies.replenishment_policy_params
-    )
+    if cfg.policies.replenishment_policy_params is not None:
+        initial_policy_params = omegaconf.OmegaConf.to_container(
+            cfg.policies.replenishment_policy_params
+        )
+    else:
+        initial_policy_params = None
     if cfg.param_search.sampler._target_ == "optuna.samplers.GridSampler":
         study = simopt_grid_sampler(
             cfg, rep_policy, train_evaluator, rng_fit, initial_policy_params
@@ -282,17 +285,18 @@ def main(cfg: DictConfig) -> None:
     types = cfg.environment.types
     # Create a dataframe of KPIs by type and log to W&B as a table
     df = pd.DataFrame()
-    for m in group_metrics:
-        df = pd.concat(
-            [df, pd.DataFrame(kpis[m].mean(axis=(0, 1)).reshape(1, -1))], axis=0
-        )
-        df = pd.concat(
-            [df, pd.DataFrame(kpis[m].std(axis=(0, 1)).reshape(1, -1))], axis=0
-        )
-    df.columns = types
-    row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
-    df.insert(loc=0, column="metric", value=row_labels)
-    wandb.log({"eval/group_metrics": wandb.Table(dataframe=df)})
+    if cfg.environment.vector_kpis_to_log is not None:
+        for m in group_metrics:
+            df = pd.concat(
+                [df, pd.DataFrame(kpis[m].mean(axis=(0, 1)).reshape(1, -1))], axis=0
+            )
+            df = pd.concat(
+                [df, pd.DataFrame(kpis[m].std(axis=(0, 1)).reshape(1, -1))], axis=0
+            )
+        df.columns = types
+        row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
+        df.insert(loc=0, column="metric", value=row_labels)
+        wandb.log({"eval/group_metrics": wandb.Table(dataframe=df)})
 
     # TODO: Put this into config etc
     if "all_allocations" in kpis:
