@@ -32,6 +32,6 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=rs_four_exact_match_pretrained
+  - +experiment=rs_exact_match_pretrained
 
   
