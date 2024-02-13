@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 import chex
-from typing import Dict, Optional, Any, List
+from typing import Union, Dict, Optional, Any, List
 from bloodbank_marl.utils.gymnax_fitness import make
 from bloodbank_marl.utils.yaml import from_yaml, to_yaml
 from bloodbank_marl.environments.environment import MarlEnvironment
@@ -18,7 +18,7 @@ import pandas as pd
 
 
 class RepDiscreteMLP(nn.Module):
-    n_hidden: int
+    n_hidden: Union[int, list]
     n_actions: int
     action_pad: int = 0
     preprocess_observation: callable = lambda obs: obs.obs
@@ -26,8 +26,13 @@ class RepDiscreteMLP(nn.Module):
     @nn.compact
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
         x = self.preprocess_observation(obs)
-        x = nn.Dense(self.n_hidden)(x)
-        x = nn.relu(x)
+        # Handle single or multiple hidden layers
+        n_hidden = [self.n_hidden] if isinstance(self.n_hidden, int) else self.n_hidden
+        for h in n_hidden:
+            x = nn.Dense(h)(x)
+            x = nn.relu(x)
+        # x = nn.Dense(self.n_hidden)(x)
+        # x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
         x = jnp.hstack([x, jnp.zeros((x.shape[:-1] + (self.action_pad,)))])
         x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
@@ -36,7 +41,7 @@ class RepDiscreteMLP(nn.Module):
 
 
 class RepMultiProductMLP(nn.Module):
-    n_hidden: int
+    n_hidden: Union[int, list]
     n_actions: int
     action_pad: int = 0
     preprocess_observation: callable = lambda obs: obs.obs
@@ -45,15 +50,19 @@ class RepMultiProductMLP(nn.Module):
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
         # x = obs.stock.sum(axis=-1) # Alternative is just have total number of stock per product
         x = self.preprocess_observation(obs)
-        x = nn.Dense(self.n_hidden)(x)
-        x = nn.relu(x)
+        # x = nn.Dense(self.n_hidden)(x)
+        # x = nn.relu(x)
+        n_hidden = [self.n_hidden] if isinstance(self.n_hidden, int) else self.n_hidden
+        for h in n_hidden:
+            x = nn.Dense(h)(x)
+            x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
         # x = nn.tanh(x)
         return x
 
 
 class IssueDiscreteMLP(nn.Module):
-    n_hidden: int
+    n_hidden: Union[int, list]
     n_actions: int
     action_pad: int = 0
     preprocess_observation: callable = lambda obs: obs.stock
@@ -61,8 +70,10 @@ class IssueDiscreteMLP(nn.Module):
     @nn.compact
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
         x = self.preprocess_observation(obs)
-        x = nn.Dense(self.n_hidden)(x)
-        x = nn.relu(x)
+        n_hidden = [self.n_hidden] if isinstance(self.n_hidden, int) else self.n_hidden
+        for h in n_hidden:
+            x = nn.Dense(h)(x)
+            x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
         x = jnp.hstack([x, jnp.zeros((x.shape[:-1] + (self.action_pad,)))])
         x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
@@ -78,7 +89,7 @@ class IssueMultiProductMLP(nn.Module):
     # Action spaces need to be the same size, so this has one action dim per product type
     # And will be all zeros if no products are issued.
 
-    n_hidden: int
+    n_hidden: Union[int, list]
     n_actions: int  # This will be the number of products
     action_pad: int = 0
     preprocess_observation: callable = lambda obs: obs.obs
@@ -86,8 +97,10 @@ class IssueMultiProductMLP(nn.Module):
     @nn.compact
     def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
         x = self.preprocess_observation(obs)
-        x = nn.Dense(self.n_hidden)(x)
-        x = nn.relu(x)
+        n_hidden = [self.n_hidden] if isinstance(self.n_hidden, int) else self.n_hidden
+        for h in n_hidden:
+            x = nn.Dense(h)(x)
+            x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
         x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
         a = jnp.where(x == x.max(), 1, 0)
