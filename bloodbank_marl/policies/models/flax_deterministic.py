@@ -40,6 +40,25 @@ class RepDiscreteMLP(nn.Module):
         return x
 
 
+class RepDiscretePretrainMLP(nn.Module):
+    # Version without action masking and padding for more efficient pretraining,
+    # and return the logits instead of the argmax for use with the ordinal cross entropy loss
+    n_hidden: Union[int, list]
+    n_actions: int
+    preprocess_observation: callable = lambda obs: obs.obs
+
+    @nn.compact
+    def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
+        x = self.preprocess_observation(obs)
+        # Handle single or multiple hidden layers
+        n_hidden = [self.n_hidden] if isinstance(self.n_hidden, int) else self.n_hidden
+        for h in n_hidden:
+            x = nn.Dense(h)(x)
+            x = nn.relu(x)
+        x = nn.Dense(self.n_actions)(x)
+        return x
+
+
 class RepMultiProductMLP(nn.Module):
     n_hidden: Union[int, list]
     n_actions: int
