@@ -24,7 +24,7 @@ policies:
   pretrained:
     enable: True
     checkpoint_id: 0
-    checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/draft_notebooks/rep_cpts_rs_four_prod_exact_match
+    checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rep_cpts_rs_four_exact_match
     checkpoint_manager:
       _target_: orbax.checkpoint.CheckpointManager
       directory: ${policies.pretrained.checkpoint_dir}
