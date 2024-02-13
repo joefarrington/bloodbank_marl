@@ -33,6 +33,9 @@ from bloodbank_marl.scenarios.rs_perishable.gymnax_env_four import (
 from bloodbank_marl.scenarios.rs_perishable.gymnax_env_two import (
     RSPerishableTwoGymnax,
 )
+from bloodbank_marl.scenarios.rs_perishable.gymnax_env_one import (
+    RSPerishableOneGymnax,
+)
 from bloodbank_marl.scenarios.rs_perishable.jax_env import RSPerishableEnv
 
 
@@ -72,6 +75,11 @@ def make(env_name, **env_kwargs):
         return (
             RSPerishableTwoGymnax(**env_kwargs),
             RSPerishableTwoGymnax().default_params,
+        )
+    elif env_name == "RSPerishableOneGymnax":
+        return (
+            RSPerishableOneGymnax(**env_kwargs),
+            RSPerishableOneGymnax().default_params,
         )
     elif env_name == "DeMoorPerishableGymnax":
         return (
