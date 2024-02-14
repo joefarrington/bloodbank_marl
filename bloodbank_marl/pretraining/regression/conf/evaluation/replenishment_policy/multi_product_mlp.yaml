@@ -1,0 +1,12 @@
+_target_: bloodbank_marl.meneses_single_agent_eval.neuroevo.policies.replenishment.FlaxMultiProductRepPolicy
+model_class:
+  _target_: hydra.utils.get_class
+  path: bloodbank_marl.policies.models.flax_deterministic.RepMultiProductMLP
+model_kwargs:
+  n_hidden: [512, 512]
+env_name: ${environment.env_name}
+env_kwargs: ${environment.env_kwargs}
+env_params: ${environment.env_params}
+clip_min: -2
+clip_max: 2
+min_order_quantity: 0

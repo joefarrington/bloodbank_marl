@@ -1,7 +1,8 @@
 defaults:
   - heuristic/policy: order_up_to
-  - evaluation/replenishment_policy: single_product_mlp
-  - environment: de_moor_perishable_gymnax
+  - policies/issuing: heuristic_exact_match
+  - evaluation/replenishment_policy: multi_product_mlp
+  - environment: rs_perishable_gymnax
   - _self_
 
 wandb:
@@ -15,24 +16,38 @@ hydra:
 heuristic:
   params:
     _target_: jax.numpy.array
-    object:
-      - [10]
+    object: [5, 21, 4, 19, 2, 6, 1, 2]
 
 seed: 12
 
+obs_collection:
+  seed: 12345
+  num_envs: 200
+  samples_per_env: 700
+  policy:
+    _target_: bloodbank_marl.policies.replenishment.heuristic.SRepPolicyExplore
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    epsilon: 0.1
+
 pretraining:
-  num_epochs: 20
+  num_epochs: 100
   batch_size: 64
-  stock_limit: 15
+  #stock_limit: 15
   preprocess_observations:
     _target_: bloodbank_marl.utils.pretraining.get_obs
   preprocess_labels: 
-    _target_: bloodbank_marl.utils.pretraining.passthrough
+    _target_: bloodbank_marl.utils.pretraining.transform_integer_target
+    max_order_quantity: 50 # Set this based on the env?
+    min_order_quantity: ${evaluation.replenishment_policy.min_order_quantity}
+    clip_max: ${evaluation.replenishment_policy.clip_max}
+    clip_min: ${evaluation.replenishment_policy.clip_min}
   optimizer:
     _target_: optax.adam
-    learning_rate: 0.01
+    learning_rate: 0.05
   nn_model:
-    _target_: bloodbank_marl.policies.models.flax_deterministic.RepDiscretePretrainMLP
+    _target_: bloodbank_marl.policies.models.flax_deterministic.RepMultiProductMLP
     n_hidden: ${evaluation.replenishment_policy.model_kwargs.n_hidden}
     preprocess_observation:
       _target_: hydra.utils.get_method
@@ -40,6 +55,7 @@ pretraining:
 
 checkpoint_manager:
   _target_: orbax.checkpoint.CheckpointManager
+  directory: "checkpoints"
   checkpointers:
     _target_: orbax.checkpoint.PyTreeCheckpointer
   options:
@@ -54,7 +70,7 @@ evaluation:
     _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
-    num_rollouts: 10000
+    num_rollouts: 100
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
     test: True

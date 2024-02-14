@@ -52,7 +52,7 @@ def calculate_loss(state, params, batch):
     return loss, (accuracy, num_incorrect_preds)
 
 
-@jax.jit  # Jit the function for efficiency
+@jax.jit  
 def train_step(state, batch):
     # Gradient function
     grad_fn = jax.value_and_grad(
@@ -69,7 +69,6 @@ def train_step(state, batch):
     return state, loss, accuracy, num_incorrect_preds
 
 
-# Jit the function for efficiency
 def eval_step(state, rng, cfg, nn_policy):
     # Roll out the heuristic policy
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
@@ -86,7 +85,6 @@ def train_model(
     data_loader,
     checkpoint_manager,
     cfg,
-    test_evaluator,
     heuristic_fitness,
     nn_policy,
 ):
@@ -156,11 +154,7 @@ def main(cfg):
     wandb.log(log_to_wandb)
 
     # Get the observations for pretraining
-    all_obs = get_obs_de_moor_perishable(
-        cfg.environment.env_kwargs,
-        cfg.environment.env_params,
-        cfg.pretraining.stock_limit,
-    )
+    all_obs = get_obs_de_moor_perishable(cfg)
 
     # Label the obervations
     rng, _rng = jax.random.split(rng)
@@ -215,7 +209,6 @@ def main(cfg):
         train_data_loader,
         checkpoint_manager,
         cfg,
-        test_evaluator,
         heuristic_fitness,
         nn_policy,
     )
