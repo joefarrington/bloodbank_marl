@@ -70,7 +70,12 @@ class SimpleGA(Strategy):
             sigma_limit=self.sigma_limit,
         )
 
-    def initialize_strategy(self, rng: chex.PRNGKey, params: EvoParams) -> EvoState:
+    def initialize_strategy(
+        self,
+        rng: chex.PRNGKey,
+        params: EvoParams,
+        init_mean: Optional[Union[chex.Array, chex.ArrayTree]] = None,
+    ) -> EvoState:
         """`initialize` the differential evolution strategy."""
         initialization = jax.random.uniform(
             rng,
@@ -78,12 +83,21 @@ class SimpleGA(Strategy):
             minval=params.init_min,
             maxval=params.init_max,
         )
+
+        # If we supply an initial mean, replace the first member of the population
+        # And we assume it's the best member
+        if init_mean is not None:
+            initialization = jnp.vstack([init_mean, initialization[1:, :]])
+            best_member = init_mean
+        else:
+            best_member = initialization.mean(axis=0)
+
         state = EvoState(
             mean=initialization.mean(axis=0),
             archive=initialization,
             fitness=jnp.zeros(self.elite_popsize) + jnp.finfo(jnp.float32).max,
             sigma=params.sigma_init,
-            best_member=initialization.mean(axis=0),
+            best_member=best_member,
         )
         return state
 

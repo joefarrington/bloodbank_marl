@@ -82,7 +82,12 @@ class OpenES(Strategy):
             sigma_limit=self.sigma_limit,
         )
 
-    def initialize_strategy(self, rng: chex.PRNGKey, params: EvoParams) -> EvoState:
+    def initialize_strategy(
+        self,
+        rng: chex.PRNGKey,
+        params: EvoParams,
+        init_mean: Optional[Union[chex.Array, chex.ArrayTree]] = None,
+    ) -> EvoState:
         """`initialize` the evolution strategy."""
         initialization = jax.random.uniform(
             rng,

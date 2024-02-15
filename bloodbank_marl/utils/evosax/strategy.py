@@ -81,13 +81,15 @@ class Strategy(object):
             params = self.default_params
 
         # Initialize strategy based on strategy-specific initialize method
-        state = self.initialize_strategy(rng, params)
-
         if init_mean is not None:
             if self.use_param_reshaper:
                 init_mean = self.param_reshaper.flatten_single(init_mean)
             else:
                 init_mean = jnp.asarray(init_mean)
+
+        state = self.initialize_strategy(rng, params, init_mean)
+
+        if init_mean is not None:
             state = state.replace(mean=init_mean)
         return state
 
@@ -153,7 +155,12 @@ class Strategy(object):
             gen_counter=state.gen_counter + 1,
         )
 
-    def initialize_strategy(self, rng: chex.PRNGKey, params: EvoParams) -> EvoState:
+    def initialize_strategy(
+        self,
+        rng: chex.PRNGKey,
+        params: EvoParams,
+        init_mean: Optional[Union[chex.Array, chex.ArrayTree]] = None,
+    ) -> EvoState:
         """Search-specific `initialize` method. Returns initial state."""
         raise NotImplementedError
 
