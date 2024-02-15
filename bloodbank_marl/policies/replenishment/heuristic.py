@@ -112,6 +112,57 @@ def de_moor_perishable_S_policy(policy_params, obs, rng):
     stock_on_hand_and_in_transit = obs.stock.sum() + obs.in_transit.sum()
     return jnp.clip((policy_params[0, 0] - stock_on_hand_and_in_transit), a_min=0)
 
+# For use in with pretraining in large state spaces where we need to collect
+# samples instead of enumerating the possible states
+class SRepPolicyExplore(SRepPolicy):
+    def __init__(
+    self,
+    env_name=None,
+    env_kwargs={},
+    env_params={},
+    fixed_policy_params=None,  # Enables us to fix policy params for convenience
+    params_min= None,
+    params_max = None,
+    epsilon = 0.05,
+):
+                
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        env, default_env_params = make(self.env_name, **self.env_kwargs)
+        self.env_params = default_env_params.replace(**env_params)
+        self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
+
+        # Set up parameters
+        self._setup_param_properties()
+
+        # For now, force sample limit on all S params
+        self.params_min = params_min
+        self.params_max = params_max
+        self.epsilon = epsilon
+
+        self.param_shape = (self)
+
+        # Set up apply method
+        self._apply = self._get_apply_method()
+
+        self.apply = self.apply_with_exploration_noise
+    
+    def apply_with_exploration_noise(self, policy_params, obs, rng):
+        """Apply the policy to the observation, adding noise to the action"""
+        rng, _rng = jax.random.split(rng)
+        
+        # Will we replace each S parameter?
+        rng, _rng = jax.random.split(rng)
+        sample_exploration_noise = jax.random.uniform(_rng, shape=self.params_shape, minval=0, maxval=1)
+
+        # What will we replace each S parameter with?
+        rng, _rng = jax.random.split(rng)
+        sample_replacement_S = jax.random.poisson(_rng, shape=policy_params.shape, lam=policy_params)
+        S = jnp.where(sample_exploration_noise < self.epsilon, sample_replacement_S, policy_params)
+        
+        tr_action = self._apply(S, obs, _rng)
+        action = self._postprocess_action(obs, tr_action)
+        return action
 
 class sSRepPolicy(SRepPolicy):
     # (s,S) policy with a pair of parameters for each product
