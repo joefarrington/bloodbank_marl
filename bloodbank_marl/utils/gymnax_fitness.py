@@ -37,6 +37,9 @@ from bloodbank_marl.scenarios.rs_perishable.gymnax_env_one import (
     RSPerishableOneGymnax,
 )
 from bloodbank_marl.scenarios.rs_perishable.jax_env import RSPerishableEnv
+from bloodbank_marl.scenarios.mirjalili_perishable_platelet import (
+    MirjaliliPerishablePlateletGymnax,
+)
 
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
@@ -90,6 +93,11 @@ def make(env_name, **env_kwargs):
         return (
             DeMoorPerishableMAJAX(**env_kwargs),
             DeMoorPerishableMAJAX().default_params,
+        )
+    elif env_name == "MirjaliliPerishablePlatelet":
+        return (
+            MirjaliliPerishablePlateletGymnax(**env_kwargs),
+            MirjaliliPerishablePlateletGymnax().default_params,
         )
     else:
         raise ValueError(f"Unknown environment '{env_name}'")

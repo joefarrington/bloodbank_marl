@@ -112,20 +112,21 @@ def de_moor_perishable_S_policy(policy_params, obs, rng):
     stock_on_hand_and_in_transit = obs.stock.sum() + obs.in_transit.sum()
     return jnp.clip((policy_params[0, 0] - stock_on_hand_and_in_transit), a_min=0)
 
+
 # For use in with pretraining in large state spaces where we need to collect
 # samples instead of enumerating the possible states
 class SRepPolicyExplore(SRepPolicy):
     def __init__(
-    self,
-    env_name=None,
-    env_kwargs={},
-    env_params={},
-    fixed_policy_params=None,  # Enables us to fix policy params for convenience
-    params_min= None,
-    params_max = None,
-    epsilon = 0.05,
-):
-                
+        self,
+        env_name=None,
+        env_kwargs={},
+        env_params={},
+        fixed_policy_params=None,  # Enables us to fix policy params for convenience
+        params_min=None,
+        params_max=None,
+        epsilon=0.05,
+    ):
+
         self.env_name = env_name
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
@@ -140,29 +141,36 @@ class SRepPolicyExplore(SRepPolicy):
         self.params_max = params_max
         self.epsilon = epsilon
 
-        self.param_shape = (self)
+        self.param_shape = self
 
         # Set up apply method
         self._apply = self._get_apply_method()
 
         self.apply = self.apply_with_exploration_noise
-    
+
     def apply_with_exploration_noise(self, policy_params, obs, rng):
         """Apply the policy to the observation, adding noise to the action"""
         rng, _rng = jax.random.split(rng)
-        
+
         # Will we replace each S parameter?
         rng, _rng = jax.random.split(rng)
-        sample_exploration_noise = jax.random.uniform(_rng, shape=self.params_shape, minval=0, maxval=1)
+        sample_exploration_noise = jax.random.uniform(
+            _rng, shape=self.params_shape, minval=0, maxval=1
+        )
 
         # What will we replace each S parameter with?
         rng, _rng = jax.random.split(rng)
-        sample_replacement_S = jax.random.poisson(_rng, shape=policy_params.shape, lam=policy_params)
-        S = jnp.where(sample_exploration_noise < self.epsilon, sample_replacement_S, policy_params)
-        
+        sample_replacement_S = jax.random.poisson(
+            _rng, shape=policy_params.shape, lam=policy_params
+        )
+        S = jnp.where(
+            sample_exploration_noise < self.epsilon, sample_replacement_S, policy_params
+        )
+
         tr_action = self._apply(S, obs, _rng)
         action = self._postprocess_action(obs, tr_action)
         return action
+
 
 class sSRepPolicy(SRepPolicy):
     # (s,S) policy with a pair of parameters for each product
@@ -245,7 +253,12 @@ class SDayOfWeekRepPolicy(SRepPolicy):
 
     def _get_apply_method(self) -> callable:
         """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name in ["RSPerishableGymnax", "RSPerishableFourGymnax", "RSPerishableTwoGymnax", "RSPerishableOneGymnax"]:
+        if self.env_name in [
+            "RSPerishableGymnax",
+            "RSPerishableFourGymnax",
+            "RSPerishableTwoGymnax",
+            "RSPerishableOneGymnax",
+        ]:
             return rs_perishable_S_day_of_week_policy
         else:
             raise NotImplementedError(
@@ -261,6 +274,7 @@ def rs_perishable_S_day_of_week_policy(policy_params, obs, rng):
     S = policy_params[:, obs.weekday].reshape(-1, 1)
     return jnp.clip(S - stock_on_hand_and_in_transit, a_min=0).squeeze()
 
+
 class sSDayOfWeekRepPolicy(SRepPolicy):
     # S policy with a pair of parameters for each product for each day of week
 
@@ -274,6 +288,7 @@ class sSDayOfWeekRepPolicy(SRepPolicy):
         given paramter, e.g. for different days of the week or different products"""
         if self.env_name in [
             "RSPerishableOneGymnax",
+            "MirjaliliPerishablePlateletGymnax",
         ]:
             return [f"S_{w}" for w in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
         else:
@@ -283,17 +298,38 @@ class sSDayOfWeekRepPolicy(SRepPolicy):
         """Get the forward method for the policy - this is the function that returns the action"""
         if self.env_name == "RSPerishableOneGymnax":
             return rs_perishable_sS_day_of_week_policy
+        elif self.env_name == "MirjaliliPerishablePlateletGymnax":
+            return mirjalili_perishable_sS_day_of_week_policy
         else:
             raise NotImplementedError(
                 f"No (S) day of week policy defined for Environment ID {self.env_name}"
             )
+
 
 def rs_perishable_sS_day_of_week_policy(policy_params, obs, rng):
     """sS policy for scenario based on R&S, with single product and weekdays"""
     stock_on_hand_and_in_transit = obs.stock.sum(
         axis=-1, keepdims=True
     ) + obs.in_transit.sum(axis=-1, keepdims=True)
-    S = policy_params[obs.weekday,1]
-    s = policy_params[obs.weekday,0]
-    order = jnp.clip(jnp.where(stock_on_hand_and_in_transit <= s, S - stock_on_hand_and_in_transit, 0).squeeze(), a_min=0)
+    S = policy_params[obs.weekday, 1]
+    s = policy_params[obs.weekday, 0]
+    order = jnp.clip(
+        jnp.where(
+            stock_on_hand_and_in_transit <= s, S - stock_on_hand_and_in_transit, 0
+        ).squeeze(),
+        a_min=0,
+    )
+    return jax.lax.select(s < S, order, jnp.zeros_like(order))
+
+
+def mirjalili_perishable_sS_day_of_week_policy(policy_params, obs, rng):
+    stock_on_hand_and_in_transit = obs.stock.sum(axis=-1, keepdims=True)
+    S = policy_params[obs.weekday, 1]
+    s = policy_params[obs.weekday, 0]
+    order = jnp.clip(
+        jnp.where(
+            stock_on_hand_and_in_transit <= s, S - stock_on_hand_and_in_transit, 0
+        ).squeeze(),
+        a_min=0,
+    )
     return jax.lax.select(s < S, order, jnp.zeros_like(order))
