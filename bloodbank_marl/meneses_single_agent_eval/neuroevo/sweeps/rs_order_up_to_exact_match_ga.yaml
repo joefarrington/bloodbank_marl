@@ -3,6 +3,7 @@ method: bayes
 metric:
   name: eval/mean_params/return_mean
   goal: maximize
+parameters:
   evosax.strategy.sigma_init:
     distribution: log_uniform_values
     min: 0.001
