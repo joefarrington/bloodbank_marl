@@ -1,5 +1,5 @@
 _target_: bloodbank_marl.utils.evosax.strategies.open_es.OpenES
-popsize: ${evosax.num_train_rollouts}
+popsize: ${evosax.popsize}
 opt_name: "adam"
 lrate_init: 0.08
 sigma_init: 0.08

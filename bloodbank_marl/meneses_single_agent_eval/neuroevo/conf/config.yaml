@@ -20,6 +20,7 @@ plot_policy: False
 
 evosax:
   num_generations: 100
+  popsize: 150
   num_train_rollouts: 150
   num_test_rollouts: 10000
   evaluate_every_k_gens: 10

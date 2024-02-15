@@ -1,5 +1,5 @@
 _target_: bloodbank_marl.utils.evosax.strategies.simple_ga.SimpleGA
-popsize: ${evosax.num_train_rollouts}
+popsize: ${evosax.popsize}
 elite_ratio: 0.5
 sigma_init: 0.08
 sigma_decay: 1.0
