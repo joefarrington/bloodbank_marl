@@ -1,6 +1,7 @@
 defaults:
   - policies/replenishment: multi_product_total_order_up_to_mlp
   - policies/issuing: heuristic_priority_match
+  - evosax/strategy: open_es
   - environment: meneses_gymnax
   - _self_
 
@@ -24,25 +25,6 @@ evosax:
   evaluate_every_k_gens: 10
   seed: 10
   
-  strategy:
-    _target_: evosax.OpenES
-    popsize: ${evosax.num_train_rollouts}
-    opt_name: "adam"
-    lrate_init: 0.08
-    sigma_init: 0.08
-    sigma_decay: 1.0
-    lrate_decay: 1.0
-    lrate_limit:
-      _target_: operator.mul
-      _args_:
-        - ${evosax.strategy.lrate_init}
-        - 0.01
-    sigma_limit:
-      _target_: operator.mul
-      _args_:
-        - ${evosax.strategy.sigma_init}
-        - 0.01
-
   fitness_shaper:
     _target_: evosax.FitnessShaper
     maximize: True

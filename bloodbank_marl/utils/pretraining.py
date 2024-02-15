@@ -4,9 +4,14 @@ import torch
 from bloodbank_marl.scenarios.de_moor_perishable.gymnax_env import (
     EnvObs as DeMoorEnvObs,
 )
+from bloodbank_marl.scenarios.rs_perishable.gymnax_env import EnvObs as RSEnvObs
 from bloodbank_marl.utils.gymnax_fitness import make
 import itertools
 import chex
+from functools import partial
+from omegaconf import OmegaConf
+import hydra
+from bloodbank_marl.policies.replenishment.heuristic import SRepPolicyExplore
 
 
 def collate_fn_pytree(batch):
@@ -96,11 +101,14 @@ def ordinal_categorical_cross_entropy_with_integer_labels(
     return (1 + weighting) * ce_loss
 
 
-def get_obs_de_moor_perishable(env_kwargs, env_params, stock_limit=None):
+def get_obs_de_moor_perishable(cfg):
     """Function to get states for pretraining for DeMoor perishable scenario. Function will calculate
     all possible states, and then filter out any with stock in transit and on hand greater than `stock_limit`
     if `stock_limit` is provided.
     """
+    env_kwargs = cfg.environment.env_kwargs
+    env_params = cfg.environment.env_params
+    stock_limit = cfg.pretraining.stock_limit
     env, default_env_params = make("DeMoorPerishableGymnax", **env_kwargs)
     env_params = default_env_params.replace(**env_params)
     max_order_quantity = env.max_order_quantity
@@ -135,6 +143,65 @@ def get_obs_de_moor_perishable(env_kwargs, env_params, stock_limit=None):
     return filtered_obs
 
 
+@partial(jax.vmap, in_axes=(0, None, None, None, None, None), out_axes=0)
+def collect_samples(
+    rng: jnp.ndarray,
+    n_samples: int,
+    exploration_policy: SRepPolicyExplore,
+    heuristic_policy_params: jnp.ndarray,
+    env: RSEnvObs,
+    env_params: jnp.ndarray,
+):
+
+    rng, reset_key = jax.random.split(rng)
+    obs, state = env.reset(reset_key, env_params)
+
+    def one_step(carry, x):
+        rng, state, obs = carry
+        rng, rng_policy, rng_step = jax.random.split(rng, 3)
+        action = exploration_policy.apply(heuristic_policy_params, obs, rng_policy)
+        obs, state, _, _, _ = env.step(rng_step, state, action, env_params)
+        return (rng, state, obs), obs
+
+    return jax.lax.scan(one_step, (rng, state, obs), None, length=n_samples)
+
+
+def reshape_obs_element(element):
+    shape = element.shape
+    new_shape = (shape[0] * shape[1],) + shape[2:]
+    return jnp.reshape(element, new_shape)
+
+
+def get_obs_rs_multiproduct(cfg):
+    rng = jax.random.PRNGKey(cfg.obs_collection.seed)
+
+    exploration_policy = hydra.utils.instantiate(cfg.obs_collection.policy)
+
+    # Workaround because we need to instaniate the issuing policy
+    resolved_env_kwargs_cfg = OmegaConf.to_container(cfg.environment.env_kwargs)
+    resolved_env_kwargs_cfg["issuing_policy"] = hydra.utils.instantiate(
+        cfg.environment.env_kwargs.issuing_policy
+    )
+
+    env, default_env_params = make(cfg.environment.env_name, **resolved_env_kwargs_cfg)
+    env_params = default_env_params.replace(**cfg.environment.env_params)
+
+    policy_params = hydra.utils.instantiate(cfg.heuristic.params).reshape(
+        1, -1, 1
+    )  # Intended for S params for SRep policy with multiple products
+
+    rng_v = jax.random.split(rng, cfg.obs_collection.num_envs)
+    _, observations = collect_samples(
+        rng_v,
+        cfg.obs_collection.samples_per_env,
+        exploration_policy,
+        policy_params,
+        env,
+        env_params,
+    )
+    return jax.tree_util.tree_map(reshape_obs_element, observations)
+
+
 # Preprocessing
 def get_obs(x):
     """Enable the use of EnvObs.obs as a preprocessing function."""
@@ -144,3 +211,27 @@ def get_obs(x):
 def passthrough(x):
     """Used when no preprocessing is required."""
     return x
+
+
+# Integer target to continuous model output
+def transform_integer_target(
+    target, max_order_quantity, min_order_quantity, clip_min, clip_max
+):
+    out = target.astype(jnp.float32) - min_order_quantity
+    out = out / (max_order_quantity - min_order_quantity)
+    out = out * (clip_max - clip_min)
+    out = out + clip_min
+    return out
+
+
+# Model output to integer order quantity
+def transform_model_output_to_integer(
+    model_output, max_order_quantity, min_order_quantity, clip_max, clip_min
+):
+    out = jnp.clip(model_output, a_min=clip_min, a_max=clip_max)
+    out = out - clip_min
+    out = out / (clip_max - clip_min)
+    out = out * (max_order_quantity - min_order_quantity)
+    out = out + min_order_quantity
+    out = jnp.ceil(out)
+    return out.astype(jnp.int32)

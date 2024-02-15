@@ -30,6 +30,7 @@ plotly = "^5.18.0"
 torch = "^2.1.1"
 tqdm = "^4.66.1"
 
+
 [tool.poetry.group.jax.dependencies]
 jax = {extras = ["cuda12_pip"], version = "^0.4.14", source = "jax"}
 jaxlib = {version = "^0.4.14", source = "jaxlib"}
@@ -37,6 +38,7 @@ jaxlib = {version = "^0.4.14", source = "jaxlib"}
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.0.0"
 black = "^22.12.0"
+ipython = "8.16.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.1.3"
