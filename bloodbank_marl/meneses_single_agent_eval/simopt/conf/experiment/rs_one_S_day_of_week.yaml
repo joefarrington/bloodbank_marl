@@ -1,0 +1,40 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: heuristic_S_day_of_week
+  - override /policies/issuing: heuristic_exact_match
+  - override /environment: rs_gymnax_one
+
+# Using heuristic exact match with a single product is just OUFO
+
+wandb:
+  init:
+    project: "rs_one_gymnax_simopt"
+
+# Just some initial values to start with
+policies:
+  replenishment_policy_params:
+    S_Mon_Plt: 50
+    S_Tue_Plt: 50
+    S_Wed_Plt: 50
+    S_Thu_Plt: 50
+    S_Fri_Plt: 50
+    S_Sat_Plt: 50
+    S_Sun_Plt: 50
+
+param_search:
+  sampler:
+    _target_: optuna.samplers.NSGAIISampler
+    population_size: 100
+  max_parallel_trials: 100
+  max_iterations: 200
+  num_rollouts: 100
+  seed: 10
+  search_bounds:
+    all_params:
+      low: 0
+      high: 100
+  early_stopping_rounds: 100
+
+
+

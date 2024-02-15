@@ -1,0 +1,18 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_gymnax_four
+  - override /policies/replenishment: multi_product_stochastic_mlp
+  - override /policies/issuing: heuristic_exact_match
+
+wandb:
+  init:
+    project: "rs_four_gymnax_ppo_exact_match_alt_rula"
+
+environment:
+  env_kwargs:
+    max_order_quantities: 50
+  env_params:
+    age_on_arrival_distribution_probs: 
+      _target_: jax.numpy.array
+      object: [0.5, 0.2, 0.3]

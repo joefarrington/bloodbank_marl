@@ -10,8 +10,7 @@ policies:
   replenishment_policy_params:
 
 param_search:
-  sampler:
-    num_rollouts: 4000
+  num_rollouts: 4000
 
 evaluation:
   test_evaluator:
