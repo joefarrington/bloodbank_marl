@@ -95,7 +95,10 @@ def train_model(
             )
             performance_gap = (fitness - heuristic_fitness) * 100 / heuristic_fitness
             log_to_wandb.update(
-                {"eval/mean_return": fitness, "eval/performance_gap_%": performance_gap}
+                {
+                    "eval/mean_daily_reward": fitness,
+                    "eval/performance_gap_%": performance_gap,
+                }
             )
             if performance_gap < best_performance_gap:
                 best_performance_gap = performance_gap
@@ -134,7 +137,7 @@ def main(cfg):
     # NOTE here we're using mean daily reward instead of return
     # Easy to work with for this scenario
     heuristic_fitness = kpis["mean_daily_reward"].mean()
-    log_to_wandb = {"heuristic/mean_return": heuristic_fitness.mean()}
+    log_to_wandb = {"heuristic/mean_daily_reward": heuristic_fitness.mean()}
     for k in cfg.environment.scalar_kpis_to_log:
         log_to_wandb.update({f"heuristic/{k}_mean": kpis[k].mean()})
     wandb.log(log_to_wandb)

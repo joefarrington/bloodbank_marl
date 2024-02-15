@@ -22,7 +22,7 @@ seed: 12
 
 obs_collection:
   seed: 12345
-  num_envs: 200
+  num_envs: 20
   samples_per_env: 700
   policy:
     _target_: bloodbank_marl.policies.replenishment.heuristic.SRepPolicyExplore
@@ -45,7 +45,11 @@ pretraining:
     clip_min: ${evaluation.replenishment_policy.clip_min}
   optimizer:
     _target_: optax.adam
-    learning_rate: 0.05
+    learning_rate:
+      _target_: optax.cosine_decay_schedule
+      init_value: 0.05
+      decay_steps: 1000
+      alpha: 0.05
   nn_model:
     _target_: bloodbank_marl.policies.models.flax_deterministic.RepMultiProductMLP
     n_hidden: ${evaluation.replenishment_policy.model_kwargs.n_hidden}
