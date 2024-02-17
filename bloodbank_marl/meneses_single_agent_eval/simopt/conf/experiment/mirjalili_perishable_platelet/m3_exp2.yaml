@@ -1,0 +1,39 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: heuristic_sS_day_of_week
+  - override /environment: mirjalili_perishable_platelet_gymnax
+  - _self_
+
+wandb:
+  init:
+    project: "m_gymnax_simopt"
+
+environment:
+  env_name: MirjaliliPerishablePlateletGymnax
+  num_env_steps: 365
+  num_warmup_days: 100
+  env_params:
+    shelf_life_at_arrival_distribution_c_1:
+      _target_: jax.numpy.array
+      object:  [0.4, 0.8]
+  env_kwargs:
+    max_useful_life: 3
+    max_order_quantity: 20
+  gamma: 0.95
+  types: []
+  scalar_kpis_to_log:
+    - service_level_%
+    - wastage_%
+    - mean_holding
+  vector_kpis_to_log:
+
+policies:
+  replenishment_policy_params:
+
+param_search:
+  num_rollouts: 4000
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 10000

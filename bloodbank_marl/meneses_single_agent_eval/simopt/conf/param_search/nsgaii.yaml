@@ -2,7 +2,7 @@ sampler:
   _target_: optuna.samplers.NSGAIISampler
   population_size: 50
 max_parallel_trials: 50
-max_iterations: 5
+max_iterations: 200
 num_rollouts: 100
 seed: 10
 search_bounds:

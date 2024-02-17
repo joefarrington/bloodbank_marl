@@ -1,0 +1,40 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_gymnax_two
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: heuristic_priority_match
+  - override /evosax/strategy: open_es
+
+wandb:
+  init:
+    project: "rs_two_quarter_demand_gymnax"
+
+environment:
+  env_kwargs:
+    max_order_quantities: 20
+  env_params:
+    poisson_demand_mean:
+      _target_: jax.numpy.array
+      object: [9.38, 9.33, 9.8, 9.45, 10.13, 6.8, 7.1]
+    age_on_arrival_distribution_probs: 
+      _target_: jax.numpy.array
+      object: [0.5, 0.2, 0.3]
+
+# Just some initial values to start with
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1] # RhD- pt
+        - [1,0] # RhD+ pt
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+
+
+
+
