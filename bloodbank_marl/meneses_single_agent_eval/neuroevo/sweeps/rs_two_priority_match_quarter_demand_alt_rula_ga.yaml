@@ -21,7 +21,7 @@ parameters:
       - 0.995
       - 0.99
   policies.replenishment.model_kwargs.n_hidden:
-    distribution: categorial
+    distribution: categorical
     values:
       - [64]
       - [64,64]
