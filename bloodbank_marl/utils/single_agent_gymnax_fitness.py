@@ -37,8 +37,9 @@ from bloodbank_marl.scenarios.rs_perishable.gymnax_env_one import (
     RSPerishableOneGymnax,
 )
 from bloodbank_marl.scenarios.rs_perishable.jax_env import RSPerishableEnv
-from bloodbank_marl.scenarios.mirjalili_perishable_platelet import (
-    MirjaliliPerishablePlateletEnv,
+from bloodbank_marl.scenarios.rs_perishable.jax_env_two import RSPerishableTwoEnv
+from bloodbank_marl.scenarios.mirjalili_perishable_platelet.gymnax_env import (
+    MirjaliliPerishablePlateletGymnax,
 )
 
 
@@ -61,6 +62,12 @@ def make(env_name, **env_kwargs):
         return (
             RSPerishableEnv(**env_kwargs),
             RSPerishableEnv().default_params,
+        )
+
+    elif env_name == "RSPerishableTwo":
+        return (
+            RSPerishableTwoEnv(**env_kwargs),
+            RSPerishableTwoEnv().default_params,
         )
 
     elif env_name == "RSPerishableGymnax":
@@ -94,18 +101,16 @@ def make(env_name, **env_kwargs):
             DeMoorPerishableMAJAX(**env_kwargs),
             DeMoorPerishableMAJAX().default_params,
         )
-    elif env_name == "MirjaliliPerishablePlatelet":
+    elif env_name == "MirjaliliPerishablePlateletGymnax":
         return (
-            MirjaliliPerishablePlateletEnv(**env_kwargs),
-            MirjaliliPerishablePlateletEnv().default_params,
+            MirjaliliPerishablePlateletGymnax(**env_kwargs),
+            MirjaliliPerishablePlateletGymnax().default_params,
         )
     else:
         raise ValueError(f"Unknown environment '{env_name}'")
 
 
 gymnax.make = make
-
-
 class GymnaxFitness(object):
     def __init__(
         self,
@@ -245,7 +250,7 @@ class GymnaxFitness(object):
             )
             new_cum_reward = cum_reward + (reward * valid_mask)
             new_cum_return = cum_return + (
-                reward * self.gamma ** jnp.clip((next_s.step - 1), a_min=0) * valid_mask
+                (reward * self.gamma ** jnp.clip((state.step), a_min=0)) * valid_mask
             )  #
             new_cum_info = {k: v + cum_info[k] for k, v in info.items()}
             new_valid_mask = valid_mask * (1 - done)

@@ -37,7 +37,8 @@ from bloodbank_marl.scenarios.rs_perishable.gymnax_env_one import (
     RSPerishableOneGymnax,
 )
 from bloodbank_marl.scenarios.rs_perishable.jax_env import RSPerishableEnv
-from bloodbank_marl.scenarios.mirjalili_perishable_platelet import (
+from bloodbank_marl.scenarios.rs_perishable.jax_env_two import RSPerishableTwoEnv
+from bloodbank_marl.scenarios.mirjalili_perishable_platelet.gymnax_env import (
     MirjaliliPerishablePlateletGymnax,
 )
 
@@ -61,6 +62,12 @@ def make(env_name, **env_kwargs):
         return (
             RSPerishableEnv(**env_kwargs),
             RSPerishableEnv().default_params,
+        )
+
+    elif env_name == "RSPerishableTwo":
+        return (
+            RSPerishableTwoEnv(**env_kwargs),
+            RSPerishableTwoEnv().default_params,
         )
 
     elif env_name == "RSPerishableGymnax":
@@ -94,7 +101,7 @@ def make(env_name, **env_kwargs):
             DeMoorPerishableMAJAX(**env_kwargs),
             DeMoorPerishableMAJAX().default_params,
         )
-    elif env_name == "MirjaliliPerishablePlatelet":
+    elif env_name == "MirjaliliPerishablePlateletGymnax":
         return (
             MirjaliliPerishablePlateletGymnax(**env_kwargs),
             MirjaliliPerishablePlateletGymnax().default_params,
