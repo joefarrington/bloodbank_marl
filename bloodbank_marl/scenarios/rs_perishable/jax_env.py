@@ -744,7 +744,7 @@ class RSPerishableEnv(MarlEnvironment):
 
         # Age stock
         stock = jnp.roll(stock, axis=1, shift=1)
-        stock = stock.at[:n_products, 0].set(0)
+        stock = stock.at[:self.n_products, 0].set(0)
 
         # Calculate holding cost
         holding = stock.sum(axis=-1)
@@ -868,7 +868,7 @@ class RSPerishableEnv(MarlEnvironment):
         )
         shortage_cost = jnp.dot(
             -params.shortage_costs,
-            jnp.zeros(n_products).at[state.request_type].set(shortage),
+            jnp.zeros(self.n_products).at[state.request_type].set(shortage),
         )
         cumulative_rewards = cumulative_rewards + shortage_cost
 
