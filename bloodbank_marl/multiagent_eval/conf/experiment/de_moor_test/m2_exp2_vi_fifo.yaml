@@ -1,0 +1,18 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: oufo
+  - override /policies/replenishment: value_iteration
+
+policies:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  replenishment:
+    fixed_policy_params:
+      _target_: bloodbank_marl.utils.load_save_policy_params.load_vi_policy_params
+      filepath: "/home/joefarrington/CDT/bloodbank_marl/draft_notebooks/vi_cpts/de_moor_m2_exp2.npy"
+      reshape_for_fitness: False
+  load_replenishment_policy_params:
+    _target_: bloodbank_marl.utils.load_save_policy_params.load_none
+  load_issuing_policy_params:
+    _target_: bloodbank_marl.utils.load_save_policy_params.load_none
