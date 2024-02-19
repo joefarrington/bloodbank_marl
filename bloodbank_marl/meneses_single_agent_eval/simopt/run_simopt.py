@@ -19,6 +19,7 @@ import wandb
 from bloodbank_marl.utils.single_agent_gymnax_fitness import GymnaxFitness
 from bloodbank_marl.utils.gymnax_fitness import make
 import omegaconf
+from pathlib import Path
 
 # Enable logging
 log = logging.getLogger(__name__)
@@ -304,6 +305,9 @@ def main(cfg: DictConfig) -> None:
             kpis["all_allocations"].mean(axis=(0, 1)), columns=types, index=types
         )
         wandb.log({"eval/all_allocations": wandb.Table(dataframe=df)})
+
+    # Save the params for loading into other scripts
+    jnp.save(Path(wandb.run.dir) / "best_params.npy", best_params)
 
     # Log aggregate metrics to W&B, plus return
     for m in overall_metrics:

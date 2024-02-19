@@ -180,7 +180,7 @@ def main(cfg):
         # TODO Do we want to split out eval, or should eval always be on the same set of rollouts?
         # We might want two set of eval, one for early stopping and one for final eval
         # If we're comparing this and simopt we want to be consistent
-        rng, rng_init, rng_ask, rng_train, rng_eval = jax.random.split(rng, 5)
+        rng, rng_init, rng_ask, rng_train = jax.random.split(rng, 4)
         x, state = strategy.ask(rng_ask, state)
         reshaped_params = param_reshaper.reshape(x)
         fitness, cum_infos, kpis = train_evaluator.rollout(rng_train, reshaped_params)

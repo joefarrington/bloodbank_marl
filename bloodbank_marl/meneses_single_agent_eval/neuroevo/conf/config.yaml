@@ -58,7 +58,7 @@ train_evaluator:
   gamma: ${environment.gamma}
 
 evaluation: 
-  seed: 456 
+  seed: 1337 
   test_evaluator:
     _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}

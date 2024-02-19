@@ -8,7 +8,7 @@ defaults:
 
 wandb:
   init:
-    project: "rs_two_quarter_demand_gymnax"
+    project: "rs_two_quarter_demand_gymnax_neuro"
 
 environment:
   env_kwargs:
