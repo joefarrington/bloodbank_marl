@@ -23,40 +23,43 @@ def main(cfg):
     )
 
     run = wandb.init(**wandb_config["wandb"]["init"], config=wandb_config)
-    # TODO Avoid having to hardcode the product types here
-
     rep_policy = hydra.utils.instantiate(cfg.policies.replenishment)
     # TODO: Better way of inputting policy parameters
-    types = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
-    rpp = hydra.utils.instantiate(cfg.policies.replenishment_policy_params)
-    rep_policy_params = jnp.array([rpp[f"S_{t}"] for t in types]).reshape(-1, 1)
+    types = cfg.environment.types
+    policy_params = hydra.utils.call(cfg.policies.load_replenishment_policy_params)
 
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
     test_evaluator.set_apply_fn(rep_policy.apply)
-    policy_params = jnp.array([rep_policy_params])
+    # policy_params = jnp.array([rep_policy_params])
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
     log.info(
         f"Running {cfg.evaluation.test_evaluator.num_rollouts} evaluation rollouts."
     )
     fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, policy_params)
 
-    # TODO Avoid having to hardcode the different metrics here
     group_metrics = cfg.environment.vector_kpis_to_log
     overall_metrics = cfg.environment.scalar_kpis_to_log
 
     # Create a dataframe of KPIs by type and log to W&B as a table
-    df = pd.DataFrame()
-    for m in group_metrics:
-        df = pd.concat(
-            [df, pd.DataFrame(kpis[m].mean(axis=(0, 1)).reshape(1, -1))], axis=0
+    if group_metrics is not None:
+        df = pd.DataFrame()
+        for m in group_metrics:
+            df = pd.concat(
+                [df, pd.DataFrame(kpis[m].mean(axis=(0, 1)).reshape(1, -1))], axis=0
+            )
+            df = pd.concat(
+                [df, pd.DataFrame(kpis[m].std(axis=(0, 1)).reshape(1, -1))], axis=0
+            )
+        df.columns = types
+        row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
+        df.insert(loc=0, column="metric", value=row_labels)
+        wandb.log({"eval/group_metrics": wandb.Table(dataframe=df)})
+
+    if "all_allocations" in kpis:
+        df = pd.DataFrame(
+            kpis["all_allocations"].mean(axis=(0, 1)), columns=types, index=types
         )
-        df = pd.concat(
-            [df, pd.DataFrame(kpis[m].std(axis=(0, 1)).reshape(1, -1))], axis=0
-        )
-    df.columns = types
-    row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
-    df.insert(loc=0, column="metric", value=row_labels)
-    wandb.log({"eval/group_metrics": wandb.Table(dataframe=df)})
+        wandb.log({"eval/all_allocations": wandb.Table(dataframe=df)})
 
     # Log aggregate metrics to W&B, plus return
     for m in overall_metrics:

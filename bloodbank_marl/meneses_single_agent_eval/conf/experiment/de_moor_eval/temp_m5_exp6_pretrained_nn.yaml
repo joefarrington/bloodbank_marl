@@ -1,0 +1,29 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: single_product_mlp
+  - override /environment: de_moor_perishable_gymnax
+
+wandb:
+  init:
+    project: "text_eval_de_moor_gymnax_neuro_m5_exp6_pretrained"
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 2
+
+policies:
+  load_replenishment_policy_params:
+    _target_: bloodbank_marl.utils.load_save_policy_params.load_flax_policy_params
+    param_key: "trained_params"
+    checkpoint_id: 0
+    checkpoint_manager:
+      _target_: orbax.checkpoint.CheckpointManager
+      directory: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rep_cpts_m5_L2
+      checkpointers:
+        _target_: orbax.checkpoint.PyTreeCheckpointer
+      options:
+        _target_: orbax.checkpoint.CheckpointManagerOptions
+        max_to_keep: 1
+        create: True
