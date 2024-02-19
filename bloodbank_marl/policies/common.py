@@ -145,7 +145,7 @@ class FlaxStochasticPolicy(FlaxPolicy):
         tr_action = self._sample_action(pi, rng)
         log_prob = self._get_log_prob(pi, tr_action)
         action = self._postprocess_action(obs, tr_action)
-        return action, tr_action, log_prob, value
+        return action.astype(jnp.int32), tr_action.astype(jnp.float32), log_prob, value
 
     def apply_deterministic(self, policy_params, obs, rng):
         # Get the most likely action
@@ -205,7 +205,7 @@ class FlaxStochasticMAPolicy(FlaxStochasticPolicy):
         tr_action = self._sample_action(pi, rng)
         log_prob = self._get_log_prob(pi, tr_action)
         action = self._postprocess_action(obs, tr_action)
-        return action, tr_action, log_prob, value
+        return action.astype(jnp.int32), tr_action.astype(jnp.float32), log_prob, value
 
     def apply_deterministic(self, policy_params, obs, rng):
         # Get the most likely action

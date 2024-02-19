@@ -341,5 +341,5 @@ class DeMoorPerishableGymnax(environment.Environment):
         _, state_reset = self.reset(key, params)
         # We want to keep the stock on hand and in transit, but reset everything else
         return state_reset.replace(
-            stock=state.stock, in_transit=state.in_transit, step=1
+            stock=state.stock, in_transit=state.in_transit, step=0
         )
