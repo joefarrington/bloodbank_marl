@@ -61,3 +61,44 @@ class PriorityMatchIssuingPolicy(HeuristicPolicy):
 
     def _postprocess_action(self, obs, tr_action):
         return tr_action.astype(jnp.int32)
+
+
+class OldestCompatibleUnitIssuingPolicy(HeuristicPolicy):
+    # Issue the oldest compatible unit; if there are multiple compatible units with the same age, issue the one with the highest priority
+    # Policy parameters are the priorities for each request type
+    def _apply(self, policy_params, obs, rng):
+        # 0 if there are units about the expire, 1 if units has 1 day of remaining useful life etc; inf if no units in stock
+        age_priority = jnp.where(
+            obs.stock.sum(axis=-1) > 0,
+            jnp.flip(obs.stock, axis=-1).argmax(axis=-1),
+            jnp.inf,
+        )
+        # Compatibility priority for the requested type
+        compatibility_priority = jax.lax.dynamic_index_in_dim(
+            policy_params, obs.request_type, 0
+        )
+        # Array of the age prioritity in order of compatibility priority, so first element is age priority of most compatible unit
+        age_priority_in_compatibility_order = jnp.where(
+            compatibility_priority >= 0, age_priority[compatibility_priority], jnp.inf
+        )
+        min_compatible_age_priority = jnp.min(age_priority_in_compatibility_order)
+
+        tr_action = jnp.zeros_like(obs.stock.sum(axis=-1), dtype=jnp.float32)
+        # If there are compatible units in stock, select the most compatible unit with the highest age priority
+        tr_action = jax.lax.select(
+            min_compatible_age_priority < jnp.inf,
+            tr_action.at[
+                compatibility_priority[
+                    0,
+                    (
+                        age_priority_in_compatibility_order
+                        == min_compatible_age_priority
+                    ).argmax(),
+                ]
+            ].set(1.0),
+            tr_action,
+        )
+        return tr_action
+
+    def _postprocess_action(self, obs, tr_action):
+        return tr_action.astype(jnp.int32)
