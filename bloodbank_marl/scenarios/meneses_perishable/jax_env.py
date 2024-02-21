@@ -52,8 +52,9 @@ class EnvParams:
     # then it is the wost and so should be 7/8)
     substitution_costs: chex.Array
     action_mask_per_request_type: chex.Array
-    max_expiry_target: float
-    min_service_level_target: float
+    max_expiry_pc_target: float
+    min_service_pc_level_target: float
+    min_exact_match_pc_level_target: float
     target_kpi_breach_penalty: float
     max_days_in_episode: int
     max_steps_in_episode: int
