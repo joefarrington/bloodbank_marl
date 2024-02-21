@@ -110,7 +110,7 @@ def get_obs_de_moor_perishable(cfg):
     env_params = cfg.environment.env_params
     stock_limit = cfg.pretraining.stock_limit
     env, default_env_params = make("DeMoorPerishableGymnax", **env_kwargs)
-    env_params = default_env_params.replace(**env_params)
+    env_params = default_env_params.create_env_params(**env_params)
     max_order_quantity = env.max_order_quantity
     lead_time = env.lead_time
     max_useful_life = env.max_useful_life
@@ -184,7 +184,7 @@ def get_obs_rs_multiproduct(cfg):
     )
 
     env, default_env_params = make(cfg.environment.env_name, **resolved_env_kwargs_cfg)
-    env_params = default_env_params.replace(**cfg.environment.env_params)
+    env_params = default_env_params.create_env_params(**cfg.environment.env_params)
 
     policy_params = hydra.utils.instantiate(cfg.heuristic.params).reshape(
         1, -1, 1

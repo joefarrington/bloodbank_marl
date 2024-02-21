@@ -53,7 +53,7 @@ class RolloutManager(object):
 
         # Define the RL environment & replace default parameters if desired
         self.env, self.env_params = make(env_name, **env_kwargs)
-        self.env_params = self.env_params.replace(**env_params)
+        self.env_params = self.env_params.create_env_params(**env_params)
 
         self.num_warmup_days = num_warmup_days
         self.max_warmup_steps = max_warmup_steps

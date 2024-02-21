@@ -17,7 +17,7 @@ class SRepPolicy(HeuristicPolicy):
         self.env_name = env_name
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
-        self.env_params = default_env_params.replace(**env_params)
+        self.env_params = default_env_params.create_env_params(**env_params)
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
 
         # Set up parameters
@@ -128,7 +128,7 @@ class SRepPolicyExplore(SRepPolicy):
         self.env_name = env_name
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
-        self.env_params = default_env_params.replace(**env_params)
+        self.env_params = default_env_params.create_env_params(**env_params)
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
 
         # Set up parameters

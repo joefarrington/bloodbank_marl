@@ -30,7 +30,7 @@ class FlaxMultiProductRepPolicy(FlaxMAPolicy):
         self.env_name = env_name
         self.env_kwargs = env_kwargs
         env, default_env_params = make(self.env_name, **self.env_kwargs)
-        self.env_params = default_env_params.replace(**env_params)
+        self.env_params = default_env_params.create_env_params(**env_params)
         self.policy_id = policy_id
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
         self.model = model_class(
