@@ -155,7 +155,7 @@ def main(cfg):
     train_evaluator = hydra.utils.instantiate(cfg.train_evaluator)
     train_evaluator.set_apply_fn(policy_manager.apply)
 
-    test_evaluator = hydra.utils.instantiate(cfg.test_evaluator)
+    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
     test_evaluator.set_apply_fn(policy_manager.apply)
 
     # Checkpointing for NN policies
@@ -186,13 +186,14 @@ def main(cfg):
         cfg.evosax.logging, num_dims=param_reshaper.total_params
     )
     log = es_logging.initialize()
+    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
     # Start by rolling out the pretrained policy
     if (
         cfg.policies.pretrained.replenishment.enable
         or cfg.policies.pretrained.issuing.enable
     ):
-        rng, rng_init, rng_ask, rng_train, rng_eval = jax.random.split(rng, 5)
+
         log_to_wandb = {}
         fitness, cum_infos, kpis = test_evaluator.rollout(
             rng_eval,
@@ -217,7 +218,7 @@ def main(cfg):
         wandb.log(log_to_wandb)
 
     for gen in range(cfg.evosax.num_generations):
-        rng, rng_init, rng_ask, rng_train, rng_eval = jax.random.split(rng, 5)
+        rng, rng_init, rng_ask, rng_train = jax.random.split(rng, 4)
         x, state = strategy.ask(rng_ask, state)
         reshaped_params = param_reshaper.reshape(x)
         fitness = train_evaluator.rollout(rng_train, reshaped_params)[0].mean(axis=-1)
