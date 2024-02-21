@@ -65,7 +65,9 @@ product_probabilities = [0.45, 0.40, 0.11, 0.04]  # O  # A  # B  # AB
 class EnvParams:
     poisson_demand_mean: chex.Array
     product_probabilities: chex.Array  # NOTE: For now, assume same for all days of week
-    age_on_arrival_distribution_probs: chex.Array  # NOTE: For now, assume same for all days of week
+    age_on_arrival_distribution_probs: (
+        chex.Array
+    )  # NOTE: For now, assume same for all days of week
     fixed_order_cost: float
     variable_order_costs: chex.Array
     shortage_costs: chex.Array

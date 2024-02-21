@@ -323,8 +323,24 @@ class EnvObs:
         batch_dims = self.in_transit.shape[:-2]
         return jnp.hstack(
             [
-                self.time.reshape(batch_dims + (1,)),
+                self.time.reshape(batch_dims + (1,))
+                - jnp.floor(
+                    self.time.reshape(batch_dims + (1,))
+                ),  # We just want to decimal part
                 self.request_type.reshape(batch_dims + (1,)),
+                self.weekday.reshape(batch_dims + (1,)),
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
+            ]
+        )
+
+    # Get an observation consistent with the Gymnax single agent env for replenishment
+    # The replenishment policy does not need the time or the request type
+    def rep_obs(self):
+        batch_dims = self.in_transit.shape[:-2]
+        return jnp.hstack(
+            [
+                self.weekday.reshape(batch_dims + (1,)),
                 self.in_transit.reshape(batch_dims + (-1,)),
                 self.stock.reshape(batch_dims + (-1,)),
             ]
@@ -744,7 +760,7 @@ class RSPerishableEnv(MarlEnvironment):
 
         # Age stock
         stock = jnp.roll(stock, axis=1, shift=1)
-        stock = stock.at[:self.n_products, 0].set(0)
+        stock = stock.at[: self.n_products, 0].set(0)
 
         # Calculate holding cost
         holding = stock.sum(axis=-1)
