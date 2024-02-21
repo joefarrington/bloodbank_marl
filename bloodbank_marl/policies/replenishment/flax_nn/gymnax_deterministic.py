@@ -79,3 +79,34 @@ class FlaxMultiProductOrderUpToRepPolicy(FlaxMultiProductRepPolicy):
             a_min=0,
             a_max=None,
         )
+
+
+class FlaxMultiProductCategoricalRepPolicy(FlaxPolicy):
+    def __init__(
+        self,
+        model_class,
+        model_kwargs,
+        env_name,
+        env_kwargs={},
+        env_params={},
+    ):
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        env, default_env_params = make(self.env_name, **self.env_kwargs)
+        self.env_params = default_env_params.replace(**env_params)
+        self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
+        # TODO: Note that this always takes the highest max order quantity
+        # for now - could modify with some clipping etc if needed
+        self.model = model_class(n_actions=env.num_actions, **model_kwargs)
+
+
+class FlaxMultiProductOrderUpToCategoricalRepPolicy(
+    FlaxMultiProductCategoricalRepPolicy
+):
+    def _postprocess_action(self, obs, tr_action):
+        S = super()._postprocess_action(obs, tr_action)
+        return jnp.clip(
+            S - obs.stock.sum(axis=-1) - obs.in_transit.sum(axis=-1),
+            a_min=0,
+            a_max=None,
+        )

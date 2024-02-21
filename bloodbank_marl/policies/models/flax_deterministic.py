@@ -80,6 +80,26 @@ class RepMultiProductMLP(nn.Module):
         return x
 
 
+class RepMultiProductCategoricalMLP(nn.Module):
+    n_hidden: Union[int, list]
+    max_order_quantity: int
+    n_actions: int
+    action_pad: int = 0
+    preprocess_observation: callable = lambda obs: obs.obs
+
+    @nn.compact
+    def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
+        x = self.preprocess_observation(obs)
+        n_hidden = [self.n_hidden] if isinstance(self.n_hidden, int) else self.n_hidden
+        for h in n_hidden:
+            x = nn.Dense(h)(x)
+            x = nn.relu(x)
+        x = nn.Dense(self.n_actions * self.max_order_quantity)(x)
+        x = x.reshape(x.shape[:-1] + (self.n_actions, self.max_order_quantity))
+        x = jnp.argmax(x, axis=-1)
+        return x.astype(jnp.float32)
+
+
 class IssueDiscreteMLP(nn.Module):
     n_hidden: Union[int, list]
     n_actions: int
