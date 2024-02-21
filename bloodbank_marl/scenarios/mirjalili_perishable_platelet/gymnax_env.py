@@ -154,6 +154,7 @@ class MirjaliliPerishablePlateletGymnax(environment.Environment):
         )
         # Calculate this to report in info - units accepted for delivery
         new_stock_accepted = opening_stock_after_delivery - jnp.hstack([0, state.stock])
+        
 
         # Generate demand
         n = jax.lax.dynamic_slice(
@@ -213,6 +214,7 @@ class MirjaliliPerishablePlateletGymnax(environment.Environment):
                 "day_counter": 1,
                 "max_stock_received": max_stock_received,
                 "new_stock_accepted": new_stock_accepted,
+                "order": action,
                 "demand": demand,
                 "shortage": shortage,
                 "holding": holding,
@@ -365,8 +367,9 @@ class MirjaliliPerishablePlateletGymnax(environment.Environment):
             "discount": 0.0,
             "cumulative_gamma": 1.0,
             "day_counter": 0,
-            "max_stock_received": 0,
-            "new_stock_accepted": 0,
+            "max_stock_received": jnp.zeros(self.max_useful_life, dtype=jnp_int),
+            "new_stock_accepted": jnp.zeros(self.max_useful_life, dtype=jnp_int),
+            "order": 0,
             "demand": 0,
             "shortage": 0,
             "expiries": 0,
@@ -400,7 +403,7 @@ class MirjaliliPerishablePlateletGymnax(environment.Environment):
     ):
         """Run at end of warmup period to partially reset State"""
         _, state_reset = self.reset(key, params)
-        # We want to keep the stock on hand and in transit, but reset everything else
+        # We want to keep the stock on hand, but reset everything else
         return state_reset.replace(
-            stock=state.stock, in_transit=state.in_transit, step=1
+            stock=state.stock, step=0
         )
