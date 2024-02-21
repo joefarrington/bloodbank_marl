@@ -63,7 +63,7 @@ class PriorityMatchIssuingPolicy(HeuristicPolicy):
         return tr_action.astype(jnp.int32)
 
 
-class OldestCompatibleUnitIssuingPolicy(HeuristicPolicy):
+class OldestCompatibleIssuingPolicy(HeuristicPolicy):
     # Issue the oldest compatible unit; if there are multiple compatible units with the same age, issue the one with the highest priority
     # Policy parameters are the priorities for each request type
     def _apply(self, policy_params, obs, rng):
