@@ -17,7 +17,7 @@ training:
   seed: 123
   lr: 2.5e-4
   num_steps: ${issuing.num_steps}
-  total_timesteps: 1e5
+  total_timesteps: 1e6
   update_epochs: 3
   num_minibatches: 10
   gamma: 0.9
