@@ -336,11 +336,39 @@ class EnvObs:
 
     # Get an observation consistent with the Gymnax single agent env for replenishment
     # The replenishment policy does not need the time or the request type
+    @property
     def rep_obs(self):
         batch_dims = self.in_transit.shape[:-2]
         return jnp.hstack(
             [
                 self.weekday.reshape(batch_dims + (1,)),
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
+            ]
+        )
+
+    @property
+    def obs_with_one_hot_day_of_week(self):
+        batch_dims = self.in_transit.shape[:-2]
+        return jnp.hstack(
+            [
+                self.time.reshape(batch_dims + (1,))
+                - jnp.floor(
+                    self.time.reshape(batch_dims + (1,))
+                ),  # We just want to decimal part
+                self.request_type.reshape(batch_dims + (1,)),
+                self.one_hot_day_of_week().reshape(batch_dims + (-1,)),
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
+            ]
+        )
+
+    @property
+    def rep_obs_with_one_hot_day_of_week(self):
+        batch_dims = self.in_transit.shape[:-2]
+        return jnp.hstack(
+            [
+                self.one_hot_day_of_week().reshape(batch_dims + (-1,)),
                 self.in_transit.reshape(batch_dims + (-1,)),
                 self.stock.reshape(batch_dims + (-1,)),
             ]

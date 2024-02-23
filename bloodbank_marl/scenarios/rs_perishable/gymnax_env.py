@@ -107,7 +107,9 @@ class EnvState:
 class EnvParams:
     poisson_demand_mean: chex.Array
     product_probabilities: chex.Array  # NOTE: For now, assume same for all days of week
-    age_on_arrival_distribution_probs: chex.Array  # NOTE: For now, assume same for all days of week
+    age_on_arrival_distribution_probs: (
+        chex.Array
+    )  # NOTE: For now, assume same for all days of week
     fixed_order_cost: float
     variable_order_costs: chex.Array
     shortage_costs: chex.Array
@@ -189,6 +191,17 @@ class EnvObs:
         return jnp.hstack(
             [
                 self.weekday.reshape(batch_dims + (1,)),
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
+            ]
+        )
+
+    @property
+    def obs_with_one_hot_day_of_week(self):
+        batch_dims = self.in_transit.shape[:-2]
+        return jnp.hstack(
+            [
+                self.one_hot_day_of_week().reshape(batch_dims + (-1,)),
                 self.in_transit.reshape(batch_dims + (-1,)),
                 self.stock.reshape(batch_dims + (-1,)),
             ]
