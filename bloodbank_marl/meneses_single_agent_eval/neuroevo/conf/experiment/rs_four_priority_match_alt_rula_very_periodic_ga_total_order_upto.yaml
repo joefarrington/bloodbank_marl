@@ -1,8 +1,8 @@
 # @package _global_
 
 defaults:
-  - override /environment: rs_gymnax
-  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /environment: rs_gymnax_four
+  - override /policies/replenishment: multi_product_total_order_up_to_mlp
   - override /policies/issuing: heuristic_priority_match
   - override /evosax/strategy: simple_ga
 
@@ -12,7 +12,7 @@ wandb:
 
 environment:
   env_kwargs:
-    max_order_quantities: 20
+    max_order_quantities: 10
   env_params:
     age_on_arrival_distribution_probs: [0.5, 0.2, 0.3]
     poisson_demand_mean: [9, 2, 10, 3, 11, 2, 2]
@@ -42,5 +42,5 @@ policies:
       n_hidden: [64]
       preprocess_observation:
         _target_: hydra.utils.get_method
-        path: bloodbank_marl.policies.models.utils.one_hot_day_of_week
+        path: bloodbank_marl.policies.models.utils.total_stock_on_hand_and_in_transit_by_product_one_hot_day_of_week
 

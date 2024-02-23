@@ -1,10 +1,10 @@
 # @package _global_
 
 defaults:
-  - override /environment: rs_gymnax
+  - override /environment: rs_gymnax_four
   - override /policies/replenishment: multi_product_order_up_to_mlp
   - override /policies/issuing: heuristic_priority_match
-  - override /evosax/strategy: simple_ga
+  - override /evosax/strategy: open_es
 
 wandb:
   init:
@@ -12,7 +12,7 @@ wandb:
 
 environment:
   env_kwargs:
-    max_order_quantities: 20
+    max_order_quantities: 10
   env_params:
     age_on_arrival_distribution_probs: [0.5, 0.2, 0.3]
     poisson_demand_mean: [9, 2, 10, 3, 11, 2, 2]
