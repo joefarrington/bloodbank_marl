@@ -1,0 +1,51 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: priority_match
+  - override /environment: rs_perishable_two
+
+wandb:
+  init:
+    project: "text_eval_rs_simopt"
+
+environment:
+  env_kwargs:
+    max_order_quantities: [20,20]
+  env_params:
+    poisson_demand_mean:
+      _target_: jax.numpy.array
+      object: [9.38, 9.33, 9.8, 9.45, 10.13, 6.8, 7.1]
+    age_on_arrival_distribution_probs: 
+      _target_: jax.numpy.array
+      object: [0.5, 0.2, 0.3]
+
+policies:
+  replenishment:
+    model_kwargs:
+      preprocess_observation: 
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.rep_obs
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  load_replenishment_policy_params:
+    _target_: bloodbank_marl.utils.load_save_policy_params.load_flax_policy_params
+    param_key: best_params
+    checkpoint_id: 99
+    checkpoint_manager:
+      _target_: orbax.checkpoint.CheckpointManager
+      directory: "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/meneses_single_agent_eval/neuroevo/outputs/2024-02-23/14-41-50/wandb/latest-run/files"
+      options:
+        _target_: orbax.checkpoint.CheckpointManagerOptions
+        max_to_keep: 1
+        create: True
+      checkpointers:
+        _target_ : orbax.checkpoint.PyTreeCheckpointer
+  load_issuing_policy_params:
+    _target_: bloodbank_marl.utils.load_save_policy_params.load_none
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1] # RhD- pt
+        - [1,0] # RhD+ pt
