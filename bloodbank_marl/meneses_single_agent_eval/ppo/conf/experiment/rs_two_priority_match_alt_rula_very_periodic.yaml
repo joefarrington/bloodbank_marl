@@ -1,0 +1,42 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_gymnax_two
+  - override /policies/replenishment: multi_product_stochastic_total_order_up_to_mlp
+  - override /policies/issuing: heuristic_priority_match
+
+wandb:
+  init:
+    project: "rs_two_gymnax_ppo_priotity_match_alt_rula_very_periodic"
+
+environment:
+  env_kwargs:
+    max_order_quantities: 15
+  env_params:
+    age_on_arrival_distribution_probs: [0.5, 0.2, 0.3]
+    poisson_demand_mean: [9, 2, 10, 3, 11, 2, 2]
+
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1] # RhD- pt
+        - [1,0] # RhD+ pt
+
+fixed_config:
+  total_timesteps: 1e7
+  anneal_lr: False
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 500
+
+hp_config:
+  clip_eps: 0.086
+  ent_coef: 0.001
+  gae_lambda: 0.984
+  gamma: 0.72
+  lr: 0.001
+  max_grad_norm: 1
+  vf_coef: 1

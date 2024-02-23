@@ -1,0 +1,11 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: single_product_mlp
+  - override /policies/issuing: heuristic_exact_match
+  - override /environment: rs_gymnax_one
+  - override /evosax/strategy: simple_ga
+
+wandb:
+  init:
+    project: "rs_one_gymnax_neuro"

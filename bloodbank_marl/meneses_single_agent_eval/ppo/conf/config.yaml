@@ -25,7 +25,7 @@ training:
 fixed_config:
   num_envs: 200
   num_steps: 20
-  total_timesteps: 1e7
+  total_timesteps: 1e6
   update_epochs: 4
   num_minibatches: 20
   anneal_lr: True

@@ -1,0 +1,51 @@
+program: ../run_evosax.py
+method: bayes
+metric:
+  name: eval/mean_params/return_mean
+  goal: maximize
+parameters:
+  evosax.strategy.sigma_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  evosax.strategy.elite_ratio:
+    distribution: q_uniform
+    min: 0.05
+    max: 0.6
+    q: 0.05
+  evosax.popsize:
+    distribution: q_uniform
+    min: 50
+    max: 500
+    q: 50
+  evosax.num_train_rollouts:
+    distribution: q_uniform
+    min: 50
+    max: 200
+    q: 50
+  evosax.strategy.sigma_decay:
+    distribution: categorical
+    values:
+      - 1.0
+      - 0.999
+      - 0.995
+      - 0.99
+      - 0.98
+  policies.replenishment.model_kwargs.n_hidden:
+    distribution: categorical
+    values:
+      - [64]
+      - [64,64]
+      - [128]
+      - [128,128]
+      - [256]
+      - [256,256]
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=rs_priority_match_total_order_up_to_alt_rula_very_periodic_ga
+
+  

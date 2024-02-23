@@ -1,0 +1,39 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_gymnax_two
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: heuristic_priority_match
+  - override /evosax/strategy: open_es
+
+wandb:
+  init:
+    project: "rs_two_multiproduct_gymnax_neuro_very_periodic"
+
+environment:
+  env_kwargs:
+    max_order_quantities: 20
+  env_params:
+    age_on_arrival_distribution_probs: [0.5, 0.2, 0.3]
+    poisson_demand_mean: [9, 2, 10, 3, 11, 2, 2]
+
+# Just some initial values to start with
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1] # RhD- pt
+        - [1,0] # RhD+ pt
+  replenishment:
+    model_kwargs:
+      n_hidden: [64,64]
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+
+
+
+

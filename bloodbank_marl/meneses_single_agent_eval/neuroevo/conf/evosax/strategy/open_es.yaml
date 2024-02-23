@@ -9,9 +9,9 @@ lrate_limit:
   _target_: operator.mul
   _args_:
     - ${evosax.strategy.lrate_init}
-    - 0.01
+    - 0.0001
 sigma_limit:
   _target_: operator.mul
   _args_:
     - ${evosax.strategy.sigma_init}
-    - 0.01
+    - 0.0001

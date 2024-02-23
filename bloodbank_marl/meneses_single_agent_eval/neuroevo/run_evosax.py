@@ -257,10 +257,13 @@ def main(cfg):
         plot_policy(policy_rep, policy_params_mean, "mean_params")
         plot_policy(policy_rep, policy_params_top_1, "top_1")
 
+    params_to_save = jnp.stack([best_params, mean_params], axis=0)
+    reshaped_params_to_save = test_param_reshaper.reshape(params_to_save)
+
     ckpt = {
         "state": state,
-        "best_params": param_reshaper.reshape(best_params.reshape(1, -1)),
-        "mean_params": param_reshaper.reshape(mean_params.reshape(1, -1)),
+        "best_params": jax.tree_util.tree_map(lambda x: x[0], reshaped_params_to_save),
+        "mean_params": jax.tree_util.tree_map(lambda x: x[1], reshaped_params_to_save),
     }
     checkpoint_manager.save(gen, ckpt)
 
