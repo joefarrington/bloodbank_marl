@@ -64,6 +64,11 @@ class SRepPolicy(HeuristicPolicy):
             return ["O", "A", "B", "AB"]
         elif self.env_name in ["RSPerishableTwoGymnax", "RSPerishable"]:
             return ["RhD-", "RhD+"]
+        elif (
+            self.env_name == "SimpleTwoProductPerishableGymnax"
+            or "SimpleTwoProductPerishable"
+        ):
+            return ["A", "B"]  # Temporary names, NOT blood groups
         else:
             return []
 
@@ -73,9 +78,16 @@ class SRepPolicy(HeuristicPolicy):
             return de_moor_perishable_S_policy
         elif self.env_name == "MenesesPerishable" or "MenesesPerishableGymnax":
             return meneses_perishable_S_policy
-        elif (
-            self.env_name in ["RSPerishable", "RSPerishableTwo", "RSPerishableGymnax", "RSPerishableFourGymnax", "RSPerishableTwoGymnax", "RSPerishableOneGymnax"]
-        ):
+        elif self.env_name in [
+            "RSPerishable",
+            "RSPerishableTwo",
+            "RSPerishableGymnax",
+            "RSPerishableFourGymnax",
+            "RSPerishableTwoGymnax",
+            "RSPerishableOneGymnax",
+            "SimpleTwoProductPerishableGymnax",
+            "SimpleTwoProductPerishable",
+        ]:
             return rs_perishable_S_policy
         else:
             raise NotImplementedError(
@@ -181,9 +193,7 @@ class sSRepPolicy(SRepPolicy):
     def _get_param_row_names(self) -> List[str]:
         """Get the row names for the policy parameters - these are the names of the different levels of a
         given paramter, e.g. for different days of the week or different products"""
-        if self.env_name in [
-            "RSPerishableGymnax", "RSPerishable"
-        ]:
+        if self.env_name in ["RSPerishableGymnax", "RSPerishable"]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
         elif self.env_name == "RSPerishableFourGymnax":
             return ["O", "A", "B", "AB"]
@@ -237,7 +247,8 @@ class SDayOfWeekRepPolicy(SRepPolicy):
         """Get the row names for the policy parameters - these are the names of the different levels of a
         given paramter, e.g. for different days of the week or different products"""
         if self.env_name in [
-            "RSPerishable", "RSPerishableGymnax",
+            "RSPerishable",
+            "RSPerishableGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
         elif self.env_name == "RSPerishableFourGymnax":
@@ -317,7 +328,9 @@ def rs_perishable_sS_day_of_week_policy(policy_params, obs, rng):
         ).squeeze(),
         a_min=0,
     )
-    return jax.lax.select(jnp.all(policy_params[:, 0] < policy_params[:, 1]), order, jnp.zeros_like(order))
+    return jax.lax.select(
+        jnp.all(policy_params[:, 0] < policy_params[:, 1]), order, jnp.zeros_like(order)
+    )
 
 
 def mirjalili_perishable_sS_day_of_week_policy(policy_params, obs, rng):
@@ -330,4 +343,6 @@ def mirjalili_perishable_sS_day_of_week_policy(policy_params, obs, rng):
         ).squeeze(),
         a_min=0,
     )
-    return jax.lax.select(jnp.all(policy_params[:, 0] < policy_params[:, 1]), order, jnp.zeros_like(order))
+    return jax.lax.select(
+        jnp.all(policy_params[:, 0] < policy_params[:, 1]), order, jnp.zeros_like(order)
+    )

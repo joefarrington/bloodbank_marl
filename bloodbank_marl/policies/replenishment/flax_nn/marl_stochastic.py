@@ -27,8 +27,8 @@ class FlaxStochasticMultiProductRepPolicy(FlaxStochasticMAPolicy):
         env_name=None,
         env_kwargs={},
         env_params={},
-        clip_min=-1,
-        clip_max=1,
+        clip_min=-2,
+        clip_max=2,
         min_order_quantity=0,
     ):
         self.policy_id = policy_id

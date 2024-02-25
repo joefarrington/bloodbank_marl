@@ -23,8 +23,8 @@ class FlaxMultiProductRepPolicy(FlaxMAPolicy):
         env_name,
         env_kwargs={},
         env_params={},
-        clip_min=-1,
-        clip_max=1,
+        clip_min=-2,
+        clip_max=2,
         min_order_quantity=0,
     ):
         self.env_name = env_name
@@ -45,7 +45,7 @@ class FlaxMultiProductRepPolicy(FlaxMAPolicy):
             jnp.ones_like(self.max_order_quantities) * min_order_quantity
         )
 
-    def postprocess_action(self, obs, tr_action):
+    def _postprocess_action(self, obs, tr_action):
         clipped_outputs = jnp.clip(tr_action, a_min=self.clip_min, a_max=self.clip_max)
         action = (
             jnp.ceil(
