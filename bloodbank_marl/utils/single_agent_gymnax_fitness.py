@@ -41,7 +41,18 @@ from bloodbank_marl.scenarios.rs_perishable.jax_env_two import RSPerishableTwoEn
 from bloodbank_marl.scenarios.mirjalili_perishable_platelet.gymnax_env import (
     MirjaliliPerishablePlateletGymnax,
 )
-
+from bloodbank_marl.scenarios.simple_two_product.gymnax_env import (
+    SimpleTwoProductPerishableGymnax,
+)
+from bloodbank_marl.scenarios.simple_two_product.jax_env import (
+    SimpleTwoProductPerishableEnv,
+)
+from bloodbank_marl.scenarios.simple_two_product.jax_env_limit_demand import (
+    SimpleTwoProductPerishableLimitDemandEnv,
+)
+from bloodbank_marl.scenarios.simple_two_product.gymnax_env_limit_demand import (
+    SimpleTwoProductPerishableLimitDemandGymnax,
+)
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -106,11 +117,33 @@ def make(env_name, **env_kwargs):
             MirjaliliPerishablePlateletGymnax(**env_kwargs),
             MirjaliliPerishablePlateletGymnax().default_params,
         )
+    elif env_name == "SimpleTwoProductPerishableGymnax":
+        return (
+            SimpleTwoProductPerishableGymnax(**env_kwargs),
+            SimpleTwoProductPerishableGymnax().default_params,
+        )
+    elif env_name == "SimpleTwoProductPerishable":
+        return (
+            SimpleTwoProductPerishableEnv(**env_kwargs),
+            SimpleTwoProductPerishableEnv().default_params,
+        )
+    elif env_name == "SimpleTwoProductPerishableLimitDemand":
+        return (
+            SimpleTwoProductPerishableLimitDemandEnv(**env_kwargs),
+            SimpleTwoProductPerishableLimitDemandEnv().default_params,
+        )
+    elif env_name == "SimpleTwoProductPerishableLimitDemandGymnax":
+        return (
+            SimpleTwoProductPerishableLimitDemandGymnax(**env_kwargs),
+            SimpleTwoProductPerishableLimitDemandGymnax().default_params,
+        )
     else:
         raise ValueError(f"Unknown environment '{env_name}'")
 
 
 gymnax.make = make
+
+
 class GymnaxFitness(object):
     def __init__(
         self,

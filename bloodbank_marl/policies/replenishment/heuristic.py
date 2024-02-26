@@ -64,10 +64,12 @@ class SRepPolicy(HeuristicPolicy):
             return ["O", "A", "B", "AB"]
         elif self.env_name in ["RSPerishableTwoGymnax", "RSPerishable"]:
             return ["RhD-", "RhD+"]
-        elif (
-            self.env_name == "SimpleTwoProductPerishableGymnax"
-            or "SimpleTwoProductPerishable"
-        ):
+        elif self.env_name in [
+            "SimpleTwoProductPerishableGymnax",
+            "SimpleTwoProductPerishable",
+            "SimpleTwoProductPerishableLimitDemand",
+            "SimpleTwoProductPerishableLimitDemandGymnax",
+        ]:
             return ["A", "B"]  # Temporary names, NOT blood groups
         else:
             return []
@@ -87,6 +89,8 @@ class SRepPolicy(HeuristicPolicy):
             "RSPerishableOneGymnax",
             "SimpleTwoProductPerishableGymnax",
             "SimpleTwoProductPerishable",
+            "SimpleTwoProductPerishableLimitDemand",
+            "SimpleTwoProductPerishableLimitDemandGymnax",
         ]:
             return rs_perishable_S_policy
         else:
