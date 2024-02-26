@@ -1,0 +1,33 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: order_up_to
+  - override /policies/issuing: priority_match
+  - override /environment: simple_two_product_perishable
+
+wandb:
+  init:
+    project: "text_eval_simple2prod_simopt"
+
+policies:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  replenishment:
+    fixed_policy_params:
+      _target_: bloodbank_marl.utils.load_save_policy_params.load_heuristic_policy_params
+      filepath: "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/meneses_single_agent_eval/simopt/outputs/2024-02-25/12-13-01/wandb/run-20240225_121302-uvx7i7qb/files/best_params.npy"
+      reshape_for_fitness: False
+  load_replenishment_policy_params:
+    _target_: bloodbank_marl.utils.load_save_policy_params.load_none
+  load_issuing_policy_params:
+    _target_: bloodbank_marl.utils.load_save_policy_params.load_none
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1] # RhD- pt
+        - [1,0] # RhD+ pt
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 10000
