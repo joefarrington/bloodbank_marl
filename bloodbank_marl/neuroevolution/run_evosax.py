@@ -269,12 +269,26 @@ def main(cfg):
         plot_policies(policy_rep, policy_issue, policy_params_mean, "mean_params")
         plot_policies(policy_rep, policy_issue, policy_params_top_1, "top_1")
 
-    # NOTE: Training is quick so for now just checkpoint at the end and re-run if needed
-    ckpt = {
-        "state": state,
-        "best_params": param_reshaper.reshape(best_params.reshape(1, -1)),
-        "mean_params": param_reshaper.reshape(mean_params.reshape(1, -1)),
-    }
+    params_to_save = jnp.stack([best_params, mean_params], axis=0)
+    reshaped_params_to_save = test_param_reshaper.reshape(params_to_save)
+
+    ckpt = {"state": state, "all_params": reshaped_params_to_save}
+
+    if 0 in cfg.policies.optimize:
+        ckpt["rep_best_params"] = jax.tree_util.tree_map(
+            lambda x: x[0], reshaped_params_to_save[0]
+        )
+        ckpt["rep_mean_params"] = jax.tree_util.tree_map(
+            lambda x: x[1], reshaped_params_to_save[0]
+        )
+    if 1 in cfg.policies.optimize:
+        ckpt["issue_best_params"] = jax.tree_util.tree_map(
+            lambda x: x[0], reshaped_params_to_save[1]
+        )
+        ckpt["issue_mean_params"] = jax.tree_util.tree_map(
+            lambda x: x[1], reshaped_params_to_save[1]
+        )
+
     checkpoint_manager.save(gen, ckpt)
 
 
