@@ -1,0 +1,33 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: heuristic_order_up_to
+  - override /environment: simple_two_product_perishable_gymnax
+  - override /param_search: grid
+  - _self_
+
+wandb:
+  init:
+    project: "simple_two_prod_test_simopt"
+
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 
+
+environment:
+  env_kwargs:
+    max_useful_life: 3
+  env_params:
+    age_on_arrival_distribution_probs: [1, 0, 0]
+
+param_search:
+  num_rollouts: 4000
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 10000
+
