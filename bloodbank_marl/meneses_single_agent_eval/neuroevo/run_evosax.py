@@ -23,7 +23,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# TODO: Ideally we wouldn't hard code the blood groups in here.
 
 # Enable logging
 log = logging.getLogger(__name__)
@@ -200,7 +199,9 @@ def main(cfg):
             "train/top_1_return": es_log["log_top_1"][gen],
         }
 
-        if gen % cfg.evosax.evaluate_every_k_gens == 0:
+        if (gen % cfg.evosax.evaluate_every_k_gens == 0) or (
+            gen == cfg.evosax.num_generations - 1
+        ):
             x_test = jnp.stack([best_params, mean_params], axis=0)
             reshaped_test_params = test_param_reshaper.reshape(x_test)
 
