@@ -1,0 +1,69 @@
+defaults:
+  - policies/replenishment: single_product_order_up_to_mlp
+  - evosax/strategy: open_es
+  - environment: de_moor_perishable_gymnax
+  - _self_
+
+wandb:
+  init:
+    project: "demoor_gymnax_neuro"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.single_agent_replenishment.common_conf
+
+plot_policy: False
+
+evosax:
+  num_generations: 100
+  popsize: 150
+  num_train_rollouts: 150
+  num_test_rollouts: 10000
+  evaluate_every_k_gens: 10
+  seed: 10
+  fitness_shaper:
+    _target_: evosax.FitnessShaper
+    maximize: True
+
+  logging:
+    _target_: evosax.utils.ESLog
+    num_generations: ${evosax.num_generations}
+    top_k: 5
+    maximize: ${evosax.fitness_shaper.maximize}
+
+  checkpoint_options:
+    _target_: orbax.checkpoint.CheckpointManagerOptions
+    max_to_keep: 1
+    create: True
+
+policies:
+  pretrained:
+    enable: False
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${evosax.num_train_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  gamma: ${environment.gamma}
+
+evaluation: 
+  seed: 1337 
+  test_evaluator:
+    _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: ${evosax.num_test_rollouts}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}
