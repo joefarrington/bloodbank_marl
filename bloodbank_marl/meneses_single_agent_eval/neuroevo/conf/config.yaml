@@ -25,7 +25,6 @@ evosax:
   num_test_rollouts: 10000
   evaluate_every_k_gens: 10
   seed: 10
-  
   fitness_shaper:
     _target_: evosax.FitnessShaper
     maximize: True

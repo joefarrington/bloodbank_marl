@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /environment: simple_two_product_perishable_gymnax
+  - override /policies/issuing: heuristic_priority_match
+  - override /evosax/strategy: simple_ga
+
+wandb:
+  init:
+    project: "simple_two_product_test"
+
+environment:
+  env_kwargs:
+    max_useful_life: 3
+  env_params:
+    age_on_arrival_distribution_probs: [1, 0, 0]
+
+
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0]

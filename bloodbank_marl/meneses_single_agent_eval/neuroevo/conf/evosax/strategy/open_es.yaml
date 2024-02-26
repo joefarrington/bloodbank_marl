@@ -1,8 +1,8 @@
 _target_: bloodbank_marl.utils.evosax.strategies.open_es.OpenES
 popsize: ${evosax.popsize}
 opt_name: "adam"
-lrate_init: 0.08
-sigma_init: 0.08
+lrate_init: 0.05
+sigma_init: 0.03
 sigma_decay: 1.0
 lrate_decay: 1.0
 lrate_limit:

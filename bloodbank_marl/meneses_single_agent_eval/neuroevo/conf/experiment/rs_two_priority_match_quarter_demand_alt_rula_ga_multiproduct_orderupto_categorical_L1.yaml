@@ -2,7 +2,7 @@
 
 defaults:
   - override /environment: rs_gymnax_two
-  - override /policies/replenishment: multi_product_categorical_mlp
+  - override /policies/replenishment: multi_productorder_up_to_mlp
   - override /policies/issuing: heuristic_priority_match
   - override /evosax/strategy: simple_ga
 
@@ -31,7 +31,10 @@ policies:
         - [1,0] # RhD+ pt
   replenishment:
     model_kwargs:
-      n_hidden: [64,64]
+      n_hidden: [64]
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.one_hot_day_of_week
       # For now, specifying separately to avoid JIT issues
       max_order_quantity: 20
 

@@ -3,7 +3,7 @@ model_class:
   _target_: hydra.utils.get_class
   path: bloodbank_marl.policies.models.flax_stochastic.DiscreteActorCritic
 model_kwargs:
-  activation: "tanh"
+  n_hidden: 64
 env_name: ${environment.env_name}
 env_kwargs: ${environment.env_kwargs}
 env_params: ${environment.env_params}
