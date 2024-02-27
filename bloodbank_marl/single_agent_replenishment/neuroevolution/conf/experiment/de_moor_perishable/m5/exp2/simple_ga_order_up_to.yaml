@@ -1,8 +1,6 @@
 # @package _global_
 
 defaults:
-  - override /policies/replenishment: single_product_order_up_to_mlp
-  - override /environment: de_moor_perishable_gymnax
   - override /evosax/strategy: simple_ga
 
 wandb:

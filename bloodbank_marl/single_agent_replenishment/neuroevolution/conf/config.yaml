@@ -1,20 +1,23 @@
 defaults:
-  - policies/replenishment: single_product_order_up_to_mlp
+  - policies/replenishment: single_agent_single_product_order_up_to_mlp
   - evosax/strategy: open_es
   - environment: de_moor_perishable_gymnax
   - _self_
 
+plot_policy: False
+
 wandb:
   init:
-    project: "demoor_gymnax_neuro"
+    project: "de_moor_gymnax_neuro"
 
 hydra:
   job:
     chdir: True
   searchpath:
-    - pkg://bloodbank_marl.single_agent_replenishment.common_conf
+    - pkg://bloodbank_marl.scenarios.common_conf
+    - pkg://bloodbank_marl.policies.common_conf
 
-plot_policy: False
+
 
 evosax:
   num_generations: 100
