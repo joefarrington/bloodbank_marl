@@ -1,9 +1,0 @@
-# @package _global_
-defaults:
-  - override /replenishment/policy: heuristic_order_up_to
-  - override /issuing/policy: one_product_mlp
-
-training:
-  policy_to_train: 1
-  num_steps: ${issuing.num_steps}
-  heuristic_params: 7 # Order up to level for m=2, L=1
