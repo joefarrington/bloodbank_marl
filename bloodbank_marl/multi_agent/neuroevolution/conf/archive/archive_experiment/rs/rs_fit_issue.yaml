@@ -1,0 +1,34 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_perishable
+  - override /policies/replenishment: order_up_to
+  - override /policies/issuing: multi_product_mlp
+
+wandb:
+  init:
+    project: rs_marl_neuroevo_fit_issue
+
+test_evaluator:
+  num_rollouts: 5
+
+train_evaluator:
+  env_params:
+    max_days_in_episode: 90
+  num_warmup_days: 30
+
+policies:
+  optimize:
+    - 1 # issuing
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - - [4]
+          - [18]
+          - [4]
+          - [17]
+          - [2]
+          - [5]
+          - [1]
+          - [2]

@@ -1,0 +1,31 @@
+# @package _global_
+defaults:
+  - override /environment: rs_perishable_two
+  - override /replenishment/policy: heuristic_order_up_to
+  - override /issuing/policy: multi_product_mlp
+
+wandb:
+  init:
+    project: rs_two_marl_quarter_demand_ppo_fit_issue
+plot_policies: False
+
+training:
+  num_envs: 100
+  policy_to_train: 1
+  num_steps: ${issuing.num_steps}
+  total_timesteps: 1e7
+
+replenishment:
+  num_steps: 2
+  policy:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - - [3]
+          - [11]
+
+issuing:
+  num_steps: 10
+
+test_evaluator:
+  num_rollouts: 1000

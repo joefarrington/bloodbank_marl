@@ -1,0 +1,13 @@
+env_name: "DeMoorPerishable"
+num_env_steps: 1e6 # Much higher than for one episode
+env_kwargs:
+  max_useful_life: 2
+  lead_time: 1
+  max_order_quantity: 10
+env_params: {}
+num_warmup_days: 100
+gamma: 0.99
+kpis_log_eval:
+  - service_level_%
+  - wastage_%
+  - holding

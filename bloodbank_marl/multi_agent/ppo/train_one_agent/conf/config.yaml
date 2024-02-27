@@ -1,14 +1,14 @@
 defaults:
-  - policies/replenishment: single_agent_stochastic_single_product_order_up_to_mlp
-  - environment: de_moor_perishable_gymnax
-  - policies/issuing: 
+  - environment: de_moor_perishable
+  - policies/replenishment: heuristic_order_up_to
+  - policies/issuing: multi_agent_stochastic_single_product_mlp
   - _self_
 
-plot_policy: False
+plot_policies: False
 
 wandb:
   init:
-    project: "de_moor_gymnax_ppo"
+    project: "single_agent_ppo_jax_demoor"
 
 hydra:
   job:
@@ -17,22 +17,15 @@ hydra:
     - pkg://bloodbank_marl.common_config
 
 training:
-  seed: 10
-  n_seeds: 1 # This is how many repeats of training to run with different seeds
-
-# Remember we can change these, but can't vmap over changes (probably)
-fixed_config:
+# Note steps relate the agent we are training, not both agents
+  seed: 123
+  policy_to_train: 1
   num_envs: 200
-  num_steps: 20
+  num_steps: ${training.issuing.num_steps} # We only train issuing with this env
   total_timesteps: 1e7
   update_epochs: 4
   num_minibatches: 4
   anneal_lr: True
-  environment: ${environment}
-  policies: ${policies}
-
-# We can vmap over different settings for these if we want
-hp_config:
   lr: 2.5e-4
   gamma: 0.99
   gae_lambda: 0.95
@@ -41,10 +34,22 @@ hp_config:
   vf_coef: 0.5
   max_grad_norm: 0.5
 
-evaluation: 
+  replenishment:
+    num_steps: 50
+  issuing:
+    num_steps: 200
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [7.] # For DeMoor m=2, exp2
+
+evaluation:
   seed: 1337
   test_evaluator:
-    _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
     num_rollouts: 10000
@@ -54,3 +59,6 @@ evaluation:
     n_devices:
     num_warmup_days: ${environment.num_warmup_days}
     gamma: ${environment.gamma}
+
+
+

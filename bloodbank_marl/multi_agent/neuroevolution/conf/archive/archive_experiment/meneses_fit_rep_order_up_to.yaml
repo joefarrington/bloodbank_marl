@@ -1,0 +1,25 @@
+# @package _global_
+defaults:
+  - override /environment: meneses_perishable
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: exact_match
+  
+wandb:
+  init:
+    project: meneses_neuroevo_test
+
+environment:
+  num_rollouts: 20
+
+evosax:
+  num_generations: 100
+
+  strategy:
+    popsize: 50
+
+test_evaluator:
+  num_rollouts: 50
+
+policies:
+  optimize:
+    - 0 # replenishment

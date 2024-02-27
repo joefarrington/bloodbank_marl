@@ -1,0 +1,50 @@
+program: ../one_opt_each_multistep/run_evosax.py
+method: bayes
+metric:
+  name: eval/mean_params/return_mean
+  goal: maximize
+parameters:
+  evosax.issuing.strategy.lrate_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  evosax.issuing.strategy.sigma_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  evosax.replenishment.strategy.lrate_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  evosax.replenishment.strategy.sigma_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  evosax.n_rep_updates:
+    distribution: q_uniform
+    min: 1
+    max: 5
+    q: 1
+  evosax.n_issue_updates:
+    distribution: q_uniform
+    min: 1
+    max: 5
+    q: 1
+  policies.replenishment.model_kwargs.n_hidden:
+    distribution: q_uniform
+    min: 32
+    max: 256
+    q: 32
+  policies.issuing.model_kwargs.n_hidden:
+    distribution: q_uniform
+    min: 32
+    max: 256
+    q: 32
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=de_moor_m5_exp6_fit_both
+  

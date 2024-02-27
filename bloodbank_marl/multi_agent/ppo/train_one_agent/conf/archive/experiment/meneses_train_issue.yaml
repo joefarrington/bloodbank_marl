@@ -1,0 +1,38 @@
+# @package _global_
+defaults:
+  - override /environment: meneses_perishable
+  - override /replenishment/policy: heuristic_order_up_to
+  - override /issuing/policy: multi_product_mlp
+
+wandb:
+  init:
+    project: "single_agent_ppo_jax_meneses"
+plot_policies: False
+
+training:
+  num_envs: 100
+  policy_to_train: 1
+  num_steps: ${issuing.num_steps}
+  #heuristic_params: [31., 126., 29., 128., 5.,24.,2.,8.] # Placeholder order up to values
+  total_timesteps: 1e6
+
+replenishment:
+  num_steps: 2
+  policy:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+      - [31.] #O -
+      - [126.] #O +
+      - [29.] #A -
+      - [128.] #A +
+      - [5.] #B - 
+      - [24.] #B + 
+      - [2.] #AB -
+      - [8.] #AB +
+
+issuing:
+  num_steps: 10
+
+test_evaluator:
+  num_rollouts: 5

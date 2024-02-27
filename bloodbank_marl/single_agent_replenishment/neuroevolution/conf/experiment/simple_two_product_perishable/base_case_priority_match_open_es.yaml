@@ -1,0 +1,19 @@
+# @package _global_
+
+defaults:
+  - override /environment: simple_two_product_perishable_gymnax
+  - override /policies/replenishment: single_agent_multi_product_order_up_to_mlp
+  - override /policies/issuing: heuristic_priority_match
+
+wandb:
+  init:
+    project: "temp"
+
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 
+

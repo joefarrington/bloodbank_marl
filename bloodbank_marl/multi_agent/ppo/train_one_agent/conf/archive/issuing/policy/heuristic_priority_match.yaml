@@ -1,0 +1,5 @@
+_target_: bloodbank_marl.policies.issuing.heuristic.PriorityMatchIssuingPolicy
+env_name: ${environment.env_name}
+env_kwargs: ${environment.env_kwargs}
+env_params: ${environment.env_params}
+fixed_policy_params:

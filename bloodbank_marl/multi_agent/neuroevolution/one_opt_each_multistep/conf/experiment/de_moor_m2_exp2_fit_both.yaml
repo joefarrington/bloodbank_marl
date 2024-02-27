@@ -1,0 +1,18 @@
+# @package _global_
+
+wandb:
+  init:
+    project: bbm_neuro_de_moor_perishable_m2_exp2_fit_both_one_opt_each_multistep
+
+plot_policies: True
+
+environment:
+  env_kwargs:
+    max_useful_life: 2
+    lead_time: 1
+    max_order_quantity: 10
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing

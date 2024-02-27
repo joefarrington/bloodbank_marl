@@ -1,0 +1,17 @@
+# @package _global_
+
+wandb:
+  init:
+    project: "single_agent_ppo_jax_demoor"
+
+plot_policies: True
+
+training:
+  policy_to_train: 1
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [7.] # For DeMoor m=2, exp2

@@ -1,0 +1,24 @@
+# @package _global_
+defaults:
+  - override /environment: simple_two_product_perishable
+  - override /policies/issuing: multi_agent_multi_product_mlp
+  - override /policies/replenishment: multi_agent_multi_product_order_up_to_mlp
+
+wandb:
+  init:
+    project: "temp"
+
+train_evaluator:
+  env_params:
+    max_days_in_episode: 90
+  num_warmup_days: 30
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing
+  replenishment:
+    model_kwargs:
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.rep_obs

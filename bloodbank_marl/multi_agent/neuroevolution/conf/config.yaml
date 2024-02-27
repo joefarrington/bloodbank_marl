@@ -1,15 +1,14 @@
-defaults:
-  - policies/replenishment: single_agent_single_product_order_up_to_mlp
-  - policies/issuing:
-  - evosax/strategy: open_es
-  - environment: de_moor_perishable_gymnax
-  - _self_
 
-plot_policy: False
+defaults:
+  - environment: de_moor_perishable
+  - policies/replenishment: multi_agent_single_product_order_up_to_mlp
+  - policies/issuing: multi_agent_single_product_mlp
+  - evosax/strategy: open_es
+  - _self_
 
 wandb:
   init:
-    project: "de_moor_gymnax_neuro"
+    project: "bloodbank_marl_neuroevolution_default"
 
 hydra:
   job:
@@ -17,13 +16,16 @@ hydra:
   searchpath:
     - pkg://bloodbank_marl.common_config
 
+plot_policies: False
+
 evosax:
   num_generations: 100
   popsize: 150
-  num_train_rollouts: 150
-  num_test_rollouts: 10000
+  num_train_rollouts: 100
+  num_test_rollouts: 1000
   evaluate_every_k_gens: 10
   seed: 10
+  
   fitness_shaper:
     _target_: evosax.FitnessShaper
     maximize: True
@@ -38,13 +40,9 @@ evosax:
     _target_: orbax.checkpoint.CheckpointManagerOptions
     max_to_keep: 1
     create: True
-
-policies:
-  pretrained:
-    enable: False
-
+    
 train_evaluator:
-  _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
   env_name: ${environment.env_name}
   num_env_steps: ${environment.num_env_steps}
   num_rollouts: ${evosax.num_train_rollouts}
@@ -55,10 +53,10 @@ train_evaluator:
   num_warmup_days: ${environment.num_warmup_days}
   gamma: ${environment.gamma}
 
-evaluation: 
-  seed: 1337 
+evaluation:
+  seed: 1337
   test_evaluator:
-    _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
     num_rollouts: ${evosax.num_test_rollouts}
@@ -68,3 +66,15 @@ evaluation:
     n_devices:
     num_warmup_days: ${environment.num_warmup_days}
     gamma: ${environment.gamma}
+
+policies:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  pretrained:
+    replenishment:
+      enable: False
+    issuing:
+      enable: False
+
+
+

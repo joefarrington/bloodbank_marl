@@ -1,0 +1,28 @@
+program: ../run_evosax.py
+method: bayes
+metric:
+  name: eval/mean_params/return_mean
+  goal: maximize
+parameters:
+  evosax.strategy.lrate_init:
+    distribution: log_uniform_values
+    min: 0.005
+    max: 0.5
+  evosax.strategy.sigma_init:
+    distribution: log_uniform_values
+    min: 0.005
+    max: 0.5
+  # No tuning of replenishment n_hidden as already set in pretraining
+  policies.issuing.model_kwargs.n_hidden:
+    distribution: q_uniform
+    min: 32
+    max: 256
+    q: 32
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=de_moor_m2_exp6_fit_both_discrete_mlp_rep_pretrained
+  

@@ -1,0 +1,9 @@
+# @package _global_
+defaults:
+  - override /replenishment/policy: one_product_order_up_to_mlp
+  - override /issuing/policy: heuristic_oufo
+
+training:
+  policy_to_train: 0
+  num_steps: ${replenishment.num_steps}
+  total_timesteps: 1e6

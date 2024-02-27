@@ -1,0 +1,16 @@
+# @package _global_
+
+wandb:
+  init:
+    project: bbm_neuro_de_moor_perishable_m5_exp6_fit_both
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 2
+    max_order_quantity: 10
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing

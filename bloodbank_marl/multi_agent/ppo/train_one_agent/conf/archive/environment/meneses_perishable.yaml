@@ -1,0 +1,19 @@
+env_name: "MenesesPerishable"
+num_env_steps: 1e6 # Much higher than for one episode
+num_rollouts: 5
+env_kwargs:
+  n_products: 8
+  max_useful_life: 35
+  lead_time: 1
+  max_order_quantities: [100, 100, 100, 100, 100, 100, 100, 100]
+  max_demand: 100
+env_params: {}
+num_warmup_days: 0
+gamma: 1.0
+kpis_log_eval:
+  - mean_total_order
+  - service_level_%
+  - expiries_%
+  - mean_holding
+  - exact_match_%
+  - mean_age_at_transfusion

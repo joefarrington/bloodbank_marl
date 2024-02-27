@@ -1,0 +1,18 @@
+env_name: DeMoorPerishableGymnax
+num_env_steps: 365
+num_warmup_days: 100
+env_params: {}
+env_kwargs:
+  max_useful_life: 2
+  lead_time: 1
+  max_order_quantity: 10
+  issuing_policy: "fifo"
+gamma: 0.99
+types: []
+scalar_kpis_to_log:
+  - mean_daily_reward
+  - service_level_%
+  - wastage_%
+  - mean_holding
+
+vector_kpis_to_log:

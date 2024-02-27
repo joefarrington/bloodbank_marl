@@ -1,0 +1,21 @@
+# @package _global_
+
+defaults:
+  - override /environment: simple_two_product_perishable
+  - override /policies/issuing: multi_agent_stochastic_multi_product_mlp
+  - override /policies/replenishment: heuristic_order_up_to
+
+wandb:
+  init:
+    project: "temp"
+
+training:
+  policy_to_train: 1
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [4]
+        - [2]

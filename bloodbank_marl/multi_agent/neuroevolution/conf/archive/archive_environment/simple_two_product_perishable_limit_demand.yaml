@@ -1,0 +1,21 @@
+env_name: "SimpleTwoProductPerishableLimitDemand"
+num_env_steps: 1e6 # Much longer than episode expected to be
+num_rollouts: 100
+env_kwargs:
+  n_products: 2
+  max_useful_life: 2
+  lead_time: 1
+  max_order_quantity: 10
+  max_demand: 100
+env_params:
+  max_days_in_episode: 365
+num_warmup_days: 100
+gamma: 1.0
+kpis_log_eval:
+  - mean_daily_reward
+  - mean_total_order
+  - service_level_%
+  - expiries_%
+  - mean_holding
+  - exact_match_%
+  - mean_age_at_transfusion

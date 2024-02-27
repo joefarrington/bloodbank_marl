@@ -1,0 +1,24 @@
+# @package _global_
+defaults:
+  - override /environment: simple_two_product_perishable
+  - override /policies/issuing: multi_agent_multi_product_mlp
+  - override /policies/replenishment: heuristic_order_up_to
+
+wandb:
+  init:
+    project: "temp"
+
+train_evaluator:
+  env_params:
+    max_days_in_episode: 90
+  num_warmup_days: 30
+
+policies:
+  optimize:
+    - 1 # issuing
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [4]
+        - [2]

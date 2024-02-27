@@ -1,0 +1,68 @@
+defaults:
+  - environment: de_moor_perishable
+  - policies/replenishment: multi_agent_stochastic_single_product_mlp
+  - policies/issuing: multi_agent_stochastic_single_product_mlp
+  - _self_
+
+plot_policies: False
+
+wandb:
+  init:
+    project: "marl_ppo_jax_demoor"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+training:
+  num_envs: 40
+  seed: 123
+
+  replenishment:
+    num_envs: ${training.num_envs}
+    lr: 2.5e-4
+    num_steps: 50
+    total_timesteps: 1e6
+    update_epochs: 4
+    num_minibatches: 4
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_eps: 0.2
+    ent_coef: 0.01
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    anneal_lr: True
+
+  issuing:
+    num_envs: ${training.num_envs}
+    lr: 2.5e-4
+    num_steps: 200
+    total_timesteps: 4e6
+    update_epochs: 4
+    num_minibatches: 16
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_eps: 0.2
+    ent_coef: 0.01
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    anneal_lr: True
+
+evaluation:
+  seed: 1337
+  test_evaluator:
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 1000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}
+
+
+

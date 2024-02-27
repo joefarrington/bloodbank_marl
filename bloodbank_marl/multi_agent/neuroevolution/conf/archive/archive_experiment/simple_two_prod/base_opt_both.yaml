@@ -1,0 +1,35 @@
+# @package _global_
+
+defaults:
+  - override /environment: simple_two_product_perishable
+  - override /policies/replenishment: multi_product_order_up_to_mlp
+  - override /policies/issuing: multi_product_mlp
+  - override /evosax/strategy: simple_ga
+
+wandb:
+  init:
+    project: simple_two_product_perishable_opt_both
+
+test_evaluator:
+  num_rollouts: 500
+
+train_evaluator:
+  env_params:
+    max_days_in_episode: 90
+  num_warmup_days: 30
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing
+  issuing:
+    model_kwargs:
+      n_hidden: [64]
+  replenishment:
+    model_kwargs:
+      n_hidden: [64]
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.rep_obs
+
+
