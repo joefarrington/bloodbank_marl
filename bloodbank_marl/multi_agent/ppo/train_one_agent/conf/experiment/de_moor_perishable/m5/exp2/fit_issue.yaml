@@ -1,0 +1,21 @@
+# @package _global_
+
+wandb:
+  init:
+    project: "single_agent_ppo_jax_demoor"
+
+plot_policies: True
+
+training:
+  policy_to_train: 1
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [8.]

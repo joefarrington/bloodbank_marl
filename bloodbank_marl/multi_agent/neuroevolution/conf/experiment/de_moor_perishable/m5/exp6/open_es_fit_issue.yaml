@@ -4,9 +4,12 @@ defaults:
 
 wandb:
   init:
-    project: de_moor_perishable_neuro_m2_exp2_fit_issue
+    project: de_moor_perishable_neuro_m5_exp6_fit_issue
 
-plot_policies: True
+environment:
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 2
 
 policies:
   optimize:
@@ -15,4 +18,4 @@ policies:
     fixed_policy_params:
       _target_: jax.numpy.array
       object:
-        - [7]
+        - [10]
