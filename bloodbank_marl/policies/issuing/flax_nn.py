@@ -16,6 +16,27 @@ from bloodbank_marl.policies.common import FlaxStochasticMAPolicy
 
 
 class FlaxStochasticMultiProductIssuePolicy(FlaxStochasticMAPolicy):
+    def __init__(
+        self,
+        model_class,
+        model_kwargs,
+        policy_id,
+        env_name=None,
+        env_kwargs={},
+        env_params={},
+    ):
+        self.policy_id = policy_id
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        env, default_env_params = make(self.env_name, **self.env_kwargs)
+        self.env_params = default_env_params.create_env_params(**env_params)
+        self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
+        self.n_actions = int(env.num_actions(policy_id))
+        self.action_pad = int(env.action_padding(policy_id))
+        self.model = model_class(
+            n_actions=self.n_actions + 1, action_pad=self.action_pad, **model_kwargs
+        )  # Add one to reflect issuing nothing; gets resshaped to nb_products in methods that get the action
+
     def _sample_action(self, pi, rng):
         raw_action = pi.sample(seed=rng)
         tr_action = jnp.zeros(self.env_kwargs["n_products"])
