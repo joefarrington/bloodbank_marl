@@ -93,13 +93,13 @@ class DeMoorPerishableGymnax(environment.Environment):
         max_useful_life: int = 2,
         lead_time: int = 1,
         max_order_quantity: int = 10,
-        issue_policy: str = "lifo",
+        issuing_policy: str = "fifo",
     ):
         super().__init__()
         self.max_useful_life = max_useful_life
         self.lead_time = lead_time
         self.max_order_quantity = max_order_quantity
-        self.issue_policy = issue_policy
+        self.issuing_policy = issuing_policy
 
     @property
     def default_params(self) -> EnvParams:
@@ -149,7 +149,7 @@ class DeMoorPerishableGymnax(environment.Environment):
 
         # Meet demand
         stock_after_issue = jax.lax.cond(
-            self.issue_policy == "fifo",
+            self.issuing_policy == "fifo",
             self._issue_fifo,
             self._issue_lifo,
             state.stock,
