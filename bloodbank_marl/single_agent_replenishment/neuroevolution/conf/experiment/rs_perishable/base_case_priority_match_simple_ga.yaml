@@ -1,0 +1,39 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_perishable_gymnax
+  - override /policies/replenishment: single_agent_multi_product_order_up_to_mlp
+  - override /policies/issuing: heuristic_priority_match
+  - override /evosax/strategy: simple_ga
+
+wandb:
+  init:
+    project: "temp"
+
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0, 4, 2, 6, 1, 5, 3, 7] # O- pt
+        - [1, 0, 5, 4, 3, 2, 7, 6] # O+ pt
+        - [2, 6, 4, 0, 3, 7, 5, 1 ] # A- pt
+        - [3, 2, 7, 6, 5, 4, 1, 0 ] # A+ pt
+        - [4, 6, 2, 0, 5, 7, 3, 1] # B- pt
+        - [5,4, 7, 6, 3, 2, 1, 0 ] #B+ pt
+        - [6, 2, 4, 0, 7, 3, 5, 1] # AB- pt
+        - [7, 6, 3, 2, 5, 4, 1, 0] # AB+ pt
+  replenishment:
+    model_kwargs:
+      n_hidden: [128, 128]
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.one_hot_day_of_week
+
+# Temporary to check it run
+environment:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+evosax:
+  num_test_rollouts: 500

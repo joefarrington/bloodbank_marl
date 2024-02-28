@@ -1,0 +1,41 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_perishable
+  - override /policies/issuing: multi_agent_stochastic_multi_product_mlp
+  - override /policies/replenishment: multi_agent_stochastic_multi_product_order_up_to_mlp
+
+wandb:
+  init:
+    project: ""
+
+# All temporary, basic ratio estimated based on mean demand around 30
+# These settings are just for debugging
+training:
+  num_envs: 5
+
+  replenishment:
+    num_steps: 10
+    total_timesteps: 1e3
+    num_minibatches: 1
+
+  issuing:
+    num_steps: 300
+    total_timesteps: 3e4
+    num_minibatches: 20
+
+evaluation:
+  num_rollouts: 50
+
+policies:
+  replenishment:
+    model_kwargs:
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.rep_obs_with_one_hot_day_of_week
+  issuing:
+    model_kwargs:
+      n_hidden: [64]
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.one_hot_day_of_week

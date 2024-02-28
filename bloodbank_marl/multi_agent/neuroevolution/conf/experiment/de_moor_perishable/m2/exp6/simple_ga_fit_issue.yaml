@@ -1,11 +1,14 @@
 # @package _global_
 defaults:
-  - override /policies/replenishment: order_up_to
+  - override /policies/replenishment: heuristic_order_up_to
   - override /evosax/strategy: simple_ga
 
 wandb:
   init:
-    project: de_moor_perishable_neuro_m2_exp6_fit_issue
+    project: de_moor_m2_exp6
+  tags:
+    - fit_issue
+    - simple_ga
 
 environment:
   env_kwargs:

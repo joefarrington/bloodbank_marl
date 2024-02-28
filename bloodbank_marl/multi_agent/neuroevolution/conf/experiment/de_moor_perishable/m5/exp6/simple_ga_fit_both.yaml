@@ -5,7 +5,10 @@ defaults:
 
 wandb:
   init:
-    project: de_moor_marl_ga_m5_exp6
+    project: de_moor_m5_exp6
+  tags:
+    - fit_both
+    - simple_ga
 
 environment:
   env_kwargs:
@@ -16,3 +19,6 @@ policies:
   optimize:
     - 0 # replenishment
     - 1 # issuing
+  replenishment:
+    model_kwargs:
+      n_hidden: [64]

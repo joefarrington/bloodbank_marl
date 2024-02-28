@@ -5,7 +5,10 @@ defaults:
 
 wandb:
   init:
-    project: de_moor_marl_ga_m2_exp6
+    project: de_moor_m2_exp6
+  tags:
+    - fit_both
+    - simple_ga
 
 environment:
   env_kwargs:

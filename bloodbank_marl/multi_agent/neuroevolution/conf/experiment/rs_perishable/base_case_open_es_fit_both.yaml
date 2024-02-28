@@ -13,12 +13,23 @@ train_evaluator:
     max_days_in_episode: 90
   num_warmup_days: 30
 
+evosax:
+  num_train_rollouts: 10
+  num_test_rollouts: 50
+
 policies:
   optimize:
     - 0 # replenishment
     - 1 # issuing
   replenishment:
     model_kwargs:
+      n_hidden: [64]
       preprocess_observation:
         _target_: hydra.utils.get_method
-        path: bloodbank_marl.policies.models.utils.rep_obs
+        path: bloodbank_marl.policies.models.utils.rep_obs_with_one_hot_day_of_week
+  issuing:
+    model_kwargs:
+      n_hidden: [64]
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.one_hot_day_of_week

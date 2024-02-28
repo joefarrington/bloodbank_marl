@@ -8,7 +8,7 @@ plot_policy: False
 
 wandb:
   init:
-    project: "de_moor_gymnax_ppo"
+    project: "temp"
 
 hydra:
   job:

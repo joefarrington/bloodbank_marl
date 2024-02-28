@@ -18,5 +18,9 @@ def rep_obs(obs):
     return obs.rep_obs
 
 
+def rep_obs_with_one_hot_day_of_week(obs):
+    return obs.rep_obs_with_one_hot_day_of_week
+
+
 def one_hot_day_of_week(obs):
     return obs.obs_with_one_hot_day_of_week

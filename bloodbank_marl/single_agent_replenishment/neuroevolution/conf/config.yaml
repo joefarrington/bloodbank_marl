@@ -19,9 +19,9 @@ hydra:
 
 evosax:
   num_generations: 100
-  popsize: 150
-  num_train_rollouts: 150
-  num_test_rollouts: 10000
+  popsize: 200
+  num_train_rollouts: 100
+  num_test_rollouts: 1000
   evaluate_every_k_gens: 10
   seed: 10
   fitness_shaper:

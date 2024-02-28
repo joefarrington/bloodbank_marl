@@ -4,7 +4,10 @@ defaults:
 
 wandb:
   init:
-    project: de_moor_perishable_neuro_m5_exp6_fit_issue
+    project: de_moor_m5_exp6
+  tags:
+    - fit_issue
+    - open_es
 
 environment:
   env_kwargs:
