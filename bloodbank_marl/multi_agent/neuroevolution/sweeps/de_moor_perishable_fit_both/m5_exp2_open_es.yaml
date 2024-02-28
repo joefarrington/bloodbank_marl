@@ -1,4 +1,4 @@
-program: ../../run_evosax.py
+program: ../run_evosax.py
 method: bayes
 metric:
   name: eval/mean_params/return_mean

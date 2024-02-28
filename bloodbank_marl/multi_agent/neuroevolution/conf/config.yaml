@@ -9,8 +9,8 @@ defaults:
 wandb:
   init:
     project: "bloodbank_marl_neuroevolution_default"
-  tags:
-    - "marl_env"
+    tags:
+      - "marl_env"
 
 hydra:
   job:
