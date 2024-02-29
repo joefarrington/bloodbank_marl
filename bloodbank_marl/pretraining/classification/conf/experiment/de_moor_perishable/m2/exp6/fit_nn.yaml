@@ -15,3 +15,6 @@ heuristic_policy:
     _target_: jax.numpy.array
     object:
       - [9]
+
+pretraining:
+  num_epochs: 250

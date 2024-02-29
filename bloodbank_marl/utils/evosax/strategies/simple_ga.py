@@ -77,17 +77,31 @@ class SimpleGA(Strategy):
         init_mean: Optional[Union[chex.Array, chex.ArrayTree]] = None,
     ) -> EvoState:
         """`initialize` the differential evolution strategy."""
+        rng_init, rng_init_mean_noise = jax.random.split(rng)
         initialization = jax.random.uniform(
-            rng,
+            rng_init,
             (self.elite_popsize, self.num_dims),
             minval=params.init_min,
             maxval=params.init_max,
         )
 
         # If we supply an initial mean, replace the first member of the population
+        # Make half of the initial pop based on the initial mean, by adding noise
         # And we assume it's the best member
         if init_mean is not None:
-            initialization = jnp.vstack([init_mean, initialization[1:, :]])
+            init_pop_based_on_init_mean = self.popsize // 2
+            epsilon = (
+                jax.random.normal(rng_init_mean_noise, (self.popsize, self.num_dims))
+                * self.sigma_init
+            )
+            based_on_init_mean = init_mean + epsilon
+            initialization = jnp.vstack(
+                [
+                    init_mean,
+                    based_on_init_mean,
+                    initialization[init_pop_based_on_init_mean + 1 :, :],
+                ]
+            )
             best_member = init_mean
         else:
             best_member = initialization.mean(axis=0)

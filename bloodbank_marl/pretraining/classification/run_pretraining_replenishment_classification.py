@@ -90,12 +90,12 @@ def train_model(
 ):
     # Training loop
     best_performance_gap = jnp.inf
-    log_to_wandb = {}
     num_epochs = cfg.pretraining.num_epochs
     for epoch in tqdm(range(num_epochs)):
         losses = []
         accs = []
         total_incorrect_preds = 0
+        log_to_wandb = {}
         for batch_idx, batch in enumerate(data_loader):
             state, loss, accuracy, num_incorrect_preds = train_step(state, batch)
             losses.append(loss)

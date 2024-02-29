@@ -9,7 +9,7 @@ wandb:
 environment:
   env_kwargs:
     max_useful_life: 5
-    lead_time: 1
+    lead_time: 2
 
 heuristic_policy:
   fixed_policy_params:
@@ -19,3 +19,7 @@ heuristic_policy:
 
 pretraining:
   stock_limit: 15
+  num_epochs: 20
+  batch_size: 64
+  optimizer:
+    learning_rate: 0.01

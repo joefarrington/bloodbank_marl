@@ -1,0 +1,39 @@
+# @package _global_
+
+defaults:
+  - override /evosax/strategy: simple_ga
+  - override /policies/replenishment: multi_agent_single_product_mlp
+
+wandb:
+  init:
+    project: de_moor_m5_exp2
+    tags:
+      - fit_both
+      - simple_ga
+      - rep_pretrained
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing
+  replenishment:
+    model_kwargs:
+      n_hidden: [64]
+  pretrained:
+    replenishment:
+      enable: True
+      checkpoint_id: 0
+      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/pretrained_replenishment/m5/exp2
+      checkpoint_manager:
+        _target_: orbax.checkpoint.CheckpointManager
+        directory: ${policies.pretrained.replenishment.checkpoint_dir}
+        checkpointers:
+          _target_: orbax.checkpoint.PyTreeCheckpointer
+        options:
+          _target_: orbax.checkpoint.CheckpointManagerOptions
+          max_to_keep: 1
+          create: True

@@ -18,3 +18,7 @@ heuristic_policy:
 
 pretraining:
   stock_limit: 15
+  num_epochs: 50
+  batch_size: 64
+  optimizer:
+    learning_rate: 0.01
