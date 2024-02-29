@@ -1,0 +1,7 @@
+# @package _global_
+
+wandb:
+  init:
+    tags:
+      - m2_exp2
+      - raw_action_nn

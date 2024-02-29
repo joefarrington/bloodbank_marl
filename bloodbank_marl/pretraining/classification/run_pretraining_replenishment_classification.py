@@ -52,7 +52,7 @@ def calculate_loss(state, params, batch):
     return loss, (accuracy, num_incorrect_preds)
 
 
-@jax.jit  
+@jax.jit
 def train_step(state, batch):
     # Gradient function
     grad_fn = jax.value_and_grad(
@@ -109,7 +109,7 @@ def train_model(
                 "training/incorrect_preds": total_incorrect_preds,
             },
         )
-        if epoch % cfg.evaluation.eval_freq == 0:
+        if epoch % cfg.evaluation.eval_freq == 0 or epoch == num_epochs - 1:
             fitness = eval_step(
                 state, jax.random.PRNGKey(cfg.evaluation.seed), cfg, nn_policy
             )
@@ -119,7 +119,6 @@ def train_model(
             )
             if performance_gap < best_performance_gap:
                 best_performance_gap = performance_gap
-                # TODO Add this as an artifact to W&B
                 checkpoint_manager.save(
                     0, {"state": state, "trained_params": state.params}
                 )
@@ -140,8 +139,10 @@ def main(cfg):
     # Instantiate a heuristic policy for labelling, and the parameters
     # Do a rollout to log the performance of the heuristic policy
 
-    heuristic_policy = hydra.utils.instantiate(cfg.heuristic.policy)
-    heuristic_params = hydra.utils.instantiate(cfg.heuristic.params)
+    heuristic_policy = hydra.utils.instantiate(cfg.heuristic_policy)
+    heuristic_params = jnp.array(
+        [[0]]
+    )  # Placeholder, use fixed_policy_params to define
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
     test_evaluator.set_apply_fn(heuristic_policy.apply)
     heuristic_fitness, cum_infos, kpis = test_evaluator.rollout(
@@ -186,7 +187,7 @@ def main(cfg):
     # Instantiate the nn replenishment policy and change the apply function of test evaluator.
     # This does have preprocessing because we use it in the eval steps to roll out the policy
     # compare to heuristic
-    nn_policy = hydra.utils.instantiate(cfg.evaluation.replenishment_policy)
+    nn_policy = hydra.utils.instantiate(cfg.policies.replenishment)
     test_evaluator.set_apply_fn(nn_policy.apply)
 
     # Instantiate the optimizer

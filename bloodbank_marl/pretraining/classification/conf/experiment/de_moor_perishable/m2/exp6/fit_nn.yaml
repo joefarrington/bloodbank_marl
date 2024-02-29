@@ -1,0 +1,17 @@
+# @package _global_
+
+wandb:
+  init:
+    tags:
+      - m2_exp6
+      - raw_action_nn
+
+environment:
+  env_kwargs:
+    lead_time: 2
+
+heuristic_policy:
+  fixed_policy_params:
+    _target_: jax.numpy.array
+    object:
+      - [9]

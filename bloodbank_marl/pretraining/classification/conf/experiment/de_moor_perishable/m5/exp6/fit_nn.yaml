@@ -1,0 +1,21 @@
+# @package _global_
+
+wandb:
+  init:
+    tags:
+      - m5_exp6
+      - raw_action_nn
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 1
+
+heuristic_policy:
+  fixed_policy_params:
+    _target_: jax.numpy.array
+    object:
+      - [10]
+
+pretraining:
+  stock_limit: 15
