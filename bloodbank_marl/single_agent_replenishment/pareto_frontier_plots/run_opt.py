@@ -14,22 +14,16 @@ from omegaconf.dictconfig import DictConfig
 from bloodbank_marl.policies.common import HeuristicPolicy
 from bloodbank_marl.utils.single_agent_gymnax_fitness import GymnaxFitness
 import logging
-
-# Enable logging
-log = logging.getLogger(__name__)
-
-
+import jax.numpy as jnp
 from bloodbank_marl.single_agent_replenishment.simopt.run_simopt import (
     param_search_bounds_from_config,
     grid_search_space_from_config,
 )
 
-import jax.numpy as jnp
+# Enable logging
+log = logging.getLogger(__name__)
 
-
-# TODO Think about what the config looks like
-# How do we specify the range etc.
-# How do we separate the two different replenishment policies
+C = 1e8  # Large constant to use as a penalty for infeasible solutions
 
 
 # Adapted from bloodbank_marl/single_agent_replenishment/run_simopt.py to include KPIs
@@ -37,7 +31,7 @@ def simopt_grid_sampler(
     cfg: DictConfig,
     policy: HeuristicPolicy,
     test_evaluator: GymnaxFitness,
-    rng_fit: chex.PRNGKey,
+    rng_eval: chex.PRNGKey,
     initial_policy_params: Optional[Dict[str, int]] = None,
 ) -> Study:
     """Run simulation optimization using Optuna's GridSampler to propose parameter values"""
@@ -80,7 +74,7 @@ def simopt_grid_sampler(
                 ).reshape(policy.params_shape)
             )
         policy_params = jnp.array(policy_params)
-        fitness, cum_infos, kpis = test_evaluator.rollout(rng_fit, policy_params)
+        fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, policy_params)
 
         # NEW: CODE FOR KPIs
         wastage_pc = jnp.nan_to_num(kpis["wastage_%"].mean(axis=-1))
@@ -105,24 +99,12 @@ def simopt_grid_sampler(
 
 
 def run_grid_search_record_kpis(cfg: DictConfig):
-    run = wandb.init(**wandb_config["wandb"]["init"], config=wandb_config)
-
-    rep_policy = hydra.utils.instantiate(cfg.policies.replenishment)
-    test_evaluator = hydra.utils.instantiate(cfg.test_evaluator)
+    rep_policy = hydra.utils.instantiate(cfg.heuristic_policy)
+    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
     test_evaluator.set_apply_fn(rep_policy.apply)
-    rng_fit = jax.random.PRNGKey(cfg.param_search.seed)
+    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
-    # Initial policy params
-    if cfg.policies.replenishment_policy_params is not None:
-        initial_policy_params = omegaconf.OmegaConf.to_container(
-            cfg.policies.replenishment_policy_params
-        )
-    else:
-        initial_policy_params = None
-
-    study = simopt_grid_sampler(
-        cfg, rep_policy, test_evaluator, rng_fit, initial_policy_params
-    )
+    study = simopt_grid_sampler(cfg, rep_policy, test_evaluator, rng_eval, None)
 
     trials_df = study.trials_dataframe()
     trials_df = trials_df.sort_values(by="params_S", ascending=True)
@@ -135,12 +117,27 @@ def run_grid_search_record_kpis(cfg: DictConfig):
 def run_neuro_opt_one_kpi(
     cfg: DictConfig,
     fitness_kpi_name: str,
+    fitness_kpi_direction: str,
     penalty_kpi_name: str,
     penalty_kpi_limit: str,
 ) -> pd.DataFrame:
     rows = []
     best_params_last_round = None
-    for penalty_kpi_threshold in np.arange(0.5, 10.5, 0.5):
+    if penalty_kpi_name == "service_level_%":
+        limit_range = hydra.utils.instantiate(cfg.kpi_ranges.service_level_pc)
+    elif penalty_kpi_name == "wastage_%":
+        limit_range = hydra.utils.instantiate(cfg.kpi_ranges.wastage_pc)
+    else:
+        raise ValueError("penalty_kpi_name must be 'service_level_pc' or 'wastage_pc'")
+
+    if fitness_kpi_direction == "max":
+        cfg.evosax.fitness_shaper.maximize = True
+    elif fitness_kpi_direction == "min":
+        cfg.evosax.fitness_shaper.maximize = False
+    else:
+        raise ValueError("fitness_kpi_direction must be 'max' or 'min'")
+
+    for penalty_kpi_threshold in limit_range:
 
         rng = jax.random.PRNGKey(cfg.evosax.seed)
         rng, rng_rep = jax.random.split(rng, 2)
@@ -157,13 +154,6 @@ def run_neuro_opt_one_kpi(
         test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
         test_evaluator.set_apply_fn(policy_rep.apply)
 
-        # Checkpointing for NN policies
-        orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-        checkpoint_options = hydra.utils.instantiate(cfg.evosax.checkpoint_options)
-        checkpoint_manager = orbax.checkpoint.CheckpointManager(
-            wandb.run.dir, orbax_checkpointer, checkpoint_options
-        )
-
         # Strategy and fitness shaper
 
         strategy = hydra.utils.instantiate(
@@ -172,7 +162,9 @@ def run_neuro_opt_one_kpi(
         fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
         rng, rng_state_init = jax.random.split(rng, 2)
 
-        if best_params_last_round is not None:
+        # If this isn't the first policy to be optimized for this KPI,
+        # use the previous best params as a starting point for optimization
+        if cfg.evosax.init_prev_best == True and best_params_last_round is not None:
             state = strategy.initialize(
                 rng_state_init,
                 init_mean=param_reshaper.flatten_single(best_params_last_round),
@@ -201,14 +193,12 @@ def run_neuro_opt_one_kpi(
             if penalty_kpi_limit == "max":
                 fitness = (
                     kpis[fitness_kpi_name].mean(axis=-1)
-                    - (kpis[penalty_kpi_name].mean(axis=-1) > penalty_kpi_threshold)
-                    * 1e6
+                    - (kpis[penalty_kpi_name].mean(axis=-1) > penalty_kpi_threshold) * C
                 )
             elif penalty_kpi_limit == "min":
                 fitness = (
                     kpis[fitness_kpi_name].mean(axis=-1)
-                    + (kpis[penalty_kpi_name].mean(axis=-1) < penalty_kpi_threshold)
-                    * 1e6
+                    + (kpis[penalty_kpi_name].mean(axis=-1) < penalty_kpi_threshold) * C
                 )
             else:
                 raise ValueError("penalty_kpi_limit must be 'max' or 'min'")
@@ -225,7 +215,7 @@ def run_neuro_opt_one_kpi(
         reshaped_test_params = test_param_reshaper.reshape(x_test)
 
         fitness, cum_infos, kpis = test_evaluator.rollout(
-            rng_train, reshaped_test_params
+            rng_eval, reshaped_test_params
         )
         cum_returns = fitness.mean(axis=1)
 
@@ -266,6 +256,11 @@ def run_neuro_opt_one_kpi(
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg):
+    wandb_config = omegaconf.OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
+
+    run = wandb.init(**wandb_config["wandb"]["init"], config=wandb_config)
 
     log.info("Starting grid search over heuristic policy parameters")
     # Run grid search over the possible heuristic order up to parameters
@@ -276,16 +271,26 @@ def main(cfg):
 
     log.info("Starting optimization of service level with maximum wastage")
     # Run neuroevo to optimize service level, with a maximum wastage
-    service_level_df = run_neuro_opt_one_kpi(cfg, "service_level_%", "wastage_%", "max")
-    service_level_df.to_csv("service_level_df.csv")
-    wandb.log({f"neurevo_opt_service_level": wandb.Table(dataframe=service_level_df)})
+    wastage_limit_df = run_neuro_opt_one_kpi(
+        cfg, "service_level_%", "max", "wastage_%", "max"
+    )
+    wastage_limit_df.to_csv("wastage_limit_df.csv")
+    wandb.log({f"neurevo_wastage_limit": wandb.Table(dataframe=wastage_limit_df)})
     log.info("Optimization of service level with maximum wastage complete")
 
     log.info("Starting optimization of wastage with minimum service level")
     # Run neuroevo to optimize wastage, with a minimum service level
-    wastage_df = run_neuro_opt_one_kpi(cfg, "wastage_%", "service_level_%", "min")
-    wastage_df.to_csv("wastage_df.csv")
-    wandb.log({f"neurevo_opt_wastage": wandb.Table(dataframe=wastage_df)})
+    service_level_limit_df = run_neuro_opt_one_kpi(
+        cfg, "wastage_%", "min", "service_level_%", "min"
+    )
+    service_level_limit_df.to_csv("service_level_limit_df.csv")
+    wandb.log(
+        {f"neurevo_service_level_limit": wandb.Table(dataframe=service_level_limit_df)}
+    )
     log.info("Optimization of wastage with minimum service level complete")
 
     log.info("All optimization runs complete, results saved to csv for plotting")
+
+
+if __name__ == "__main__":
+    main()

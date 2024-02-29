@@ -7,6 +7,7 @@ import chex
 from flax import struct
 from ..strategy import Strategy
 from evosax.core import exp_decay
+import math
 
 
 @struct.dataclass
@@ -86,10 +87,14 @@ class SimpleGA(Strategy):
         )
 
         # If we supply an initial mean, replace the first member of the population
-        # Make half of the initial pop based on the initial mean, by adding noise
+        # Make a fraction of the initial pop based on the initial mean, by adding noise
+        # This should be equal to about half the popsize * the elite ratio to ensure some
+        # randomly generated solutions make it past the first generation
         # And we assume it's the best member
         if init_mean is not None:
-            init_pop_based_on_init_mean = self.popsize // 2
+            init_pop_based_on_init_mean = math.floor(
+                self.popsize / (2 / self.elite_ratio)
+            )
             epsilon = (
                 jax.random.normal(rng_init_mean_noise, (self.popsize, self.num_dims))
                 * self.sigma_init

@@ -206,7 +206,7 @@ def main(cfg):
             reshaped_test_params = test_param_reshaper.reshape(x_test)
 
             fitness, cum_infos, kpis = test_evaluator.rollout(
-                rng_train, reshaped_test_params
+                rng_eval, reshaped_test_params
             )
             cum_returns = fitness.mean(axis=1)
 
