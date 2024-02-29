@@ -1,6 +1,6 @@
 # @package _global_
 defaults:
-  - override /policies/replenishment: heuristic_order_up_to
+  - override /policies/replenishment: value_iteration
   - override /evosax/strategy: simple_ga
 
 wandb:
@@ -19,6 +19,6 @@ policies:
     - 1 # issuing
   replenishment:
     fixed_policy_params:
-      _target_: jax.numpy.array
-      object:
-        - [9]
+      _target_: bloodbank_marl.utils.load_save_policy_params.load_vi_policy_params
+      filepath: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/value_iteration_replenishment/m2_exp6.npy"
+      reshape_for_fitness: False
