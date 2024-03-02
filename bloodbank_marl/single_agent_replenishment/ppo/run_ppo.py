@@ -1,24 +1,16 @@
 import jax
 import jax.numpy as jnp
-from gymnax.environments import environment, spaces
-from typing import Tuple, Optional, Dict
+from gymnax.environments import environment
+from typing import Tuple, Optional
 import chex
 from flax import struct
-import numpyro
 
-import flax.linen as nn
-import numpy as np
 import optax
-from flax.linen.initializers import constant, orthogonal
-from typing import Sequence, NamedTuple, Any
+from typing import NamedTuple
 from flax.training.train_state import TrainState
-import distrax
-import gymnax
-import time
 import matplotlib.pyplot as plt
-from typing import Optional, Callable, Dict, Any, Tuple
+from typing import Optional, Tuple
 from functools import partial
-import orbax
 import wandb
 import hydra
 import omegaconf
@@ -31,8 +23,6 @@ import matplotlib.pyplot as plt
 
 # TODO: Need to think carefully about logging if we are vmapping over some config inputs
 # Which this is sort of designed to handle (as as per the HPConfig class)
-
-# NOTE: Eval currently NOT deterministic because getting odd results
 
 
 class Transition(NamedTuple):
@@ -51,9 +41,14 @@ class HPConfig:
     gamma: float
     gae_lambda: float
     clip_eps: float
+    dual_clip: bool
+    dual_clip_value: float
     ent_coef: float
     vf_coef: float
     max_grad_norm: float
+    norm_adv: bool
+    value_clip: bool
+    partial_episode_bootstrapping: bool
 
 
 import jax
@@ -62,8 +57,8 @@ import chex
 import numpy as np
 from flax import struct
 from functools import partial
-from typing import Optional, Tuple, Union, Any
-from gymnax.environments import environment, spaces
+from typing import Optional, Tuple, Union
+from gymnax.environments import environment
 
 
 class GymnaxWrapper(object):
@@ -199,9 +194,6 @@ def make_train(fixed_config):
                 action, tr_action, log_prob, value = policy.apply_for_training(
                     train_state.params, last_obs, _rng
                 )
-                # pi, value = network.apply(train_state.params, last_obs)
-                # action = pi.sample(seed=_rng)
-                # log_prob = pi.log_prob(action)
 
                 # STEP ENV
                 rng, _rng = jax.random.split(rng)
@@ -221,7 +213,6 @@ def make_train(fixed_config):
 
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, rng = runner_state
-            # _, last_val = network.apply(train_state.params, last_obs)
             _, last_val = policy.model.apply(train_state.params, last_obs)
 
             def _calculate_gae(traj_batch, last_val):
@@ -232,7 +223,16 @@ def make_train(fixed_config):
                         transition.value,
                         transition.reward,
                     )
-                    delta = reward + hp_config.gamma * next_value * (1 - done) - value
+                    # if hp_config.partial_episode_bootstrapping is True, then we assume
+                    # we assume done actually represents truncation and so we bootstrap.
+                    # This is a simplification, but in single agent env we just have done
+                    # instead of truncation/terminiation. In our envs of interest terminiation
+                    # always represents truncation because there is no true end.
+                    delta = jax.lax.select(
+                        hp_config.partial_episode_bootstrapping,
+                        (reward + hp_config.gamma * next_value) - value,
+                        (reward + hp_config.gamma * next_value * (1 - done)) - value,
+                    )
                     gae = (
                         delta
                         + hp_config.gamma * hp_config.gae_lambda * (1 - done) * gae
@@ -255,28 +255,50 @@ def make_train(fixed_config):
                 def _update_minbatch(train_state, batch_info):
                     traj_batch, advantages, targets = batch_info
 
+                    def _clipped_value_loss(traj_batch, value, targets):
+                        value_pred_clipped = traj_batch.value + (
+                            value - traj_batch.value
+                        ).clip(-hp_config.clip_eps, hp_config.clip_eps)
+                        value_losses = jnp.square(value - targets)
+                        value_losses_clipped = jnp.square(value_pred_clipped - targets)
+                        return jnp.maximum(value_losses, value_losses_clipped).mean()
+
+                    def _value_loss(traj_batch, value, targets):
+                        return jnp.square(value - targets).mean()
+
+                    def _dual_clip_actor_loss(loss_actor1, loss_actor2, gae):
+                        clip1 = jnp.minimum(loss_actor1, loss_actor2)
+                        clip2 = jnp.maximum(clip1, hp_config.dual_clip_value * gae)
+                        return -jnp.where(gae < 0, clip2, clip1).mean()
+
+                    def _default_actor_loss(loss_actor1, loss_actor2, gae):
+                        return -jnp.minimum(loss_actor1, loss_actor2).mean()
+
                     def _loss_fn(params, traj_batch, gae, targets):
                         # RERUN NETWORK
 
                         log_prob, value, entropy = policy.apply_for_loss_fn(
                             params, traj_batch.obs, traj_batch.action
                         )
-                        # pi, value = network.apply(params, traj_batch.obs)
-                        # log_prob = pi.log_prob(traj_batch.action)
 
                         # CALCULATE VALUE LOSS
-                        value_pred_clipped = traj_batch.value + (
-                            value - traj_batch.value
-                        ).clip(-hp_config.clip_eps, hp_config.clip_eps)
-                        value_losses = jnp.square(value - targets)
-                        value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                        value_loss = (
-                            0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                        value_loss = jax.lax.cond(
+                            hp_config.value_clip,
+                            _clipped_value_loss,
+                            _value_loss,
+                            traj_batch,
+                            value,
+                            targets,
                         )
 
                         # CALCULATE ACTOR LOSS
                         ratio = jnp.exp(log_prob - traj_batch.log_prob)
-                        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+                        # Apply advantage normalization if selected
+                        gae = jax.lax.select(
+                            hp_config.norm_adv,
+                            (gae - gae.mean()) / (gae.std() + 1e-8),
+                            gae,
+                        )
                         loss_actor1 = ratio * gae
                         loss_actor2 = (
                             jnp.clip(
@@ -286,9 +308,14 @@ def make_train(fixed_config):
                             )
                             * gae
                         )
-                        loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                        loss_actor = loss_actor.mean()
-                        # entropy = pi.entropy().mean()
+                        loss_actor = jax.lax.cond(
+                            hp_config.dual_clip,
+                            _dual_clip_actor_loss,
+                            _default_actor_loss,
+                            loss_actor1,
+                            loss_actor2,
+                            gae,
+                        )
 
                         total_loss = (
                             loss_actor
@@ -371,7 +398,7 @@ def log_losses(fixed_config, metrics):
 
         # Log omce for each update (i-1)
         # Take the final epoch (which is axis 1)
-        # And the mean over the minibatches for that epocj
+        # And the mean over the minibatches for that epoch
 
         log_dict[f"train/total_loss"] = metrics["loss"][0][:, i - 1, -1, :].mean()
         log_dict[f"train/value_loss"] = metrics["loss"][1][0][:, i - 1, -1, :].mean()
@@ -448,13 +475,16 @@ def main(cfg):
     # Resolve these to dicts because make_train adds extra elements
     # and we want to use hp_config as input to the dataclass
     fixed_config = omegaconf.OmegaConf.to_container(cfg.fixed_config, resolve=True)
-    # Instantiate the issuing policy if provided
+    # Instantiate the issuing policy if provided, and if it needs to be instantiated
     if "issuing_policy" in fixed_config["environment"]["env_kwargs"]:
-        fixed_config["environment"]["env_kwargs"][
-            "issuing_policy"
-        ] = hydra.utils.instantiate(
-            fixed_config["environment"]["env_kwargs"]["issuing_policy"]
-        )
+        try:
+            fixed_config["environment"]["env_kwargs"]["issuing_policy"] = (
+                hydra.utils.instantiate(
+                    fixed_config["environment"]["env_kwargs"]["issuing_policy"]
+                )
+            )
+        except:
+            pass
     hp_config = HPConfig(
         **omegaconf.OmegaConf.to_container(cfg.hp_config, resolve=True)
     )

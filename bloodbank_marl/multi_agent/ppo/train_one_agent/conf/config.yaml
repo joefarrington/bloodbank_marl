@@ -33,6 +33,11 @@ training:
   ent_coef: 0.01
   vf_coef: 0.5
   max_grad_norm: 0.5
+  dual_clip: False
+  dual_clip_value: 5.0
+  norm_adv: True
+  value_clip: True
+  partial_episode_bootstrapping: True
 
   replenishment:
     num_steps: 50

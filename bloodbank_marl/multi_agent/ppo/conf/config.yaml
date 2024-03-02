@@ -34,6 +34,11 @@ training:
     vf_coef: 0.5
     max_grad_norm: 0.5
     anneal_lr: True
+    dual_clip: False
+    dual_clip_value: 5.0
+    norm_adv: True
+    value_clip: True
+    partial_episode_bootstrapping: True
 
   issuing:
     num_envs: ${training.num_envs}
@@ -49,6 +54,11 @@ training:
     vf_coef: 0.5
     max_grad_norm: 0.5
     anneal_lr: True
+    dual_clip: False
+    dual_clip_value: 5.0
+    norm_adv: True
+    value_clip: True
+    partial_episode_bootstrapping: True
 
 evaluation:
   seed: 1337

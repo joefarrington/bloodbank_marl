@@ -21,8 +21,6 @@ from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness
 from bloodbank_marl.utils.rollout_manager import RolloutManager
 from bloodbank_marl.utils.gymnax_wrappers import LogEnvState, LogWrapper, LogInfo
 
-# from bloodbank_marl.ppo_multi_agent.ppo_models import DiscreteActorCritic
-# from bloodbank_marl.ppo_multi_agent.ppo_policies import FlaxStochasticPolicy
 import flax.linen as nn
 import numpy as np
 import optax
@@ -113,27 +111,50 @@ def make_update_epoch(policy, config):
             ## We run this one for each minibatch
             traj_batch, advantages, targets = batch_info
 
+            def _clipped_value_loss(traj_batch, value, targets):
+                value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
+                    -config["clip_eps"], config["clip_eps"]
+                )
+                value_losses = jnp.square(value - targets)
+                value_losses_clipped = jnp.square(value_pred_clipped - targets)
+                return jnp.maximum(value_losses, value_losses_clipped).mean()
+
+            def _value_loss(traj_batch, value, targets):
+                return jnp.square(value - targets).mean()
+
+            def _dual_clip_actor_loss(loss_actor1, loss_actor2, gae):
+                clip1 = jnp.minimum(loss_actor1, loss_actor2)
+                clip2 = jnp.maximum(clip1, config["dual_clip_value"] * gae)
+                return -jnp.where(gae < 0, clip2, clip1).mean()
+
+            def _default_actor_loss(loss_actor1, loss_actor2, gae):
+                return -jnp.minimum(loss_actor1, loss_actor2).mean()
+
             def _loss_fn(params, traj_batch, gae, targets):
                 # RERUN NETWORK
                 params = {policy.policy_id: params}
                 log_prob, value, entropy = policy.apply_for_loss_fn(
                     params, traj_batch.obs, traj_batch.action
                 )
-                # log_prob = pi.log_prob(traj_batch.action)
 
                 # CALCULATE VALUE LOSS
-                value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
-                    -config["clip_eps"], config["clip_eps"]
-                )
-                value_losses = jnp.square(value - targets)
-                value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                value_loss = (
-                    0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                value_loss = jax.lax.cond(
+                    config["value_clip"],
+                    _clipped_value_loss,
+                    _value_loss,
+                    traj_batch,
+                    value,
+                    targets,
                 )
 
                 # CALCULATE ACTOR LOSS
                 ratio = jnp.exp(log_prob - traj_batch.log_prob)
-                gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+                # Apply advantage normalization if selected
+                gae = jax.lax.select(
+                    config["norm_adv"],
+                    (gae - gae.mean()) / (gae.std() + 1e-8),
+                    gae,
+                )
                 loss_actor1 = ratio * gae
                 loss_actor2 = (
                     jnp.clip(
@@ -143,9 +164,14 @@ def make_update_epoch(policy, config):
                     )
                     * gae
                 )
-                loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                loss_actor = loss_actor.mean()
-
+                loss_actor = jax.lax.cond(
+                    config["dual_clip"],
+                    _dual_clip_actor_loss,
+                    _default_actor_loss,
+                    loss_actor1,
+                    loss_actor2,
+                    gae,
+                )
                 total_loss = (
                     loss_actor
                     + config["vf_coef"] * value_loss
@@ -486,7 +512,15 @@ def make_train(config):
                         transition.value,
                         transition.reward,
                     )
-                    delta = reward + config["gamma"] * next_value * (1 - done) - value
+                    # if config.partial_episode_bootstrapping is True, then we assume
+                    # we assume done actually represents truncation and so we bootstrap.
+                    # This is a simplification, but in our envs of interest terminiation
+                    # always represents truncation because there is no true end.
+                    delta = jax.lax.select(
+                        config["partial_episode_bootstrapping"],
+                        (reward + config["gamma"] * next_value) - value,
+                        (reward + config["gamma"] * next_value * (1 - done)) - value,
+                    )
                     gae = (
                         delta
                         + config["gamma"] * config["gae_lambda"] * (1 - done) * gae
