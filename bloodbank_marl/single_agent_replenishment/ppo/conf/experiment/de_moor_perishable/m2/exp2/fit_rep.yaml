@@ -2,6 +2,6 @@
 
 wandb:
   init:
-    project: "de_moor_gymnax_ppo_m2_exp2"
+    project: "de_moor_m2_exp2"
 
 plot_policy: True
