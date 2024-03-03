@@ -53,6 +53,9 @@ from bloodbank_marl.scenarios.simple_two_product.jax_env_limit_demand import (
 from bloodbank_marl.scenarios.simple_two_product.gymnax_env_limit_demand import (
     SimpleTwoProductPerishableLimitDemandGymnax,
 )
+from bloodbank_marl.scenarios.simple_two_product.gymnax_env_try_issue_too import (
+    SimpleTwoProductPerishableIncIssueGymnax,
+)
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 
@@ -136,6 +139,11 @@ def make(env_name, **env_kwargs):
         return (
             SimpleTwoProductPerishableLimitDemandGymnax(**env_kwargs),
             SimpleTwoProductPerishableLimitDemandGymnax().default_params,
+        )
+    elif env_name == "SimpleTwoProductPerishableIncIssueGymnax":
+        return (
+            SimpleTwoProductPerishableIncIssueGymnax(**env_kwargs),
+            SimpleTwoProductPerishableIncIssueGymnax().default_params,
         )
     else:
         raise ValueError(f"Unknown environment '{env_name}'")

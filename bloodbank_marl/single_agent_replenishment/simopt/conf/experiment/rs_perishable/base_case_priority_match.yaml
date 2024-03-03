@@ -39,11 +39,12 @@ environment:
   num_warmup_days: 30
 
 param_search:
-  num_rollouts: 150
+  num_rollouts: 1000
   search_bounds:
     all_params:
       high: 50
   early_stopping_rounds: 50
 
 evaluation:
-  num_rollouts: 500
+  num_rollouts: 10000
+  

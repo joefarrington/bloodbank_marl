@@ -1,0 +1,81 @@
+program: ../run_ppo.py
+method: bayes
+metric:
+  name: eval/return_mean
+  goal: maximize
+
+parameters:
+  ### We can remove these later, but interesting to get a sense of whether they make a difference, expecially in terms of training time ###
+  fixed_config.num_envs:
+    distribution: categorical
+    values:
+      - 50
+      - 100
+      - 200
+      - 400
+  
+  fixed_config.num_steps:
+    distribution: categorical
+    values:
+      - 10
+      - 20
+      - 40
+      - 80
+
+  fixed_config.num_minibatches:
+    distribution: categorical
+    values:
+      - 5
+      - 10
+      - 20
+      - 40
+
+  ### Remove the above once we have a sense of how good
+
+  fixed_config.anneal_lr:
+    distribution: categorical
+    values:
+      - True
+      - False
+  fixed_config.update_epochs:
+    distribution: categorical
+    values:
+      - 2
+      - 4
+      - 8
+      - 16
+  hp_config.lr:
+    distribution: log_uniform_values
+    min: 5e-6
+    max: 1e-2
+  hp_config.gamma:
+    distribution: uniform
+    min: 0.7
+    max: 0.99
+  hp_config.gae_lambda:
+    distribution: uniform
+    min: 0.7
+    max: 0.99
+  hp_config.clip_eps:
+    distribution: uniform
+    min: 0.05
+    max: 0.5
+  hp_config.ent_coef:
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
+  hp_config.vf_coef:
+    distribution: uniform
+    min: 0.1
+    max: 1.0
+  hp_config.max_grad_norm:
+    distribution: uniform
+    min: 0.05
+    max: 1.0
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=de_moor_perishable/m5/exp6/fit_rep

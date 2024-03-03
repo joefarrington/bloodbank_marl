@@ -29,14 +29,7 @@ import numpy as np
 # TODO THink about best way to have default issuing policy, and use config to specify another
 # exact_match = FixedPolicy(exact_match_policy, None, {})
 
-# TODO: Look again at the KPI penalty, was causing problems with the multiagent env
-
 # TODO: Decide where to specify n_products and how to get it into default params
-
-# TODO: On reset, in the original implementation, we had some stock on hand based on correspondence with authors
-
-# TODO; CHECK THE SUBSTITUTION ORDER WITH CLINICIANS - we could forbid RhD mismatches or penalize more heavily
-# TODO: Platelet request type ratios
 
 n_products = 2
 C = 1e10  # invalid substitution cost

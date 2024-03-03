@@ -9,9 +9,9 @@ plot_policy: False
 wandb:
   init:
     project: "temp"
-  tags:
-    - "ppo"
-    - "fit_rep"
+    tags:
+      - "ppo"
+      - "fit_rep"
 
 hydra:
   job:
