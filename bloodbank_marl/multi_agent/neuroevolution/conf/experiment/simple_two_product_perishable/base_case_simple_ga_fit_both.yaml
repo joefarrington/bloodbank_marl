@@ -9,10 +9,10 @@ wandb:
   init:
     project: "temp"
 
-train_evaluator:
-  env_params:
-    max_days_in_episode: 90
-  num_warmup_days: 30
+#train_evaluator:
+#  env_params:
+#    max_days_in_episode: 90
+#  num_warmup_days: 30
 
 policies:
   optimize:

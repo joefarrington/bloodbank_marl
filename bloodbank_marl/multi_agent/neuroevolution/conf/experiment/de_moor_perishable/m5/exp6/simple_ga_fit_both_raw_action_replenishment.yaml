@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - override /evosax/strategy: simple_ga
+  - override /policies/replenishment: multi_agent_single_product_mlp
+
+wandb:
+  init:
+    project: de_moor_m5_exp6
+    tags:
+      - fit_both
+      - raw_action
+      - simple_ga
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 2
+
+policies:
+  optimize:
+    - 0 # replenishment
+    - 1 # issuing
+  replenishment:
+    model_kwargs:
+      n_hidden: [64]
