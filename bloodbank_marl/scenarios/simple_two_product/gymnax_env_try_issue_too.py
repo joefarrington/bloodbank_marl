@@ -182,7 +182,6 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         lead_time: int = 1,
         max_order_quantity: int = 10,  # Applies to any individual product, rather than in total
         max_demand: int = 100,  # TODO: Check older work
-        issuing_policy=None,  # TODO: For now, set as None
     ):
         super().__init__()
         self.n_products = n_products
@@ -190,7 +189,9 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         self.lead_time = lead_time
         self.max_order_quantities = jnp.array([max_order_quantity] * self.n_products)
         self.max_demand = max_demand
-        self._issuing_policy = issuing_policy
+
+    def set_issuing_fn(self, issuing_fn):
+        self._issuing_fn = issuing_fn
 
     @property
     def default_params(self) -> EnvParams:
@@ -203,7 +204,6 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         state: EnvState,
         action: Union[int, float],
         params: Optional[EnvParams] = None,
-        issue_policy_params=None,
     ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
         """Performs step transitions in the environment."""
         # Use default env parameters if no others specified
@@ -211,13 +211,18 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
             params = self.default_params
         key, key_reset = jax.random.split(key)
         obs_st, state_st, reward, done, info = self.step_env(
-            key, state, action, params, issue_policy_params
+            key,
+            state,
+            action,
+            params,
         )
         obs_re, state_re = self.reset_env(key_reset, params)
         # Auto-reset environment based on termination
         state = jax.tree_map(
             lambda x, y: jax.lax.select(done, x, y), state_re, state_st
         )
+        # This is to handle keeping issue policy params over episode boundaries
+        state = state.replace(issue_policy_params=state_st.issue_policy_params)
         obs = jax.tree_map(lambda x, y: jax.lax.select(done, x, y), obs_re, obs_st)
         return obs, state, reward, done, info
 
@@ -227,7 +232,6 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         state: EnvState,
         action: Union[int, float],
         params: EnvParams,
-        issue_policy_params=None,
     ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
         """Environment-specific step transition."""
         cumulative_gamma = self.cumulative_gamma(state, params)
@@ -283,7 +287,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
             in_transit,
             request_types,
             arrival_key,
-            issue_policy_params,
+            state.issue_policy_params,
             params.action_mask_per_request_type,
         )
 
@@ -341,6 +345,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
             stock=stock,
             in_transit=in_transit,
             step=state.step + 1,
+            issue_policy_params=state.issue_policy_params,
         )  # TODO Add in the other elements
         done = self.is_terminal(state, params)
 
@@ -442,7 +447,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
             request_type=requested_product_idx,
             action_mask=self._get_issuing_mask(demand_info, requested_product_idx),
         )
-        issue_action = self._issuing_policy.apply(
+        issue_action = self._issuing_fn(
             demand_info.issue_policy_params, issuing_obs, issue_key
         )
         issued_product_idx = jnp.argmax(issue_action)
@@ -676,4 +681,8 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         """Run at end of warmup period to partially reset State"""
         _, state_reset = self.reset(key, params)
         # We want to keep the stock on hand and in transit, but reset everything else
-        return state_reset.replace(stock=state.stock, in_transit=state.in_transit)
+        return state_reset.replace(
+            stock=state.stock,
+            in_transit=state.in_transit,
+            issue_policy_params=state.issue_policy_params,
+        )

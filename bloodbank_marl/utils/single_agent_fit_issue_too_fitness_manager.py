@@ -220,6 +220,10 @@ class GymnaxFitness(object):
         else:
             self.rollout_map = self.rollout_pop
 
+    def set_issuing_fn(self, issuing_fn):
+        """Set the issue function."""
+        self.env.set_issuing_fn(issuing_fn)
+
     # TODO Would need to adjust to account for infos
     def rollout_pmap(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Parallelize rollout across devices. Split keys/reshape correctly."""
@@ -244,6 +248,7 @@ class GymnaxFitness(object):
         # Reset the environment
         rng_reset, rng_episode = jax.random.split(rng_input)
         obs, state = self.env.reset(rng_reset, self.env_params)
+        state = state.replace(issue_policy_params=policy_params[1])
 
         def warmup_step(state_input):
             # New method added to handle warmup
@@ -251,13 +256,17 @@ class GymnaxFitness(object):
             rng, rng_step, rng_net = jax.random.split(rng, 3)
             action = self.network(policy_params[0], obs, rng=rng_net)
             next_o, next_s, reward, done, info = self.env.step(
-                rng_step, state, action, self.env_params, policy_params[1]
+                rng_step,
+                state,
+                action,
+                self.env_params,
             )
             warmup_done = jax.lax.ge(state.step, self.num_warmup_days)
             # TODO: We can probably get rid of the next few lines when using the while loop
             state = jax.tree_map(
                 lambda x, y: jnp.where(warmup_done, x, y), state, next_s
             )
+            state = state.replace(issue_policy_params=state.issue_policy_params)
             obs = jax.tree_map(lambda x, y: jnp.where(warmup_done, x, y), obs, next_o)
             carry = (obs, state, warmup_done, rng)
             return carry
@@ -287,7 +296,6 @@ class GymnaxFitness(object):
                 state,
                 action,
                 self.env_params,
-                policy_params[1],
             )
             new_cum_reward = cum_reward + (reward * valid_mask)
             new_cum_return = cum_return + (
