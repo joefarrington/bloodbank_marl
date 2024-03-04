@@ -148,6 +148,7 @@ class DemandInfo:
     remaining_stock: chex.Array
     in_transit: chex.Array
     request_type_samples: chex.Array
+    request_time_samples: chex.Array
     key: jax.random.PRNGKey
     issue_policy_params: Optional[Dict]
     action_mask_per_request_type: chex.Array
@@ -157,6 +158,7 @@ class DemandInfo:
 class IssueObs:
     stock: chex.Array
     in_transit: chex.Array
+    request_time: int
     request_type: chex.Array
     action_mask: chex.Array
 
@@ -165,6 +167,7 @@ class IssueObs:
         batch_dims = self.in_transit.shape[:-2]
         return jnp.hstack(
             [
+                self.request_time.reshape(batch_dims + (-1,)),
                 self.request_type.reshape(batch_dims + (-1,)),
                 self.in_transit.reshape(batch_dims + (-1,)),
                 self.stock.reshape(batch_dims + (-1,)),
@@ -181,7 +184,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         max_useful_life: int = 2,
         lead_time: int = 1,
         max_order_quantity: int = 10,  # Applies to any individual product, rather than in total
-        max_demand: int = 100,  # TODO: Check older work
+        max_demand: int = 100,
     ):
         super().__init__()
         self.n_products = n_products
@@ -286,6 +289,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
             stock,
             in_transit,
             request_types,
+            cum_time,
             arrival_key,
             state.issue_policy_params,
             params.action_mask_per_request_type,
@@ -440,10 +444,12 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         key, issue_key = jax.random.split(demand_info.key)
         remaining_demand = demand_info.remaining_demand - 1
         requested_product_idx = demand_info.request_type_samples[idx]
+        request_time = demand_info.request_time_samples[idx]
         # Identify the product type to be issued
         issuing_obs = IssueObs(
             stock=demand_info.remaining_stock,
             in_transit=demand_info.in_transit,
+            request_time=request_time,
             request_type=requested_product_idx,
             action_mask=self._get_issuing_mask(demand_info, requested_product_idx),
         )
@@ -482,6 +488,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
             stock_after_issue,
             demand_info.in_transit,
             demand_info.request_type_samples,
+            demand_info.request_time_samples,
             key,
             demand_info.issue_policy_params,
             demand_info.action_mask_per_request_type,
