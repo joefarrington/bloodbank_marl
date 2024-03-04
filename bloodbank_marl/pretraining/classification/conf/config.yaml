@@ -20,6 +20,8 @@ heuristic_policy:
     object:
       - [7] #DeMoor m=2, exp2
 
+labelling_policy: ${heuristic_policy}
+
 seed: 12
 
 pretraining:

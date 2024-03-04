@@ -76,9 +76,9 @@ class SRepPolicy(HeuristicPolicy):
 
     def _get_apply_method(self) -> callable:
         """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name == "DeMoorPerishable":
+        if self.env_name in ["DeMoorPerishable", "DeMoorPerishableGymnax"]:
             return de_moor_perishable_S_policy
-        elif self.env_name == "MenesesPerishable" or "MenesesPerishableGymnax":
+        elif self.env_name in ["MenesesPerishable", "MenesesPerishableGymnax"]:
             return meneses_perishable_S_policy
         elif self.env_name in [
             "RSPerishable",
@@ -350,3 +350,26 @@ def mirjalili_perishable_sS_day_of_week_policy(policy_params, obs, rng):
     return jax.lax.select(
         jnp.all(policy_params[:, 0] < policy_params[:, 1]), order, jnp.zeros_like(order)
     )
+
+
+# We just use this to generate labels for pretraining when we want to pretrain an order-up-to-network
+class SRepLabellingPolicy(SRepPolicy):
+    def _get_param_row_names(self) -> List[str]:
+        """Get the row names for the policy parameters - these are the names of the different levels of a
+        given paramter, e.g. for different days of the week or different products"""
+        return []
+
+    def _get_apply_method(self) -> callable:
+        """Get the forward method for the policy - this is the function that returns the action"""
+        if self.env_name in ["DeMoorPerishable", "DeMoorPerishableGymnax"]:
+            return de_moor_perishable_S_labelling_policy
+        else:
+            raise NotImplementedError(
+                f"No (S) labelling policy defined for Environment ID {self.env_name}"
+            )
+
+
+def de_moor_perishable_S_labelling_policy(policy_params, obs, rng):
+    """(S) policy for DeMoorPerishable environment"""
+    # policy_params = [[S]]
+    return policy_params[0, 0]

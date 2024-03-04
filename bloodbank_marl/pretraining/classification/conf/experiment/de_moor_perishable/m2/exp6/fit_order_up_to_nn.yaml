@@ -1,0 +1,30 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: single_agent_single_product_order_up_to_mlp
+
+wandb:
+  init:
+    tags:
+      - m2_exp6
+      - order_up_to_nn
+
+environment:
+  env_kwargs:
+    lead_time: 2
+
+heuristic_policy:
+  fixed_policy_params:
+    _target_: jax.numpy.array
+    object:
+      - [9]
+
+pretraining:
+  num_epochs: 250
+
+labelling_policy:
+  _target_: bloodbank_marl.policies.replenishment.heuristic.SRepLabellingPolicy
+  env_name: ${environment.env_name}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  fixed_policy_params: ${heuristic_policy.fixed_policy_params}

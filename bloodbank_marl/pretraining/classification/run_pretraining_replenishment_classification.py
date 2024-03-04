@@ -158,8 +158,13 @@ def main(cfg):
     all_obs = get_obs_de_moor_perishable(cfg)
 
     # Label the obervations
+    # By default labelling policy == heuristic policy, but we can change this, for example
+    # when we want to pretrain for an order-up-to policy where the NN outputs S and this is converted to an order
+    # quantity by the policy class
     rng, _rng = jax.random.split(rng)
-    labels = heuristic_policy.apply(heuristic_params, all_obs, _rng)
+    labelling_policy = hydra.utils.instantiate(cfg.labelling_policy)
+    label_fn = jax.vmap(labelling_policy.apply, in_axes=(None, 0, None))
+    labels = label_fn(heuristic_params, all_obs, _rng)
 
     # Apply preprocessing to the observations so that it does not need to be repeated during training
     all_obs = hydra.utils.call(cfg.pretraining.preprocess_observations, all_obs)

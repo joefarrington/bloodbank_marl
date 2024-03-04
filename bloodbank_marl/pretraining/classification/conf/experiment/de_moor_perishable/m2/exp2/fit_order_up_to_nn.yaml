@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: single_agent_single_product_order_up_to_mlp
+
+wandb:
+  init:
+    tags:
+      - m2_exp2
+      - order_up_to_nn
+
+labelling_policy:
+  _target_: bloodbank_marl.policies.replenishment.heuristic.SRepLabellingPolicy
+  env_name: ${environment.env_name}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  fixed_policy_params: ${heuristic_policy.fixed_policy_params}
