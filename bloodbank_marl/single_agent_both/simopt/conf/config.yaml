@@ -1,0 +1,45 @@
+defaults:
+  - policies/replenishment: heuristic_order_up_to
+  - policies/issuing: heuristic_priority_match
+  - param_search: grid
+  - environment: simple_two_product_perishable_gymnax_test_double
+  - _self_
+
+wandb:
+  init:
+    project: "temp"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+policies:
+  replenishment_policy_params: # None, here as placeholder
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${param_search.num_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  gamma: ${environment.gamma}
+
+evaluation: 
+  seed: 1337
+  test_evaluator:
+    _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 10000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}

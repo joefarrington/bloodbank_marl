@@ -8,7 +8,11 @@ defaults:
 
 wandb:
   init:
-    project: "temp"
+    project: "simple_two_perishable_base"
+    tags:
+      - "simple_ga"
+      - "fit_rep"
+      - "basic_gymnax_env"
 
 policies:
   issuing:

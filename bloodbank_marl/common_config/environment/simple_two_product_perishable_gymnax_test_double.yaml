@@ -1,7 +1,16 @@
 env_name: SimpleTwoProductPerishableIncIssueGymnax
 num_env_steps: 365
 num_warmup_days: 100
-env_params: {}
+env_params:
+  poisson_demand_mean: 4
+  product_probabilities: [0.5, 0.5]
+  age_on_arrival_distribution_probs: [1, 0]
+  fixed_order_cost: 0
+  variable_order_costs: [3.0, 3.0]
+  shortage_costs: [5.0, 5.0]
+  wastage_costs: [7.0, 7.0]
+  holding_costs: [1.0, 1.0]
+  max_substitution_cost: 2.0
 env_kwargs:
   n_products: 2
   max_useful_life: 2

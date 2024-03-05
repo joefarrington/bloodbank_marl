@@ -7,12 +7,11 @@ defaults:
 
 wandb:
   init:
-    project: "temp"
-
-train_evaluator:
-  env_params:
-    max_days_in_episode: 90
-  num_warmup_days: 30
+    project: "simple_two_perishable_base"
+    tags:
+      - "simple_ga"
+      - "fit_issue"
+      - "marl_env"
 
 policies:
   optimize:

@@ -15,13 +15,6 @@ import numpy as np
 
 # TODO: Fill out missing methods (e.g. for action/obs/state spaces etc) if we end up using this for final results
 
-# TODO: Decide what to do about EnvObs and policies - can write specific policies for the single
-# agent env, do what we currently do here, or rethink the use of them if it is what is slowing down
-# the multiagent env.
-
-# TODO THink about best way to have default issuing policy, and use config to specify another
-# exact_match = FixedPolicy(exact_match_policy, None, {})
-
 # TODO: Decide where to specify n_products and how to get it into default params
 
 n_products = 2
@@ -140,25 +133,10 @@ class EnvObs:
 
 
 @struct.dataclass
-class DemandInfo:
-    total_demand: int
-    remaining_demand: int
-    shortages: int
-    allocations: int
-    remaining_stock: chex.Array
-    in_transit: chex.Array
-    request_type_samples: chex.Array
-    request_time_samples: chex.Array
-    key: jax.random.PRNGKey
-    issue_policy_params: Optional[Dict]
-    action_mask_per_request_type: chex.Array
-
-
-@struct.dataclass
 class IssueObs:
     stock: chex.Array
     in_transit: chex.Array
-    request_time: int
+    request_time: chex.Array
     request_type: chex.Array
     action_mask: chex.Array
 
@@ -173,6 +151,21 @@ class IssueObs:
                 self.stock.reshape(batch_dims + (-1,)),
             ]
         )
+
+
+@struct.dataclass
+class DemandInfo:
+    total_demand: int
+    remaining_demand: int
+    shortages: int
+    allocations: int
+    remaining_stock: chex.Array
+    in_transit: chex.Array
+    request_type_samples: chex.Array
+    request_time_samples: chex.Array
+    key: jax.random.PRNGKey
+    issue_policy_params: Optional[Dict]
+    action_mask_per_request_type: chex.Array
 
 
 class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
@@ -195,6 +188,19 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
 
     def set_issuing_fn(self, issuing_fn):
         self._issuing_fn = issuing_fn
+
+    def default_issue_obs(self, params: EnvParams) -> IssueObs:
+        return IssueObs(
+            stock=jnp.zeros((self.n_products, self.max_useful_life)),
+            in_transit=jnp.zeros((self.n_products, self.lead_time)),
+            request_time=jnp.array(0.0),
+            request_type=jnp.array(0),
+            action_mask=jnp.ones((self.n_products,)),
+        )
+
+    @property
+    def num_issue_actions(self):
+        return self.n_products
 
     @property
     def default_params(self) -> EnvParams:
@@ -247,7 +253,6 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         orders = jnp.clip(action, 0, self.max_order_quantities)
         order_placed = jax.lax.cond(jnp.sum(orders) > 0, lambda: 1, lambda: 0)
         info["orders"] = orders
-        # TODO: Handle cases where lead time = 0
         in_transit = in_transit.at[0 : self.n_products, 0].set(orders)
 
         # If the lead time is 0, then receive order immediately; otherwise add to in transit
@@ -371,6 +376,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         # when using receive order functions
         state = EnvState(
             stock=jnp.zeros((self.n_products, self.max_useful_life)),
+            # The in_transit element of state should have at least one element, even if L=0
             in_transit=jnp.zeros((self.n_products, max(self.lead_time, 1))),
             step=0,
         )
@@ -380,15 +386,10 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         """Applies observation function to state."""
 
         # Simple action masking, for now can always order each product
-
-        # NOTE: For L = 0, observation made at the end of the day after ageing stock, and first element would always be zero
-        # In older work we removed the first element, but we need to keep it in the multi-agent environment for issuing steps
-        # So keep here too for consistency of states between the two versions (e.g. means we should be able to use same NN
-        # replenishment policy on both)
         return EnvObs(
             stock=state.stock,
-            # If lead time is 0 or 1, nothing to include in obs
-            in_transit=state.in_transit,
+            # If lead time is 0 or 1, nothing to include in replenishment obs
+            in_transit=state.in_transit[:, 1 : self.lead_time],
             action_mask=jnp.ones((self.n_products,)),
         )
 
@@ -445,10 +446,13 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         remaining_demand = demand_info.remaining_demand - 1
         requested_product_idx = demand_info.request_type_samples[idx]
         request_time = demand_info.request_time_samples[idx]
+
         # Identify the product type to be issued
         issuing_obs = IssueObs(
             stock=demand_info.remaining_stock,
-            in_transit=demand_info.in_transit,
+            # Additional element of lead time compared to replenishment obs if L>0
+            # because there is stock in transit during the day we may need to account for
+            in_transit=demand_info.in_transit[:, 0 : self.lead_time],
             request_time=request_time,
             request_type=requested_product_idx,
             action_mask=self._get_issuing_mask(demand_info, requested_product_idx),

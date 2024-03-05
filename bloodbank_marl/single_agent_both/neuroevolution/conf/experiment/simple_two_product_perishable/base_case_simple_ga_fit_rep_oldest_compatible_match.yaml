@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+ - override /policies/issuing: heuristic_oldest_compatible_match
+
+wandb:
+  init:
+    project: "simple_two_perishable_base"
+    tags:
+      - "new_type_env"
+      - "oldest_compatible_match"
+      - "fit_rep"
+      - "simple_ga"
+
+policies:
+  optimize:
+    - 0
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 

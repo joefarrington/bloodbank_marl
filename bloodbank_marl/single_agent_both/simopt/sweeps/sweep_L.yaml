@@ -1,0 +1,19 @@
+program: ../run_simopt.py
+method: grid
+metric:
+  name: eval/mean_params/return_mean
+  goal: maximize
+parameters:
+  environment.env_kwargs.lead_time:
+    distribution: categorical
+    values:
+      - 0
+      - 1
+      - 2
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=simple_two_product_perishable/base_case_priority_match

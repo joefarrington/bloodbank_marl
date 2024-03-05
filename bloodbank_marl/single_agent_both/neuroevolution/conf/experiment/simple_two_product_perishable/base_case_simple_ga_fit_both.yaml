@@ -1,0 +1,13 @@
+# @package _global_
+wandb:
+  init:
+    project: "simple_two_perishable_base"
+    tags:
+      - "new_type_env"
+      - "fit_both"
+      - "simple_ga"
+
+policies:
+  optimize:
+    - 0
+    - 1

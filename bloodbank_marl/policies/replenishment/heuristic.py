@@ -69,6 +69,7 @@ class SRepPolicy(HeuristicPolicy):
             "SimpleTwoProductPerishable",
             "SimpleTwoProductPerishableLimitDemand",
             "SimpleTwoProductPerishableLimitDemandGymnax",
+            "SimpleTwoProductPerishableIncIssueGymnax",
         ]:
             return ["A", "B"]  # Temporary names, NOT blood groups
         else:
@@ -91,6 +92,7 @@ class SRepPolicy(HeuristicPolicy):
             "SimpleTwoProductPerishable",
             "SimpleTwoProductPerishableLimitDemand",
             "SimpleTwoProductPerishableLimitDemandGymnax",
+            "SimpleTwoProductPerishableIncIssueGymnax",
         ]:
             return rs_perishable_S_policy
         else:

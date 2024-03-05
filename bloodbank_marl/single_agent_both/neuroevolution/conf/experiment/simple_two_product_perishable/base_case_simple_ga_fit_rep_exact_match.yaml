@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+ - override /policies/issuing: heuristic_exact_match
+
+wandb:
+  init:
+    project: "simple_two_perishable_base"
+    tags:
+      - "new_type_env"
+      - "exact_match"
+      - "fit_rep"
+      - "simple_ga"
+
+policies:
+  optimize:
+    - 0

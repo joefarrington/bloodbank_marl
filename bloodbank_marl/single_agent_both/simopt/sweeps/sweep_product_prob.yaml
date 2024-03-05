@@ -1,0 +1,21 @@
+program: ../run_simopt.py
+method: grid
+metric:
+  name: eval/mean_params/return_mean
+  goal: maximize
+parameters:
+  environment.env_params.product_probabilities:
+    distribution: categorical
+    values:
+      - [0.1,0.9]
+      - [0.25,0.75]
+      - [0.5,0.5]
+      - [0.75,0.25]
+      - [0.9,0.1]
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=simple_two_product_perishable/base_case_priority_match

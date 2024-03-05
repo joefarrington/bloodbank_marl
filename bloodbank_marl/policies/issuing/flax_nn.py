@@ -12,7 +12,25 @@ import chex
 from flax import struct
 from bloodbank_marl.utils.gymnax_fitness import make
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
-from bloodbank_marl.policies.common import FlaxStochasticMAPolicy
+from bloodbank_marl.policies.common import FlaxStochasticMAPolicy, FlaxPolicy
+
+
+class FlaxMultiProductIssuePolicySingleAgentEnv(FlaxPolicy):
+    # For use with the new environment - needs to get an IssueObs to instantiate NN params
+    def __init__(
+        self,
+        model_class,
+        model_kwargs,
+        env_name=None,
+        env_kwargs={},
+        env_params={},
+    ):
+        self.env_name = env_name
+        self.env_kwargs = env_kwargs
+        env, default_env_params = make(self.env_name, **self.env_kwargs)
+        self.env_params = default_env_params.create_env_params(**env_params)
+        self.obs = env.default_issue_obs(self.env_params)
+        self.model = model_class(n_actions=env.num_issue_actions, **model_kwargs)
 
 
 class FlaxStochasticMultiProductIssuePolicy(FlaxStochasticMAPolicy):

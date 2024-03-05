@@ -1,0 +1,17 @@
+# @package _global_
+
+wandb:
+  init:
+    project: "simple_two_perishable_base"
+    tags:
+      - "new_type_env"
+      - "fit_rep"
+      - "simopt"
+      - "priority_match"
+policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 
