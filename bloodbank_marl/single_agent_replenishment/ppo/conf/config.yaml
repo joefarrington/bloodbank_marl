@@ -1,6 +1,6 @@
 defaults:
-  - policies/replenishment: single_agent_stochastic_single_product_order_up_to_mlp
   - environment: de_moor_perishable_gymnax
+  - policies/replenishment: single_agent_stochastic_single_product_order_up_to_mlp
   - policies/issuing: 
   - _self_
 
@@ -27,9 +27,9 @@ training:
 fixed_config:
   num_envs: 200
   num_steps: 20
-  total_timesteps: 1e7
+  total_timesteps: 1e6
   update_epochs: 4
-  num_minibatches: 4
+  num_minibatches: 10
   anneal_lr: True
   environment: ${environment}
   policies: ${policies}

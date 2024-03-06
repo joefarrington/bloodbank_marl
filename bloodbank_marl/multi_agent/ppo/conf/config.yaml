@@ -1,6 +1,6 @@
 defaults:
   - environment: de_moor_perishable
-  - policies/replenishment: multi_agent_stochastic_single_product_mlp
+  - policies/replenishment: multi_agent_stochastic_single_product_order_up_to_mlp
   - policies/issuing: multi_agent_stochastic_single_product_mlp
   - _self_
 
@@ -8,7 +8,11 @@ plot_policies: False
 
 wandb:
   init:
-    project: "marl_ppo_jax_demoor"
+    project: "temp"
+    tags:
+      - "ppo"
+      - "fit_both"
+      - "marl_env"
 
 hydra:
   job:
@@ -17,25 +21,25 @@ hydra:
     - pkg://bloodbank_marl.common_config
 
 training:
-  num_envs: 40
+  num_envs: 200
   seed: 123
 
   replenishment:
     num_envs: ${training.num_envs}
     lr: 2.5e-4
-    num_steps: 50
+    num_steps: 20
     total_timesteps: 1e6
     update_epochs: 4
-    num_minibatches: 4
+    num_minibatches: 10
     gamma: 0.99
     gae_lambda: 0.95
     clip_eps: 0.2
     ent_coef: 0.01
     vf_coef: 0.5
-    max_grad_norm: 0.5
+    max_grad_norm: 0.5  
     anneal_lr: True
     dual_clip: False
-    dual_clip_value: 5.0
+    dual_clip_value: 5.0 # This will only be used if dual_clip is True
     norm_adv: True
     value_clip: True
     partial_episode_bootstrapping: True
@@ -43,10 +47,10 @@ training:
   issuing:
     num_envs: ${training.num_envs}
     lr: 2.5e-4
-    num_steps: 200
+    num_steps: 80
     total_timesteps: 4e6
     update_epochs: 4
-    num_minibatches: 16
+    num_minibatches: 40
     gamma: 0.99
     gae_lambda: 0.95
     clip_eps: 0.2
@@ -66,7 +70,7 @@ evaluation:
     _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
-    num_rollouts: 1000
+    num_rollouts: 10000
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
     test: True
