@@ -1,4 +1,4 @@
-program: ../run_ppo.py
+program: ../run_ppo_train_one_agent.py
 method: bayes
 metric:
   name: eval/return_mean

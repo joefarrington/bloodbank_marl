@@ -1,4 +1,4 @@
-program: ../run_ppo.py
+program: ../run_ppo_train_one_agent.py
 method: bayes
 metric:
   name: eval/return_mean
@@ -46,4 +46,4 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=de_moor_perishable/m2/exp2/fit_issue
+  - +experiment=de_moor_perishable/m5/exp6/fit_issue
