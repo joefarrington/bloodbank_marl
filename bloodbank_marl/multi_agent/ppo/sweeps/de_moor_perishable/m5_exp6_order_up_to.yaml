@@ -1,4 +1,4 @@
-program: ../run_ppo_demoor.py
+program: ../run_ppo.py
 method: bayes
 metric:
   name: eval/return_mean
