@@ -1,0 +1,106 @@
+defaults:
+  - _self_
+  - environment : de_moor_perishable_gymnax
+  - policies/replenishment: value_iteration
+
+wandb:
+  init:
+    project: "de_moor_pareto_frontier_plots_vi"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+      # Search paths assume that run_value_iteration.py will be run from value_iteration/
+    - pkg://bloodbank_marl.common_config
+
+environment:
+  env_params:
+    shortage_cost: 0
+    wastage_cost: 0
+
+vi_runner:
+  _target_: bloodbank_marl.utils.viso_jax.scenarios.de_moor_perishable.vi_runner.DeMoorPerishableVIR
+  max_demand: ${environment.env_params.max_demand}
+  demand_gamma_mean: ${environment.env_params.demand_gamma_mean}
+  demand_gamma_cov: ${environment.env_params.demand_gamma_cov}
+  max_useful_life: ${environment.env_kwargs.max_useful_life}
+  lead_time: ${environment.env_kwargs.lead_time}
+  max_order_quantity: ${environment.env_kwargs.max_order_quantity}
+  variable_order_cost: ${environment.env_params.variable_order_cost}
+  shortage_cost: ${environment.env_params.shortage_cost}
+  wastage_cost: ${environment.env_params.wastage_cost}
+  holding_cost: ${environment.env_params.holding_cost}
+  issue_policy: ${environment.env_kwargs.issuing_policy}
+  max_batch_size: 1000
+  epsilon: 1e-4
+  gamma: ${environment.gamma}
+  checkpoint_frequency: 0  # Zero for no checkpoints
+  resume_from_checkpoint: False
+
+shortage_costs:
+  - 3.2
+  - 3.5
+  - 4.0
+  - 4.44
+  - 5.0
+  - 5.714
+  - 6.66
+  - 8.0
+  - 10.0
+  - 13.33
+  - 20.0
+  - 40.0
+  - 60.0
+  - 80.0
+  - 100.0
+  - 120.0
+  - 140.0
+  - 160.0
+  - 180.0
+  - 200.0
+
+wastage_costs:
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+  - 40.0
+
+
+run_settings:
+    max_iter: 5000
+    min_iter: 1
+    extract_policy: True
+
+jax_settings:
+  double_precision: True
+
+evaluation: 
+  seed: 1337 
+  test_evaluator:
+    _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 10000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}
