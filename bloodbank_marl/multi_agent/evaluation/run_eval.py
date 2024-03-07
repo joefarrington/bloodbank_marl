@@ -51,7 +51,18 @@ def main(cfg):
     # Add batch dimension to the policy for use with the test evaluator
     policy_params = jax.tree_map(lambda x: x.reshape((1,) + x.shape), policy_params)
 
-    policies = [policy_rep.apply, policy_issue.apply]
+    # If we have a PPO policy, we want to evaluate it deterministically
+    rep_apply_fn = (
+        policy_rep.apply_deterministic
+        if hasattr(policy_rep, "apply_deterministic")
+        else policy_rep.apply
+    )
+    issue_apply_fn = (
+        policy_issue.apply_deterministic
+        if hasattr(policy_issue, "apply_deterministic")
+        else policy_issue.apply
+    )
+    policies = [rep_apply_fn, issue_apply_fn]
     policy_manager = hydra.utils.instantiate(
         cfg.policies.policy_manager, policies=policies
     )

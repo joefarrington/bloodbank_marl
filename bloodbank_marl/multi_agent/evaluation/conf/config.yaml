@@ -1,15 +1,29 @@
 defaults:
   - environment: de_moor_perishable
-  - policies/replenishment: discrete_order_up_to_mlp
-  - policies/issuing: discrete_mlp
-  - _self_
+  - policies/replenishment: multi_agent_single_product_order_up_to_mlp
+  - policies/issuing: multi_agent_single_product_mlp
+  - policies/load_replenishment_policy_params: flax_nn
+  - policies/load_issuing_policy_params: flax_nn
 
 wandb:
   init:
-    project: "bloodbank_marl_neuroevolution_default"
+    project: "bloodbank_marl_evaluation_default"
+    tags:
+      - "evaluation"
+      - "marl_env"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+policies:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
 
 evaluation:
-  seed: 1234
+  seed: 24601
   test_evaluator:
     _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}
