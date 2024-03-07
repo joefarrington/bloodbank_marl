@@ -20,6 +20,11 @@ hydra:
   searchpath:
     - pkg://bloodbank_marl.common_config
 
+checkpoint_options:
+  _target_: orbax.checkpoint.CheckpointManagerOptions
+  max_to_keep: 1
+  create: True
+
 training:
   num_envs: 200
   seed: 123

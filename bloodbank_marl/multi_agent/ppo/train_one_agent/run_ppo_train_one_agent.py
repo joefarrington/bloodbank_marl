@@ -43,6 +43,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly
 
+import orbax
+from flax.training import checkpoints
+
 
 @struct.dataclass
 class Transition:
@@ -704,6 +707,14 @@ def log_episode_metrics(config, metrics):
 def main(cfg):
     config = omegaconf.OmegaConf.to_container(cfg, resolve=True)
     run = wandb.init(**cfg.wandb.init, config=config)
+
+    # Checkpointing for NN policies
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    checkpoint_options = hydra.utils.instantiate(cfg.checkpoint_options)
+    checkpoint_manager = orbax.checkpoint.CheckpointManager(
+        wandb.run.dir, orbax_checkpointer, checkpoint_options
+    )
+
     train = make_train(config)
     print("Starting training")
     output = train(jax.random.PRNGKey(cfg.training.seed))
@@ -740,6 +751,12 @@ def main(cfg):
         for k, v in kpis.items()
         if k in cfg.environment.kpis_log_eval
     }
+
+    ckpt = {
+        "policy_params": jax.tree_util.tree_map(lambda x: x[0], training_params),
+    }
+    checkpoint_manager.save(0, ckpt)
+
     wandb.log(test_kpis)
 
     if config["plot_policies"]:

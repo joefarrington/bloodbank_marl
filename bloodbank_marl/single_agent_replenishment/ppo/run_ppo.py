@@ -19,6 +19,8 @@ from bloodbank_marl.scenarios.meneses_perishable.gymnax_env import EnvObs
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from flax.training import checkpoints
+import orbax
 
 
 # TODO: Need to think carefully about logging if we are vmapping over some config inputs
@@ -472,6 +474,13 @@ def main(cfg):
 
     run = wandb.init(**wandb_config["wandb"]["init"], config=wandb_config)
 
+    # Checkpointing for NN policies
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    checkpoint_options = hydra.utils.instantiate(cfg.checkpoint_options)
+    checkpoint_manager = orbax.checkpoint.CheckpointManager(
+        wandb.run.dir, orbax_checkpointer, checkpoint_options
+    )
+
     # Resolve these to dicts because make_train adds extra elements
     # and we want to use hp_config as input to the dataclass
     fixed_config = omegaconf.OmegaConf.to_container(cfg.fixed_config, resolve=True)
@@ -511,6 +520,13 @@ def main(cfg):
     for k, v in kpis.items():
         if k in cfg.environment.scalar_kpis_to_log:
             log_to_wandb[f"eval/{k}"] = v.mean(axis=-1)
+
+    # NOTE: For now this assumes we're just training 1 NN policy, which we are
+    # But if we want to train multiple, this will need additional work
+    ckpt = {
+        "policy_params": jax.tree_util.tree_map(lambda x: x[0], policy_params),
+    }
+    checkpoint_manager.save(0, ckpt)
 
     wandb.log(log_to_wandb)
 
