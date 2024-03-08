@@ -1,0 +1,19 @@
+program: ../run_evosax.py
+name: compare_lead_time
+method: grid
+metric:
+  name: eval/top_1/return_mean
+  goal: maximize
+parameters:
+  environment.env_kwargs.lead_time:
+    distribution: categorical
+    values:
+      - 0
+      - 1
+      - 2     
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=simple_two_product_perishable/base_case_simple_ga_fit_both_for_input_comparisons

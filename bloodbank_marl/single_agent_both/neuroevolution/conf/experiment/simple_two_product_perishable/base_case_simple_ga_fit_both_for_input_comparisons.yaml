@@ -1,0 +1,22 @@
+# @package _global_
+wandb:
+  init:
+    project: "simple_two_perishable_input_comparisons"
+    tags:
+      - "new_type_env"
+      - "fit_both"
+      - "simple_ga"
+
+evosax:
+  strategy:
+    elite_ratio: 0.5
+    sigma_init: 0.07
+    sigma_decay: 1.0
+
+policies:
+  optimize:
+    - 0
+    - 1
+
+evaluation:
+  seed: 24601
