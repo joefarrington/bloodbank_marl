@@ -1,0 +1,30 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: multi_agent_single_product_mlp
+  - override /policies/replenishment: multi_agent_single_product_order_up_to_mlp
+
+wandb:
+  init:
+    project: "de_moor_perishable_evaluation"
+    tags:
+      - "fit_both"
+      - "m5_exp2"
+      - "open_es"
+      - "order_up_to"
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+
+policies:
+  load_replenishment_policy_params:
+    param_key: rep_best_params
+    checkpoint_id: 99
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_both_replenishment_order_up_to/m5/exp2/open_es"
+  load_issuing_policy_params:
+    param_key: issue_best_params
+    checkpoint_id: 99
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_both_replenishment_order_up_to/m5/exp2/open_es"

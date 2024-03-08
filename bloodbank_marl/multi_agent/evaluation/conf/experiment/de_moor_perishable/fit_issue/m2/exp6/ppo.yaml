@@ -1,0 +1,30 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: multi_agent_stochastic_single_product_mlp
+  - override /policies/replenishment: value_iteration
+  - override /policies/load_replenishment_policy_params: blank
+
+wandb:
+  init:
+    project: "de_moor_perishable_evaluation"
+    tags:
+      - "fit_issue"
+      - "m2_exp6"
+      - "ppo"
+
+environment:
+  env_kwargs:
+    lead_time: 2
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: bloodbank_marl.utils.load_save_policy_params.load_vi_policy_params
+      filepath: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/value_iteration_replenishment/m2_exp6.npy"
+      reshape_for_fitness: False
+  load_issuing_policy_params:
+    param_key: policy_params
+    checkpoint_id: 0
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/multi_agent/ppo/train_one_agent/outputs/2024-03-07/17-22-53/wandb/latest-run/files"

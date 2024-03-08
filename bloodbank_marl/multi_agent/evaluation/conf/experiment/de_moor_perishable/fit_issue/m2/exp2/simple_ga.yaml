@@ -6,11 +6,12 @@ defaults:
   - override /policies/load_replenishment_policy_params: blank
 
 wandb:
-  project: "de_moor_perishable_evaluation"
-  tags:
-    - "fit_issue"
-    - "m2_exp2"
-    - "simple_ga"
+  init:
+    project: "de_moor_perishable_evaluation"
+    tags:
+      - "fit_issue"
+      - "m2_exp2"
+      - "simple_ga"
 
 policies:
   replenishment:

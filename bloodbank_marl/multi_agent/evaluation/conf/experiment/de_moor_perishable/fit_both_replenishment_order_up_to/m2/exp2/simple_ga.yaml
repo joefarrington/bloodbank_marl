@@ -5,12 +5,13 @@ defaults:
   - override /policies/replenishment: multi_agent_single_product_order_up_to_mlp
 
 wandb:
-  project: "de_moor_perishable_evaluation"
-  tags:
-    - "fit_both"
-    - "m2_exp2"
-    - "simple_ga"
-    - "order_up_to"
+  init:
+    project: "de_moor_perishable_evaluation"
+    tags:
+      - "fit_both"
+      - "m2_exp2"
+      - "simple_ga"
+      - "order_up_to"
 
 policies:
   load_replenishment_policy_params:

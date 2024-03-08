@@ -7,10 +7,11 @@ defaults:
   - override /policies/load_replenishment_policy_params: blank
 
 wandb:
-  project: "de_moor_perishable_evaluation"
-  tags:
-    - "simopt"
-    - "m2_exp2"
+  init:
+    project: "de_moor_perishable_evaluation"
+    tags:
+      - "simopt"
+      - "m2_exp2"
 
 policies:
   # For value iteration and SimOpt, load in as fixed params

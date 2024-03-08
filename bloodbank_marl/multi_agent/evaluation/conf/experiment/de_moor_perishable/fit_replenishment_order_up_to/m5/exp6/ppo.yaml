@@ -1,0 +1,27 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: heuristic_oufo
+  - override /policies/replenishment: multi_agent_stochastic_single_product_order_up_to_mlp
+  - override /policies/load_issuing_policy_params: blank
+
+wandb:
+  init:
+    project: "de_moor_perishable_evaluation"
+    tags:
+      - "fit_rep"
+      - "m5_exp6"
+      - "ppo"
+      - "order_up_to"
+
+environment:
+  env_kwargs:
+    lead_time: 2
+    max_useful_life: 5
+
+policies:
+  load_replenishment_policy_params:
+    param_key: policy_params
+    checkpoint_id: 0
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/single_agent_replenishment/ppo/outputs/2024-03-07/16-44-41/wandb/run-20240307_164442-sy83qfho/files"

@@ -4,6 +4,7 @@ defaults:
   - policies/issuing: multi_agent_single_product_mlp
   - policies/load_replenishment_policy_params: flax_nn
   - policies/load_issuing_policy_params: flax_nn
+  - _self_
 
 wandb:
   init:
