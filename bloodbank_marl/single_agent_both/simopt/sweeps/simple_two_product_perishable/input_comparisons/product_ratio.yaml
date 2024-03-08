@@ -1,0 +1,29 @@
+program: ../run_evosax.py
+name: compare_product_probabilities
+method: grid
+metric:
+  name: eval/top_1/return_mean
+  goal: maximize
+parameters:
+  environment.env_params.product_probabilities:
+    distribution: categorical
+    values:
+      - [0.1, 0.9]
+      - [0.25, 0.75]
+      - [0.5, 0.5]
+      - [0.75, 0.25]
+      - [0.9, 0.1]
+
+  policies.issuing._target_:
+    distribution: categorical
+    values:
+      - bloodbank_marl.policies.issuing.heuristic.ExactMatchIssuingPolicy
+      - bloodbank_marl.policies.issuing.heuristic.PriorityMatchIssuingPolicy
+      - bloodbank_marl.policies.issuing.heuristic.OldestCompatibleIssuingPolicy
+ 
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=simple_two_product_perishable/base_case_for_input_comparisons
