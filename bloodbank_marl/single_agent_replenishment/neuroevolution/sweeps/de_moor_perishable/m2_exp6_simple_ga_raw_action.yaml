@@ -1,4 +1,5 @@
 program: ../run_evosax.py
+name: simple_ga_fit_rep_raw_action
 method: bayes
 metric:
   name: eval/mean_params/return_mean
