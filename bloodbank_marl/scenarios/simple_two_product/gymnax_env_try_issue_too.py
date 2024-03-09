@@ -18,12 +18,12 @@ import numpy as np
 # TODO: Decide where to specify n_products and how to get it into default params
 
 n_products = 2
-C = 1e10  # invalid substitution cost
+M = 1e10  # invalid substitution cost
 max_useful_life = 2
 substitution_cost_ratios = [
     [
         0,
-        C,
+        M,
     ],
     [
         1,
