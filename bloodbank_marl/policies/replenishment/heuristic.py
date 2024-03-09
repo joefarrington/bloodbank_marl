@@ -58,6 +58,7 @@ class SRepPolicy(HeuristicPolicy):
             "MenesesPerishableGymnax",
             "RSPerishable",
             "RSPerishableGymnax",
+            "RSPerishableIncIssueGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
         elif self.env_name == "RSPerishableFourGymnax":
@@ -93,6 +94,7 @@ class SRepPolicy(HeuristicPolicy):
             "SimpleTwoProductPerishableLimitDemand",
             "SimpleTwoProductPerishableLimitDemandGymnax",
             "SimpleTwoProductPerishableIncIssueGymnax",
+            "RSPerishableIncIssueGymnax",
         ]:
             return rs_perishable_S_policy
         else:
@@ -199,7 +201,11 @@ class sSRepPolicy(SRepPolicy):
     def _get_param_row_names(self) -> List[str]:
         """Get the row names for the policy parameters - these are the names of the different levels of a
         given paramter, e.g. for different days of the week or different products"""
-        if self.env_name in ["RSPerishableGymnax", "RSPerishable"]:
+        if self.env_name in [
+            "RSPerishableGymnax",
+            "RSPerishable",
+            "RSPerishableIncIssueGymnax",
+        ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
         elif self.env_name == "RSPerishableFourGymnax":
             return ["O", "A", "B", "AB"]
@@ -210,7 +216,11 @@ class sSRepPolicy(SRepPolicy):
 
     def _get_apply_method(self) -> callable:
         """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name == "RSPerishableGymnax":
+        if self.env_name in [
+            "RSPerishableGymnax",
+            "RSPersihableIncIssueGymnax",
+            "RSPerishable",
+        ]:
             return rs_perishable_sS_policy
         else:
             raise NotImplementedError(
@@ -255,6 +265,7 @@ class SDayOfWeekRepPolicy(SRepPolicy):
         if self.env_name in [
             "RSPerishable",
             "RSPerishableGymnax",
+            "RSPerishableIncIssueGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
         elif self.env_name == "RSPerishableFourGymnax":
@@ -273,6 +284,8 @@ class SDayOfWeekRepPolicy(SRepPolicy):
             "RSPerishableFourGymnax",
             "RSPerishableTwoGymnax",
             "RSPerishableOneGymnax",
+            "RSPerishable",
+            "RSPerishableIncIssueGymnax",
         ]:
             return rs_perishable_S_day_of_week_policy
         else:
