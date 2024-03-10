@@ -1,21 +1,18 @@
 program: ../run_evosax.py
-name: compare_product_probabilities
+name: simple_ga_compare_higher_shortage_costs
 method: grid
 metric:
   name: eval/top_1/return_mean
   goal: maximize
 parameters:
-  environment.env_params.wastage_costs:
-    distribution: categorical
-    values:
-      - [4.0, 4.0]
   environment.env_params.shortage_costs:
     distribution: categorical
     values:
-      - [4.0, 4.0]
-      - [8.0, 8.0]
-      - [12.0, 12.0]
-      - [16.0, 16.0]
+      - [7.0, 7.0]
+      - [14.0, 14.0]
+      - [21.0, 21.0]
+      - [28.0, 28.0]
+      - [35.0, 35.0]
 
 command:
   - ${env}

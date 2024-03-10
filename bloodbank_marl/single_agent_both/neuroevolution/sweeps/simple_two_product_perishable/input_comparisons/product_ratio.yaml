@@ -1,5 +1,5 @@
 program: ../run_evosax.py
-name: compare_product_probabilities
+name: simple_ga_compare_product_probabilities
 method: grid
 metric:
   name: eval/top_1/return_mean

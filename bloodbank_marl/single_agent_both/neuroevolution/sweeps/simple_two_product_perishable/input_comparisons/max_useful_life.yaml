@@ -1,5 +1,5 @@
 program: ../run_evosax.py
-name: compare_max_useful_life
+name: simple_ga_compare_max_useful_life
 method: grid
 metric:
   name: eval/top_1/return_mean
