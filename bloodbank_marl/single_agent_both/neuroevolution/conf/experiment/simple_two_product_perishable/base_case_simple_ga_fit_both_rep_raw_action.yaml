@@ -1,6 +1,6 @@
 # @package _global_
 defaults:
-  - override /replenishment/policies: single_agent_multi_product_mlp
+  - override /policies/replenishment: single_agent_multi_product_mlp
 
 wandb:
   init:
