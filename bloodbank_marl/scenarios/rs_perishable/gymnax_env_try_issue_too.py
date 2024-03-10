@@ -11,7 +11,6 @@ import distrax
 import matplotlib.pyplot as plt
 import numpy as np
 from bloodbank_marl.scenarios.simple_two_product.gymnax_env_try_issue_too import (
-    DemandInfo,
     SimpleTwoProductPerishableIncIssueGymnax,
 )
 
@@ -85,7 +84,9 @@ product_probabilities = [
     0.03,  # AB+
 ]
 
-action_mask_per_request_type = jnp.where(substitution_cost_ratios > n_products, 0, 1)
+action_mask_per_request_type = jnp.where(
+    jnp.array(substitution_cost_ratios) > n_products, 0, 1
+)
 
 
 @struct.dataclass
@@ -241,21 +242,6 @@ class IssueObs:
 
     def one_hot_day_of_week(self):
         return jax.nn.one_hot(self.weekday, 7)
-
-
-@struct.dataclass
-class DemandInfo:
-    total_demand: int
-    remaining_demand: int
-    shortages: int
-    allocations: int
-    remaining_stock: chex.Array
-    in_transit: chex.Array
-    request_type_samples: chex.Array
-    request_time_samples: chex.Array
-    key: jax.random.PRNGKey
-    issue_policy_params: Optional[Dict]
-    action_mask_per_request_type: chex.Array
 
 
 class RSPerishableIncIssueGymnax(SimpleTwoProductPerishableIncIssueGymnax):
@@ -445,6 +431,7 @@ class RSPerishableIncIssueGymnax(SimpleTwoProductPerishableIncIssueGymnax):
             stock=jnp.zeros((self.n_products, self.max_useful_life)),
             # The in_transit element of state should have at least one element, even if L=0
             in_transit=jnp.zeros((self.n_products, max(self.lead_time, 1))),
+            weekday=initial_weekday,
             step=0,
         )
         return self.get_obs(state), state
@@ -483,16 +470,22 @@ class RSPerishableIncIssueGymnax(SimpleTwoProductPerishableIncIssueGymnax):
         key, issue_key = jax.random.split(demand_info.key)
         remaining_demand = demand_info.remaining_demand - 1
         requested_product_idx = demand_info.request_type_samples[idx]
+        request_time = demand_info.request_time_samples[idx]
+
         # Identify the product type to be issued
         issuing_obs = IssueObs(
             stock=demand_info.remaining_stock,
-            in_transit=demand_info.in_transit,
-            request_time=demand_info.request_time_samples[idx],
-            request_type=requested_product_idx,
+            # Additional element of lead time compared to replenishment obs if L>0
+            # because there is stock in transit during the day we may need to account for
+            in_transit=demand_info.in_transit[:, 0 : self.lead_time],
             weekday=demand_info.weekday,
-            action_mask=demand_info.action_mask_per_request_type,
+            request_time=request_time,
+            request_type=requested_product_idx,
+            action_mask=self._get_issuing_mask(demand_info, requested_product_idx),
         )
-        issue_action = self._issuing_policy.apply(None, issuing_obs, issue_key)
+        issue_action = self._issuing_fn(
+            demand_info.issue_policy_params, issuing_obs, issue_key
+        )
         issued_product_idx = jnp.argmax(issue_action)
         shortage = jax.lax.select(
             jax.lax.bitwise_or(
@@ -523,8 +516,13 @@ class RSPerishableIncIssueGymnax(SimpleTwoProductPerishableIncIssueGymnax):
             shortages,
             allocations,
             stock_after_issue,
+            demand_info.in_transit,
+            demand_info.weekday,
             demand_info.request_type_samples,
+            demand_info.request_time_samples,
             key,
+            demand_info.issue_policy_params,
+            demand_info.action_mask_per_request_type,
         )
 
     def end_of_warmup_reset(
