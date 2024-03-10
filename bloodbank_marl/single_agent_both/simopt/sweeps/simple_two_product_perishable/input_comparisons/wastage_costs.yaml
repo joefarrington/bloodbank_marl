@@ -1,16 +1,17 @@
 program: ../run_simopt.py
-name: simopt_compare_lead_time
+name: simopt_compare_wastage_costs
 method: grid
 metric:
   name: eval/return_mean
 parameters:
-  environment.env_kwargs.lead_time:
+  environment.env_params.shortage_costs:
     distribution: categorical
     values:
-      - 0
-      - 1
-      - 2
-
+      - [5.0, 5.0]
+      - [10.0, 10.0]
+      - [15.0, 15.0]
+      - [20.0, 20.0]
+      - [25.0, 25.0]
   policies.issuing._target_:
     distribution: categorical
     values:

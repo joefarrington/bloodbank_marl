@@ -1,9 +1,8 @@
-program: ../run_evosax.py
-name: compare_product_probabilities
+program: ../run_simopt.py
+name: simopt_compare_product_probabilities
 method: grid
 metric:
-  name: eval/top_1/return_mean
-  goal: maximize
+  name: eval/return_mean
 parameters:
   environment.env_params.product_probabilities:
     distribution: categorical

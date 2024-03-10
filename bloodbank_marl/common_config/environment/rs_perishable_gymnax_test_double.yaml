@@ -2,7 +2,7 @@ env_name: RSPerishableIncIssueGymnax
 num_env_steps: 365
 num_warmup_days: 100
 env_params:
-  poisson_mean_demand:
+  poisson_demand_mean:
     - 37.5 # Mon
     - 37.3 # Tue
     - 39.2 # Wed
@@ -19,12 +19,12 @@ env_params:
     - 0.09  # B+
     - 0.01  # AB-
     - 0.03  # AB+
-  age_on_arrival_disttribution_probs:
+  age_on_arrival_distribution_probs:
     - 1
     - 0
     - 0
   fixed_order_cost: 225
-  variable_order_cost: [650, 650, 650, 650, 650, 650, 650, 650]
+  variable_order_costs: [650, 650, 650, 650, 650, 650, 650, 650]
   shortage_costs: [3250, 3250, 3250, 3250, 3250, 3250, 3250, 3250]
   wastage_costs: [650, 650, 650, 650, 650, 650, 650, 650]
   holding_costs: [130, 130, 130, 130, 130, 130, 130, 130]

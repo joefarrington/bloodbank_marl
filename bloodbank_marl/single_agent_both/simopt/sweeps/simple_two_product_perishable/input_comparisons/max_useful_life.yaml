@@ -1,9 +1,8 @@
-program: ../run_evosax.py
-name: compare_max_useful_life
+program: ../run_simopt.py
+name: simopt_compare_max_useful_life
 method: grid
 metric:
-  name: eval/top_1/return_mean
-  goal: maximize
+  name: eval/return_mean
 parameters:
   environment.env_kwargs.max_useful_life:
     distribution: categorical
