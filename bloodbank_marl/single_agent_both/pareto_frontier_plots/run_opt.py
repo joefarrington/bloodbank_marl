@@ -41,7 +41,9 @@ def simopt_grid_sampler(
         cfg.param_search.sampler, search_space=search_space, seed=cfg.param_search.seed
     )
     # NEW: Need to specify direction for each objective
-    study = optuna.create_study(sampler=sampler, directions=["minimize", "maximize"])
+    study = optuna.create_study(
+        sampler=sampler, directions=["minimize", "maximize", "maximize"]
+    )
 
     # If we have an initial set of policy params, enqueue a trial with those
     if initial_policy_params is not None:
@@ -83,18 +85,28 @@ def simopt_grid_sampler(
         # NEW: CODE FOR KPIs
         wastage_pc = jnp.nan_to_num(kpis["wastage_%"].mean(axis=-1))
         service_level_pc = kpis["service_level_%"].mean(axis=-1)
+        exact_match_pc = kpis["exact_match_%"].mean(axis=-1)
 
         wastage_pc_std = jnp.nan_to_num(kpis["wastage_%"].std(axis=-1))
         service_level_pc_std = kpis["service_level_%"].std(axis=-1)
+        exact_match_pc_std = kpis["exact_match_%"].std(axis=-1)
 
         for idx in range(num_parallel_trials):
             try:
                 trials[idx].set_user_attr("wastage_pc_std", float(wastage_pc_std[idx]))
                 trials[idx].set_user_attr(
                     "service_level_pc_std", float(service_level_pc_std[idx])
-                )
+                ),
+                trials[idx].set_user_attr(
+                    "exact_match_pc_std", float(exact_match_pc_std[idx])
+                ),
                 study.tell(
-                    trials[idx], (float(wastage_pc[idx]), float(service_level_pc[idx]))
+                    trials[idx],
+                    (
+                        float(wastage_pc[idx]),
+                        float(service_level_pc[idx]),
+                        float(exact_match_pc[idx]),
+                    ),
                 )
             except RuntimeError:
                 break
@@ -105,21 +117,21 @@ def simopt_grid_sampler(
 def run_grid_search_record_kpis(cfg: DictConfig):
     policy_rep = hydra.utils.instantiate(cfg.heuristic_policies.replenishment)
     policy_issue = hydra.utils.instantiate(cfg.heuristic_policies.issuing)
-    policies = [policy_rep.apply, policy_issue.apply]
-    policy_manager = hydra.utils.instantiate(
-        cfg.policies.policy_manager, policies=policies
-    )
 
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
-    test_evaluator.set_apply_fn(policy_manager.apply)
+    test_evaluator.set_apply_fn(policy_rep.apply)
+    test_evaluator.set_issuing_fn(policy_issue.apply)
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
     study = simopt_grid_sampler(cfg, policy_rep, test_evaluator, rng_eval, None)
 
     trials_df = study.trials_dataframe()
-    trials_df = trials_df.sort_values(by="params_S", ascending=True)
     trials_df = trials_df.rename(
-        columns={"values_0": "wastage_%_mean", "values_1": "service_level_%_mean"}
+        columns={
+            "values_0": "wastage_%_mean",
+            "values_1": "service_level_%_mean",
+            "values_2": "exact_match_%_mean",
+        }
     )
     return trials_df
 
@@ -159,19 +171,16 @@ def run_neuro_opt_one_kpi(
         policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
         policy_params[1] = policy_issue.get_initial_params(rng_rep)
 
-        policies = [policy_rep.apply, policy_issue.apply]
-        policy_manager = hydra.utils.instantiate(
-            cfg.policies.policy_manager, policies=policies
-        )
-
         param_reshaper = ParameterReshaper(policy_params)
         test_param_reshaper = ParameterReshaper(policy_params, n_devices=1)
 
         train_evaluator = hydra.utils.instantiate(cfg.train_evaluator)
-        train_evaluator.set_apply_fn(policy_manager.apply)
+        train_evaluator.set_apply_fn(policy_rep.apply)
+        train_evaluator.set_issuing_fn(policy_issue.apply)
 
         test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
-        test_evaluator.set_apply_fn(policy_manager.apply)
+        test_evaluator.set_apply_fn(policy_rep.apply)
+        test_evaluator.set_issuing_fn(policy_issue.apply)
 
         # Strategy and fitness shaper
 
@@ -212,11 +221,13 @@ def run_neuro_opt_one_kpi(
                 fitness = (
                     kpis[fitness_kpi_name].mean(axis=-1)
                     - (kpis[penalty_kpi_name].mean(axis=-1) > penalty_kpi_threshold) * M
+                    - (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc) * M
                 )
             elif penalty_kpi_limit == "min":
                 fitness = (
                     kpis[fitness_kpi_name].mean(axis=-1)
                     + (kpis[penalty_kpi_name].mean(axis=-1) < penalty_kpi_threshold) * M
+                    - (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc) * M
                 )
             else:
                 raise ValueError("penalty_kpi_limit must be 'max' or 'min'")
@@ -236,26 +247,23 @@ def run_neuro_opt_one_kpi(
             rng_eval, reshaped_test_params
         )
 
-        test_fitness_mean = fitness.mean(axis=-1)
-        test_fitness_std = fitness.std(axis=-1)
-        test_kpis = {
-            k: v.mean(axis=-1)
-            for k, v in kpis.items()
-            if k in cfg.environment.kpis_log_eval
-        }
+        overall_metrics = cfg.environment.scalar_kpis_to_log
         for idx, p in enumerate(["top_1", "mean_params"]):
-            store[f"eval/{p}/return_mean"] = test_fitness_mean[idx]
-            store[f"eval/{p}/return_std"] = test_fitness_std[idx]
-            for k, v in test_kpis.items():
-                store[f"eval/{p}/{k}_mean"] = v[idx]
+            # Add aggregate metrics and return to dict to be logged to W&B
+            if overall_metrics is not None:
+                for m in overall_metrics:
+                    store[f"eval/{p}/{m}_mean"] = kpis[m][idx].mean()
+                    store[f"eval/{p}/{m}_std"] = kpis[m][idx].std()
 
         # TODO: Consider if we need to hardcode the names of the KPIs
         row = [
             penalty_kpi_threshold,
             float(store["eval/top_1/wastage_%_mean"]),
             float(store["eval/top_1/service_level_%_mean"]),
+            float(store["eval/top_1/exact_match_%_mean"]),
             float(store["eval/mean_params/wastage_%_mean"]),
             float(store["eval/mean_params/service_level_%_mean"]),
+            float(store["eval/mean_params/exact_match_%_mean"]),
         ]
         rows.append(row)
         best_params_last_round = best_params
@@ -265,8 +273,10 @@ def run_neuro_opt_one_kpi(
             "penalty_kpi_threshold",
             "top_1_wastage_%_mean",
             "top_1_service_level_%_mean",
+            "top_1_exact_match_%_mean",
             "mean_params_wastage_%_mean",
             "mean_params_service_level_%_mean",
+            "mean_params_exact_match_%_mean",
         ],
     )
     return res_df
@@ -281,11 +291,38 @@ def main(cfg):
     run = wandb.init(**wandb_config["wandb"]["init"], config=wandb_config)
 
     log.info("Starting grid search over heuristic policy parameters")
-    # Run grid search over the possible heuristic order up to parameters
+    # Run grid search over the possible heuristic order up to parameters for exact match issuing policy
+    cfg.heuristic_policies.issuing._target_ = (
+        "bloodbank_marl.policies.issuing.heuristic.ExactMatchIssuingPolicy"
+    )
     heuristic_df = run_grid_search_record_kpis(cfg)
-    heuristic_df.to_csv("heuristic_df.csv")
-    wandb.log({f"heuristic": wandb.Table(dataframe=heuristic_df)})
-    log.info("Grid search over heuristic policy parameters complete")
+    heuristic_df.to_csv("simopt_exact_match_df.csv")
+    wandb.log({f"simopt_exact_match": wandb.Table(dataframe=heuristic_df)})
+    log.info(
+        "Grid search over heuristic policy parameters with exact match issuing complete"
+    )
+
+    # Run grid search over the possible heuristic order up to parameters for priority match issuing policy
+    cfg.heuristic_policies.issuing._target_ = (
+        "bloodbank_marl.policies.issuing.heuristic.PriorityMatchIssuingPolicy"
+    )
+    heuristic_df = run_grid_search_record_kpis(cfg)
+    heuristic_df.to_csv("simopt_priority_match_df.csv")
+    wandb.log({f"simopt_priority_match": wandb.Table(dataframe=heuristic_df)})
+    log.info(
+        "Grid search over heuristic policy parameters with priority match issuing complete"
+    )
+
+    # Run grid search over the possible heuristic order up to parameters for oldest compatible match issuing policy
+    cfg.heuristic_policies.issuing._target_ = (
+        "bloodbank_marl.policies.issuing.heuristic.OldestCompatibleIssuingPolicy"
+    )
+    heuristic_df = run_grid_search_record_kpis(cfg)
+    heuristic_df.to_csv("simopt_oldest_compatible_match_df.csv")
+    wandb.log({f"simopt_oldest_compatible_match": wandb.Table(dataframe=heuristic_df)})
+    log.info(
+        "Grid search over heuristic policy parameters with oldest compatible match issuing complete"
+    )
 
     log.info("Starting optimization of service level with maximum wastage")
     # Run neuroevo to optimize service level, with a maximum wastage

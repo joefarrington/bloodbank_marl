@@ -4,4 +4,4 @@ wandb:
   init:
     tags:
       - "m2_exp2"
-      - "pareto_plot_opt"
+      - "simple_ga"

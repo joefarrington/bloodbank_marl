@@ -56,7 +56,7 @@ class EnvParams:
     holding_costs: chex.Array
     substitution_costs: chex.Array
     action_mask_per_request_type: chex.Array
-    max_expiry_pc_target: float
+    max_wastage_pc_target: float
     min_service_level_pc_target: float
     min_exact_match_pc_target: float
     target_kpi_breach_penalty: float
@@ -78,7 +78,7 @@ class EnvParams:
         substitution_cost_ratios: List[List[float]] = substitution_cost_ratios,
         max_substitution_cost: float = 2.0,
         action_mask_per_request_type: List[int] = action_mask_per_request_type,
-        max_expiry_pc_target: float = 100.0,  # Effectively no limit by default
+        max_wastage_pc_target: float = 100.0,  # Effectively no limit by default
         min_service_level_pc_target: float = 0.0,  # Effectively no limit by default
         min_exact_match_pc_target: float = 0.0,  # Effectively no limit by default
         target_kpi_breach_penalty: float = 0.0,  # Set penalty to 0 for now, was having issue with this
@@ -96,7 +96,7 @@ class EnvParams:
             jnp.array(holding_costs),
             jnp.array(substitution_cost_ratios) * max_substitution_cost,
             jnp.array(action_mask_per_request_type),
-            max_expiry_pc_target,
+            max_wastage_pc_target,
             min_service_level_pc_target,
             min_exact_match_pc_target,
             target_kpi_breach_penalty,
@@ -591,8 +591,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
                 (cum_info["demand"] - cum_info["shortages"]) * 100
             )
             / cum_info["demand"],
-            "expiries_%_by_product": ((cum_info["expiries"]) * 100)
-            / cum_info["orders"],
+            "wastage_%_by_product": ((cum_info["expiries"]) * 100) / cum_info["orders"],
             "mean_holding_by_product": cum_info["holding"] / cum_info["day_counter"],
             "mean_age_at_transfusion_by_pt_blood_group": self._calculate_mean_age_at_transfusion_by_pt_blood_group(
                 cum_info
@@ -606,7 +605,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
             )
             / jnp.sum(cum_info["demand"]),
             "unmet_demand_units": jnp.sum(cum_info["shortages"]),
-            "expiries_%": (jnp.sum(cum_info["expiries"]) * 100)
+            "wastage_%": (jnp.sum(cum_info["expiries"]) * 100)
             / jnp.sum(cum_info["orders"]),
             "expired_units": jnp.sum(cum_info["expiries"]),
             "mean_holding": jnp.sum(cum_info["holding"]) / cum_info["day_counter"],
@@ -634,7 +633,7 @@ class SimpleTwoProductPerishableIncIssueGymnax(environment.Environment):
         # 100% service level or 0% expriries for example to avoid issues with floating
         # point precision
         expiry_penalty = (
-            jnp.where(kpis["expiries_%"] > params.max_expiry_pc_target, 1, 0)
+            jnp.where(kpis["wastage_%"] > params.max_wastage_pc_target, 1, 0)
             * -params.target_kpi_breach_penalty
         )
 

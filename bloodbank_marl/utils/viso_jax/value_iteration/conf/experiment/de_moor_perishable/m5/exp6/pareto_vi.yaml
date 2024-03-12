@@ -1,0 +1,12 @@
+# @package _global_
+
+wandb:
+  init:
+    tags:
+      - "m5_exp6"
+      - "pareto_plot_vi"
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 2

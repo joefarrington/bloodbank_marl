@@ -1,0 +1,86 @@
+defaults:
+  - heuristic_policies/replenishment: heuristic_order_up_to
+  - heuristic_policies/issuing: heuristic_priority_match
+  - policies/replenishment: single_agent_multi_product_mlp
+  - policies/issuing: single_agent_multi_product_mlp
+  - param_search: grid
+  - evosax/strategy: simple_ga
+  - environment: simple_two_product_perishable_gymnax_test_double
+  - _self_
+
+wandb:
+  init:
+    project: "simple_two_product_pareto_frontier_plots"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+evosax:
+  strategy:
+    sigma_init: 0.07
+  num_generations: 100
+  popsize: 150
+  num_train_rollouts: 100
+  num_test_rollouts: 1000
+  seed: 10
+  init_prev_best: False
+  fitness_shaper:
+    _target_: evosax.FitnessShaper
+    maximize: True
+
+  logging:
+    _target_: evosax.utils.ESLog
+    num_generations: ${evosax.num_generations}
+    top_k: 5
+    maximize: ${evosax.fitness_shaper.maximize}
+
+kpi_ranges:
+  wastage_pc:
+    _target_: numpy.linspace
+    start: 0.5
+    stop: 20
+    num: 2 # 25
+  service_level_pc:
+    _target_: numpy.linspace
+    start: 50
+    stop: 99
+    num: 2 #25
+
+min_exact_match_pc: 0.0
+
+heuristic_policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${evosax.num_train_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  gamma: ${environment.gamma}
+
+evaluation: 
+  seed: 10191
+  test_evaluator:
+    _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: ${evosax.num_test_rollouts}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}

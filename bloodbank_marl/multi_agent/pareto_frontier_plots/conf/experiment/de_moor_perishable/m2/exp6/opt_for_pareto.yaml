@@ -1,0 +1,12 @@
+# @package _global_
+
+wandb:
+  init:
+    tags:
+      - "m2_exp6"
+      - "pareto_plot_opt"
+
+environment:
+  env_kwargs:
+    lead_time: 2
+

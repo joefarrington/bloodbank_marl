@@ -21,12 +21,6 @@ def run_vi_and_eval_one_cost_combination(cfg: DictConfig) -> DictConfig:
     VIR = hydra.utils.instantiate(cfg.vi_runner, output_directory=Path(wandb.run.dir))
     vi_output = VIR.run_value_iteration(**cfg.run_settings)
 
-    # Run evaluation for identified policy
-    policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
-    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
-    test_evaluator.set_apply_fn(policy_rep.apply)
-    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
-
     shape = (
         1,
     ) + tuple(  # Include a leading batch dimension for compatavility with the test evaluator
@@ -39,12 +33,25 @@ def run_vi_and_eval_one_cost_combination(cfg: DictConfig) -> DictConfig:
             )
         ]
     )
-    policy_params = jnp.array(vi_output["policy"].values).reshape(shape)
+    rep_params = jnp.array(vi_output["policy"].values).reshape(shape)
+    # Run evaluation for identified policy
+    policy_rep = hydra.utils.instantiate(
+        cfg.policies.replenishment, fixed_policy_params=rep_params
+    )
+    policy_issue = hydra.utils.instantiate(cfg.policies.issue)
+    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
+    test_evaluator.set_apply_fn(policy_rep.apply)
+    test_evaluator.set_issue_fn(policy_issue.apply)
+    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
+    policy_params = {
+        0: jnp.array([[0]]),
+        1: jnp.array([[0]]),
+    }  # Just placeholders - we're using fixed params for replenishment and no params needed for FIFO/OUFO
     fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, policy_params)
     cum_returns = fitness.mean(axis=1)
 
-    overall_metrics = cfg.environment.scalar_kpis_to_log
+    overall_metrics = cfg.environment.kpis_log_eval
 
     store = {}
     if overall_metrics is not None:
