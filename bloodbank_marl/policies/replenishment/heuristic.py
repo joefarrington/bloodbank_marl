@@ -78,8 +78,10 @@ class SRepPolicy(HeuristicPolicy):
 
     def _get_apply_method(self) -> callable:
         """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name in ["DeMoorPerishable", "DeMoorPerishableGymnax"]:
+        if self.env_name in ["DeMoorPerishable"]:
             return de_moor_perishable_S_policy
+        elif self.env_name in ["DeMoorPerishableGymnax"]:
+            return de_moor_perishable_gymnax_S_policy
         elif self.env_name in ["MenesesPerishable", "MenesesPerishableGymnax"]:
             return meneses_perishable_S_policy
         elif self.env_name in [
@@ -124,11 +126,18 @@ def rs_perishable_S_policy(policy_params, obs, rng):
     return jnp.clip((policy_params - stock_on_hand_and_in_transit), a_min=0).squeeze()
 
 
-def de_moor_perishable_S_policy(policy_params, obs, rng):
+def de_moor_perishable_gymnax_S_policy(policy_params, obs, rng):
     """(S) policy for DeMoorPerishable environment"""
     # policy_params = [[S]]
     stock_on_hand_and_in_transit = obs.stock.sum() + obs.in_transit.sum()
     return jnp.clip((policy_params[0, 0] - stock_on_hand_and_in_transit), a_min=0)
+
+
+def de_moor_perishable_S_policy(policy_params, obs, rng):
+    """(S) policy for DeMoorPerishable environment"""
+    # policy_params = {0:[[S]], 1:?}, assume we're using 0 for issuing
+    stock_on_hand_and_in_transit = obs.stock.sum() + obs.in_transit.sum()
+    return jnp.clip((policy_params[0][0, 0] - stock_on_hand_and_in_transit), a_min=0)
 
 
 # For use in with pretraining in large state spaces where we need to collect
