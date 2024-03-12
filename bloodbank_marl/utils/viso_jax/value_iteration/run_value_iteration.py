@@ -84,8 +84,8 @@ def main(cfg: DictConfig) -> None:
     for w, s in zip(wastage_costs, shortage_costs):
 
         # Set costs in the config to current combinatiom
-        cfg.environment.env_params.wastage_cost = w
-        cfg.environment.env_params.shortage_cost = s
+        cfg.environment.env_params.wastage_cost = float(w)
+        cfg.environment.env_params.shortage_cost = float(s)
 
         print(cfg)
         row = [w, s] + run_vi_and_eval_one_cost_combination(cfg)

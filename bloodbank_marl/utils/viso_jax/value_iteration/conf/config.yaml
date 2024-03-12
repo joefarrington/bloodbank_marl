@@ -39,49 +39,21 @@ vi_runner:
   resume_from_checkpoint: False
 
 shortage_costs:
-  - 3.2
-  - 3.5
-  - 4.0
-  - 4.44
-  - 5.0
-  - 5.714
-  - 6.66
-  - 8.0
-  - 10.0
-  - 13.33
-  - 20.0
-  - 40.0
-  - 60.0
-  - 80.0
-  - 100.0
-  - 120.0
-  - 140.0
-  - 160.0
-  - 180.0
-  - 200.0
+  _target_: numpy.logspace
+  start:
+    _target_: math.log10
+    _args_:
+      - 3.1
+  stop:
+    _target_: math.log10
+    _args_:
+      - 400
+  num: 100
 
 wastage_costs:
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-  - 40.0
-
+  _target_: numpy.repeat
+  a: 40
+  repeats: 100
 
 run_settings:
     max_iter: 5000

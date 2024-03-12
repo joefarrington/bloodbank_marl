@@ -20,6 +20,8 @@ import distrax
 import functools
 from bloodbank_marl.utils.make_env import make
 
+jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
+
 
 class GymnaxFitness(object):
     def __init__(
