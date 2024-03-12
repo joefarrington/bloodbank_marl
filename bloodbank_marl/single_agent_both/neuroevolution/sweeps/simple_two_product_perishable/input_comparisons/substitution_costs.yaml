@@ -1,17 +1,18 @@
 program: ../run_evosax.py
-name: simple_ga_compare_max_useful_life
+name: simopt_compare_substitution_costs
 method: grid
 metric:
   name: eval/top_1/return_mean
   goal: maximize
 parameters:
-  environment.env_kwargs.max_useful_life:
+  environment.env_params.max_substitution_cost:
     distribution: categorical
     values:
-      - 2
-      - 3
-      - 4
-      - 5     
+      - 0.5
+      - 1.0
+      - 2.0
+      - 4.0
+
 command:
   - ${env}
   - ${interpreter}

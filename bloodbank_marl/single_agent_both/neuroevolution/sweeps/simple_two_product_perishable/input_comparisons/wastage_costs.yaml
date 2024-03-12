@@ -5,7 +5,7 @@ metric:
   name: eval/top_1/return_mean
   goal: maximize
 parameters:
-  environment.env_params.shortage_costs:
+  environment.env_params.wastage_costs:
     distribution: categorical
     values:
       - [5.0, 5.0]

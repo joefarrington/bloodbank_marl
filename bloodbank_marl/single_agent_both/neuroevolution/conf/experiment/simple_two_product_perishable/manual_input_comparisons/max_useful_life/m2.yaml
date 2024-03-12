@@ -1,4 +1,5 @@
 # @package _global_
+
 wandb:
   init:
     project: "simple_two_perishable_input_comparisons"
@@ -6,7 +7,7 @@ wandb:
       - "new_type_env"
       - "fit_both"
       - "simple_ga"
-      - "compare_demand"
+      - "compare_max_useful_life"
 
 evosax:
   strategy:
@@ -14,11 +15,15 @@ evosax:
     sigma_init: 0.07
     sigma_decay: 1.0
 
+# Parameters not used by exact match; 
+# same params used by both oldest compatible match and priority match
 environment:
-  env_params:
-    poisson_demand_mean: 4
   env_kwargs:
-    max_order_quantity: 10
+    max_useful_life: 2
+  env_params:
+    age_on_arrival_distribution_probs:
+      - 1
+      - 0
 
 policies:
   optimize:

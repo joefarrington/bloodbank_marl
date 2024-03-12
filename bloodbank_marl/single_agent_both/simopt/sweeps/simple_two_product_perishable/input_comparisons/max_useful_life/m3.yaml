@@ -1,25 +1,20 @@
 program: ../run_simopt.py
-name: simopt_compare_max_useful_life
+name: simopt_compare_max_useful_life_3
 method: grid
 metric:
   name: eval/return_mean
 parameters:
-  environment.env_kwargs.max_useful_life:
-    distribution: categorical
-    values:
-      - 2
-      - 3
-      - 4
-      - 5     
+
   policies.issuing._target_:
     distribution: categorical
     values:
       - bloodbank_marl.policies.issuing.heuristic.ExactMatchIssuingPolicy
       - bloodbank_marl.policies.issuing.heuristic.PriorityMatchIssuingPolicy
       - bloodbank_marl.policies.issuing.heuristic.OldestCompatibleIssuingPolicy
+
 command:
   - ${env}
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=simple_two_product_perishable/base_case_for_input_comparisons
+  - +experiment=simple_two_product_perishable/input_comparisons/max_useful_life/m3
