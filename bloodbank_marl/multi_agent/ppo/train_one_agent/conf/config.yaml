@@ -11,7 +11,6 @@ wandb:
     project: "temp"
     tags:
       - "ppo"
-      - "fit_issue"
       - "marl_env"
 
 hydra:
@@ -59,7 +58,7 @@ evaluation:
     _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
-    num_rollouts: 10000
+    num_rollouts: 1000
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
     test: True
