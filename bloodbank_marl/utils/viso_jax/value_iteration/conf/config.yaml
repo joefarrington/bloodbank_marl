@@ -32,7 +32,7 @@ vi_runner:
   shortage_cost: ${environment.env_params.shortage_cost}
   wastage_cost: ${environment.env_params.wastage_cost}
   holding_cost: ${environment.env_params.holding_cost}
-  issue_policy: ${environment.env_kwargs.issuing_policy}
+  issue_policy: "fifo"
   max_batch_size: 1000
   epsilon: 1e-4
   gamma: ${environment.gamma}
@@ -63,6 +63,10 @@ run_settings:
 
 jax_settings:
   double_precision: True
+
+policies:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
 
 evaluation: 
   seed: 10191 

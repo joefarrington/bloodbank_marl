@@ -10,6 +10,7 @@ from pathlib import Path
 import wandb
 import omegaconf
 import jax.numpy as jnp
+import numpy as np
 
 # Enable logging
 log = logging.getLogger(__name__)
@@ -21,9 +22,7 @@ def run_vi_and_eval_one_cost_combination(cfg: DictConfig) -> DictConfig:
     VIR = hydra.utils.instantiate(cfg.vi_runner, output_directory=Path(wandb.run.dir))
     vi_output = VIR.run_value_iteration(**cfg.run_settings)
 
-    shape = (
-        1,
-    ) + tuple(  # Include a leading batch dimension for compatavility with the test evaluator
+    shape = tuple(  # Include a leading batch dimension for compatavility with the test evaluator
         [
             cfg.environment.env_kwargs.max_order_quantity + 1
             for i in range(
@@ -38,10 +37,16 @@ def run_vi_and_eval_one_cost_combination(cfg: DictConfig) -> DictConfig:
     policy_rep = hydra.utils.instantiate(
         cfg.policies.replenishment, fixed_policy_params=rep_params
     )
-    policy_issue = hydra.utils.instantiate(cfg.policies.issue)
+    policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
+
+    policies = [policy_rep.apply, policy_issue.apply]
+    policy_manager = hydra.utils.instantiate(
+        cfg.policies.policy_manager, policies=policies
+    )
+
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
-    test_evaluator.set_apply_fn(policy_rep.apply)
-    test_evaluator.set_issue_fn(policy_issue.apply)
+    test_evaluator.set_apply_fn(policy_manager.apply)
+
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
     policy_params = {
@@ -64,7 +69,6 @@ def run_vi_and_eval_one_cost_combination(cfg: DictConfig) -> DictConfig:
     row = [
         float(store["eval/service_level_%_mean"]),
         float(store["eval/wastage_%_mean"]),
-        float(store["eval/mean_holding_mean"]),
         float(store["eval/return_mean"]),
     ]
     return row
@@ -86,6 +90,16 @@ def main(cfg: DictConfig) -> None:
         shortage_costs
     ), "The lengths of wastage_costs and shortage_costs should be the same so pairs can be evaluated"
 
+    vi_df = pd.DataFrame(
+        columns=[
+            "wastage_cost",
+            "shortage_cost",
+            "service_level_%_mean",
+            "wastage_%_mean",
+            "mean_return",
+        ],
+    )
+
     # Run value iteration and evaluation for each cost combination
     rows = []
     for w, s in zip(wastage_costs, shortage_costs):
@@ -94,22 +108,12 @@ def main(cfg: DictConfig) -> None:
         cfg.environment.env_params.wastage_cost = float(w)
         cfg.environment.env_params.shortage_cost = float(s)
 
-        print(cfg)
-        row = [w, s] + run_vi_and_eval_one_cost_combination(cfg)
-        rows.append(row)
-
-    vi_df = pd.DataFrame(
-        rows,
-        columns=[
-            "wastage_cost",
-            "shortage_cost",
-            "service_level_%_mean",
-            "wastage_%_mean",
-            "mean_holding_mean",
-            "mean_return",
-        ],
-    )
-    vi_df.to_csv("vi_df.csv")
+        row = np.array([w, s] + run_vi_and_eval_one_cost_combination(cfg)).reshape(
+            1, -1
+        )
+        vi_df = pd.concat([vi_df, pd.DataFrame(row, columns=vi_df.columns)])
+        # Save after each iteration, because this can be time consuming
+        vi_df.to_csv("vi_df.csv")
     wandb.log({f"heuristic": wandb.Table(dataframe=vi_df)})
 
 
