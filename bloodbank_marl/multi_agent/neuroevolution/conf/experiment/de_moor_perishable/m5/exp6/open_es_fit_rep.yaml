@@ -1,14 +1,15 @@
 # @package _global_
 
 defaults:
-  - override /evosax/strategy: simple_ga
+  - override /policies/issuing: heuristic_oufo
 
 wandb:
   init:
     project: de_moor_m5_exp6
     tags:
-      - fit_both
-      - simple_ga
+      - fit_rep
+      - open_es
+      - marl_env
 
 environment:
   env_kwargs:
@@ -18,4 +19,3 @@ environment:
 policies:
   optimize:
     - 0 # replenishment
-    - 1 # issuing

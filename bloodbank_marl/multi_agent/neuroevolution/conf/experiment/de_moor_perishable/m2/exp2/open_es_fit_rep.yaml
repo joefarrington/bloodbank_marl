@@ -1,0 +1,18 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: heuristic_oufo
+
+wandb:
+  init:
+    project: de_moor_m2_exp2
+    tags:
+      - fit_rep
+      - open_es
+      - marl_env
+
+plot_policies: True
+
+policies:
+  optimize:
+    - 0 # replenishment
