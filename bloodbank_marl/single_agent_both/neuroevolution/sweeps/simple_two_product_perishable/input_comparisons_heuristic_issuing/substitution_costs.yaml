@@ -1,0 +1,27 @@
+program: ../run_evosax.py
+name: simopt_compare_substitution_costs
+method: grid
+metric:
+  name: eval/top_1/return_mean
+  goal: maximize
+parameters:
+  environment.env_params.max_substitution_cost:
+    distribution: categorical
+    values:
+      - 0.5
+      - 1.0
+      - 2.0
+      - 4.0
+
+  policies.issuing._target_:
+    distribution: categorical
+    values:
+      - bloodbank_marl.policies.issuing.heuristic.ExactMatchIssuingPolicy
+      - bloodbank_marl.policies.issuing.heuristic.PriorityMatchIssuingPolicy
+      - bloodbank_marl.policies.issuing.heuristic.OldestCompatibleIssuingPolicy
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=simple_two_product_perishable/base_case_simple_ga_fit_both_for_input_comparisons_heuristic_issuing

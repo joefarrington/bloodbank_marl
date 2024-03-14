@@ -1,0 +1,45 @@
+# @package _global_
+defaults:
+  - override /policies/issuing: heuristic_exact_match
+
+
+wandb:
+  init:
+    project: "simple_two_perishable_input_comparisons"
+    tags:
+      - "new_type_env"
+      - "fit_rep"
+      - "simple_ga"
+      - "compare_max_useful_life"
+
+evosax:
+  strategy:
+    elite_ratio: 0.5
+    sigma_init: 0.07
+    sigma_decay: 1.0
+
+# Parameters not used by exact match; 
+# same params used by both oldest compatible match and priority match
+environment:
+  env_kwargs:
+    max_useful_life: 5
+  env_params:
+    age_on_arrival_distribution_probs:
+      - 1
+      - 0
+      - 0
+      - 0
+      - 0
+
+policies:
+  optimize:
+    - 0
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 
+
+evaluation:
+  seed: 24601

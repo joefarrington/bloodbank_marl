@@ -1,10 +1,13 @@
 # @package _global_
+defaults:
+  - override /policies/issuing: heuristic_exact_match
+
 wandb:
   init:
     project: "simple_two_perishable_input_comparisons"
     tags:
       - "new_type_env"
-      - "fit_both"
+      - "fit_rep"
       - "simple_ga"
       - "compare_demand"
 
@@ -16,14 +19,19 @@ evosax:
 
 environment:
   env_params:
-    poisson_demand_mean: 4
+    poisson_demand_mean: 32
   env_kwargs:
-    max_order_quantity: 10
+    max_order_quantity: 49
 
 policies:
   optimize:
     - 0
-    - 1
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 
 
 evaluation:
   seed: 24601
