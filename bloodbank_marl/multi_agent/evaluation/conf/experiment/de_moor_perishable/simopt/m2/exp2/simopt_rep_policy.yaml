@@ -17,6 +17,7 @@ policies:
   # For value iteration and SimOpt, load in as fixed params
   replenishment:
     fixed_policy_params:
-      _target_: jax.numpy.array
-      object:
-        - [7]
+      0: 
+        _target_: jax.numpy.array
+        object:
+          - [7]
