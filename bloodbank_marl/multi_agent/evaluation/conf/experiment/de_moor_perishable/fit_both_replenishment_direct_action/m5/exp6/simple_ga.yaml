@@ -2,7 +2,7 @@
 
 defaults:
   - override /policies/issuing: multi_agent_single_product_mlp
-  - override /policies/replenishment: multi_agent_single_product_order_up_to_mlp
+  - override /policies/replenishment: multi_agent_single_product_mlp
 
 wandb:
   init:
@@ -28,4 +28,4 @@ policies:
     param_key: issue_best_params
     checkpoint_id: 99
     checkpoint_manager:
-      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_both_replenishment_dicrect_action/m5/exp6/simple_ga"
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_both_replenishment_direct_action/m5/exp6/simple_ga"
