@@ -227,7 +227,7 @@ def run_neuro_opt_one_kpi(
                 fitness = (
                     kpis[fitness_kpi_name].mean(axis=-1)
                     + (kpis[penalty_kpi_name].mean(axis=-1) < penalty_kpi_threshold) * M
-                    - (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc) * M
+                    + (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc) * M
                 )
             else:
                 raise ValueError("penalty_kpi_limit must be 'max' or 'min'")
