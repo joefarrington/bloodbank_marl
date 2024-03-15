@@ -1,0 +1,246 @@
+{
+    "os": "Linux-3.10.0-1160.53.1.el7.x86_64-x86_64-with-glibc2.17",
+    "python": "3.11.5",
+    "heartbeatAt": "2024-03-13T21:53:46.551694",
+    "startedAt": "2024-03-13T21:53:45.971459",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "training.issuing.clip_eps=0.397066903052636",
+        "training.issuing.ent_coef=0.0007023389243059356",
+        "training.issuing.gae_lambda=0.8625586883652179",
+        "training.issuing.gamma=0.9223998491328992",
+        "training.issuing.lr=0.008088663189282433",
+        "training.issuing.max_grad_norm=0.8962843328926734",
+        "training.issuing.update_epochs=2",
+        "training.issuing.vf_coef=0.878285423428355",
+        "training.replenishment.clip_eps=0.13194366732878066",
+        "training.replenishment.ent_coef=0.0001172071222885741",
+        "training.replenishment.gae_lambda=0.9806494288906206",
+        "training.replenishment.gamma=0.978674729211795",
+        "training.replenishment.lr=0.0012871463931509377",
+        "training.replenishment.max_grad_norm=0.3243113885406235",
+        "training.replenishment.update_epochs=4",
+        "training.replenishment.vf_coef=0.17040019619073654",
+        "+experiment=de_moor_perishable/m5/exp2/fit_rep_issue"
+    ],
+    "state": "running",
+    "program": "/lustre/home/ucabjmf/transfuseai/bloodbank_marl/bloodbank_marl/multi_agent/ppo/sweeps/../run_ppo.py",
+    "codePathLocal": null,
+    "codePath": "bloodbank_marl/multi_agent/ppo/run_ppo.py",
+    "git": {
+        "remote": "https://github.com/joefarrington/bloodbank_marl.git",
+        "commit": "a70857b38d490a60ee0bc5167cae920451971f2d"
+    },
+    "email": "farrington.joe@gmail.com",
+    "root": "/lustre/home/ucabjmf/transfuseai/bloodbank_marl",
+    "host": "node-e00a-014.myriad.ucl.ac.uk",
+    "username": "ucabjmf",
+    "executable": "/home/ucabjmf/miniconda3/envs/bloodbank_marl/bin/python",
+    "cpu_count": 36,
+    "cpu_count_logical": 36,
+    "cpu_freq": {
+        "current": 2600.0,
+        "min": 0.0,
+        "max": 0.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2600.0,
+            "min": 0.0,
+            "max": 0.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 9.718036651611328,
+            "used": 5.950767517089844
+        }
+    },
+    "gpu": "Tesla V100-PCIE-32GB",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34359738368
+        }
+    ],
+    "memory": {
+        "total": 188.40516662597656
+    }
+}
