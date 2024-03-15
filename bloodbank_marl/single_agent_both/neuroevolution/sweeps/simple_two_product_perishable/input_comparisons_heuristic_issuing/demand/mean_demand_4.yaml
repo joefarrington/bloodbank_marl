@@ -17,4 +17,4 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=simple_two_product_perishable/input_comparisons_heuristic_issuing/demand/mean_demand_4
+  - +experiment=simple_two_product_perishable/manual_input_comparisons_heuristic_issuing/demand/mean_demand_4
