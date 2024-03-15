@@ -48,6 +48,11 @@ from flax.training import checkpoints
 
 
 @struct.dataclass
+class DummyTrainState:
+    params: jnp.ndarray
+
+
+@struct.dataclass
 class Transition:
     done: jnp.ndarray
     action: jnp.ndarray
@@ -231,6 +236,8 @@ def make_train(config):
     ## experience and the size of batches for training. These all need to be calculated and fixed so that the resulting
     ## functions can be jitted.
     ## Hyperparams set here are not things that we could vmap over because they relate to arrays sizes/
+
+    # Calculate these even for one not being trained because rep one useful for logging
     for agent in ["replenishment", "issuing"]:
         config["training"][agent]["num_updates"] = int(
             config["training"][agent]["total_timesteps"]
@@ -244,14 +251,18 @@ def make_train(config):
         )
 
     # TODO There is probably a better way to enfore this but this will do for now
-    assert (
-        config["training"]["replenishment"]["num_envs"]
-        == config["training"]["issuing"]["num_envs"]
-    ), "Number of envs must be the same for both policies"
-    assert (
-        config["training"]["replenishment"]["num_updates"]
-        == config["training"]["issuing"]["num_updates"]
-    ), "Number of updates must be the same for both policies"
+    if (
+        config["training"]["replenishment"]["train"]
+        and config["training"]["issuing"]["train"]
+    ):
+        assert (
+            config["training"]["replenishment"]["num_envs"]
+            == config["training"]["issuing"]["num_envs"]
+        ), "Number of envs must be the same for both policies"
+        assert (
+            config["training"]["replenishment"]["num_updates"]
+            == config["training"]["issuing"]["num_updates"]
+        ), "Number of updates must be the same for both policies"
 
     env, env_params = make(
         config["environment"]["env_name"], **config["environment"]["env_kwargs"]
@@ -304,60 +315,68 @@ def make_train(config):
         ## Replenishment network
         policy_rep = hydra.utils.instantiate(config["policies"]["replenishment"])
         rng, _rng = jax.random.split(rng)
-        network_params_rep = policy_rep.get_initial_params(_rng)
-        if config["training"]["replenishment"]["anneal_lr"]:
-            tx_rep = optax.chain(
-                optax.clip_by_global_norm(
-                    config["training"]["replenishment"]["max_grad_norm"]
-                ),
-                optax.adam(
-                    learning_rate=partial(
-                        linear_schedule, config=config["training"]["replenishment"]
+        if config["training"]["replenishment"]["train"]:
+            network_params_rep = policy_rep.get_initial_params(_rng)
+            if config["training"]["replenishment"]["anneal_lr"]:
+                tx_rep = optax.chain(
+                    optax.clip_by_global_norm(
+                        config["training"]["replenishment"]["max_grad_norm"]
                     ),
-                    eps=1e-5,
-                ),
+                    optax.adam(
+                        learning_rate=partial(
+                            linear_schedule, config=config["training"]["replenishment"]
+                        ),
+                        eps=1e-5,
+                    ),
+                )
+            else:
+                tx_rep = optax.chain(
+                    optax.clip_by_global_norm(
+                        config["training"]["replenishment"]["max_grad_norm"]
+                    ),
+                    optax.adam(config["training"]["replenishment"]["lr"], eps=1e-5),
+                )
+            train_state_rep = TrainState.create(
+                apply_fn=policy_rep.apply, params=network_params_rep, tx=tx_rep
             )
         else:
-            tx_rep = optax.chain(
-                optax.clip_by_global_norm(
-                    config["training"]["replenishment"]["max_grad_norm"]
-                ),
-                optax.adam(config["training"]["replenishment"]["lr"], eps=1e-5),
-            )
-        train_state_rep = TrainState.create(
-            apply_fn=policy_rep.apply,
-            params=network_params_rep,
-            tx=tx_rep,
-        )
+            network_params_rep = jnp.array([0])  # Placeholder
+            train_state_rep = DummyTrainState(network_params_rep)
+
         ## Issuing network
         policy_issue = hydra.utils.instantiate(config["policies"]["issuing"])
         rng, _rng = jax.random.split(rng)
-        network_params_issue = policy_issue.get_initial_params(_rng)
-
-        if config["training"]["issuing"]["anneal_lr"]:
-            tx_issue = optax.chain(
-                optax.clip_by_global_norm(
-                    config["training"]["issuing"]["max_grad_norm"]
-                ),
-                optax.adam(
-                    learning_rate=partial(
-                        linear_schedule, config=config["training"]["issuing"]
+        if config["training"]["issuing"]["train"]:
+            print(config["training"]["issuing"]["train"])
+            network_params_issue = policy_issue.get_initial_params(_rng)
+            if config["training"]["issuing"]["anneal_lr"]:
+                tx_issue = optax.chain(
+                    optax.clip_by_global_norm(
+                        config["training"]["issuing"]["max_grad_norm"]
                     ),
-                    eps=1e-5,
-                ),
+                    optax.adam(
+                        learning_rate=partial(
+                            linear_schedule, config=config["training"]["issuing"]
+                        ),
+                        eps=1e-5,
+                    ),
+                )
+            else:
+                tx_issue = optax.chain(
+                    optax.clip_by_global_norm(
+                        config["training"]["issuing"]["max_grad_norm"]
+                    ),
+                    optax.adam(config["training"]["issuing"]["lr"], eps=1e-5),
+                )
+            train_state_issue = TrainState.create(
+                apply_fn=policy_issue.apply,
+                params=network_params_issue,
+                tx=tx_issue,
             )
         else:
-            tx_issue = optax.chain(
-                optax.clip_by_global_norm(
-                    config["training"]["issuing"]["max_grad_norm"]
-                ),
-                optax.adam(config["training"]["issuing"]["lr"], eps=1e-5),
-            )
-        train_state_issue = TrainState.create(
-            apply_fn=policy_issue.apply,
-            params=network_params_issue,
-            tx=tx_issue,
-        )
+            network_params_issue = jnp.array([0])  # Placeholder
+            train_state_issue = DummyTrainState(network_params_issue)
+
         ## Policy manager with both networks
         pm = policy_manager.PolicyManager(
             [policy_rep.apply_for_training, policy_issue.apply_for_training]
@@ -532,25 +551,32 @@ def make_train(config):
             # then no of envs, then size of thing
             # For last obs, take the final observation
             # Also, remove the first transition
+
+            # We run this whether or not we are trianing rep so we can log the return
+            # on completed episodes, most easily calculated from rep
             trans_rep = jax.tree_util.tree_map(
                 lambda x: x.swapaxes(0, 1), rollout_output[1]
             )
             last_obs_rep = jax.tree_util.tree_map(lambda x: x[-1], trans_rep.obs)
             traj_batch_rep = jax.tree_util.tree_map(lambda x: x[1:-1, ...], trans_rep)
-            _, last_val_rep = policy_rep.model.apply(policy_params[0], last_obs_rep)
+            if config["training"]["replenishment"]["train"]:
+                _, last_val_rep = policy_rep.model.apply(policy_params[0], last_obs_rep)
 
-            trans_issue = jax.tree_util.tree_map(
-                lambda x: x.swapaxes(0, 1), rollout_output[3]
-            )
-            last_obs_issue = jax.tree_util.tree_map(lambda x: x[-1], trans_issue.obs)
-            traj_batch_issue = jax.tree_util.tree_map(
-                lambda x: x[1:-1, ...], trans_issue
-            )
+            if config["training"]["issuing"]["train"]:
+                trans_issue = jax.tree_util.tree_map(
+                    lambda x: x.swapaxes(0, 1), rollout_output[3]
+                )
+                last_obs_issue = jax.tree_util.tree_map(
+                    lambda x: x[-1], trans_issue.obs
+                )
+                traj_batch_issue = jax.tree_util.tree_map(
+                    lambda x: x[1:-1, ...], trans_issue
+                )
 
-            _, last_val_issue = policy_issue.model.apply(
-                policy_params[1],
-                last_obs_issue,
-            )
+                _, last_val_issue = policy_issue.model.apply(
+                    policy_params[1],
+                    last_obs_issue,
+                )
 
             def _calculate_gae(traj_batch, last_val, config):
                 def _get_advantages(gae_and_next_value, transition):
@@ -584,58 +610,62 @@ def make_train(config):
                 )
                 return advantages, advantages + traj_batch.value
 
-            _calculate_gae_rep = partial(
-                _calculate_gae, config=config["training"]["replenishment"]
-            )
-            _calculate_gae_issue = partial(
-                _calculate_gae, config=config["training"]["issuing"]
-            )
-
-            ## Using the trajectories and the value of the last observation, calculate the advantages and targets
-            advantages_rep, targets_rep = _calculate_gae_rep(
-                traj_batch_rep, last_val_rep
-            )
-            advantages_issue, targets_issue = _calculate_gae_issue(
-                traj_batch_issue, last_val_issue
-            )
+            if config["training"]["replenishment"]["train"]:
+                _calculate_gae_rep = partial(
+                    _calculate_gae, config=config["training"]["replenishment"]
+                )
+                ## Using the trajectories and the value of the last observation, calculate the advantages and targets
+                advantages_rep, targets_rep = _calculate_gae_rep(
+                    traj_batch_rep, last_val_rep
+                )
+            if config["training"]["issuing"]["train"]:
+                _calculate_gae_issue = partial(
+                    _calculate_gae, config=config["training"]["issuing"]
+                )
+                ## Using the trajectories and the value of the last observation, calculate the advantages and targets
+                advantages_issue, targets_issue = _calculate_gae_issue(
+                    traj_batch_issue, last_val_issue
+                )
 
             # Run epochs for replenishment
             rng, _rng = jax.random.split(rng)
-            update_state_rep = (
-                train_state_rep,
-                traj_batch_rep,
-                advantages_rep,
-                targets_rep,
-                _rng,
-            )
-            update_state_rep, loss_info_rep = jax.lax.scan(
-                _update_epoch_rep,
-                update_state_rep,
-                None,
-                config["training"]["replenishment"]["update_epochs"],
-            )
-            train_state_rep = update_state_rep[0]
-            # TODO: Not collecting info at the moment
+            if config["training"]["replenishment"]["train"]:
+                update_state_rep = (
+                    train_state_rep,
+                    traj_batch_rep,
+                    advantages_rep,
+                    targets_rep,
+                    _rng,
+                )
+                update_state_rep, loss_info_rep = jax.lax.scan(
+                    _update_epoch_rep,
+                    update_state_rep,
+                    None,
+                    config["training"]["replenishment"]["update_epochs"],
+                )
+                train_state_rep = update_state_rep[0]
+                # TODO: Not collecting info at the moment
             metric_rep = traj_batch_rep.info
             # TODO: Sort this out, will be needed when we want to continue collection instead of resetting
 
             # And for issuing
             rng, _rng = jax.random.split(rng)
-            update_state_issue = (
-                train_state_issue,
-                traj_batch_issue,
-                advantages_issue,
-                targets_issue,
-                _rng,
-            )
-            update_state_issue, loss_info_issue = jax.lax.scan(
-                _update_epoch_issue,
-                update_state_issue,
-                None,
-                config["training"]["issuing"]["update_epochs"],
-            )
-            train_state_issue = update_state_issue[0]
-            metric_issue = None  # traj_batch_issue.info For now, we're just taking info for replenishment so we don't duplicate
+            if config["training"]["issuing"]["train"]:
+                update_state_issue = (
+                    train_state_issue,
+                    traj_batch_issue,
+                    advantages_issue,
+                    targets_issue,
+                    _rng,
+                )
+                update_state_issue, loss_info_issue = jax.lax.scan(
+                    _update_epoch_issue,
+                    update_state_issue,
+                    None,
+                    config["training"]["issuing"]["update_epochs"],
+                )
+                train_state_issue = update_state_issue[0]
+                metric_issue = None  # traj_batch_issue.info For now, we're just taking info for replenishment so we don't duplicate
 
             runner_state = (
                 train_state_rep,
@@ -644,13 +674,20 @@ def make_train(config):
                 last_obs,
                 rng,
             )
+            rep_metrics = {
+                "loss": (
+                    loss_info_rep if config["training"]["replenishment"]["train"] else 0
+                ),
+                "returned_episode_returns": metric_rep.returned_episode_returns,
+            }
+            issue_metrics = (
+                {"loss": loss_info_issue}
+                if config["training"]["issuing"]["train"]
+                else {"loss": 0}
+            )
             metric = {
-                "rep": {
-                    "loss": loss_info_rep,
-                    # TODO might want to grab some more metrics here
-                    "returned_episode_returns": metric_rep.returned_episode_returns,
-                },
-                "issue": {"loss": loss_info_issue},
+                "rep": rep_metrics,
+                "issue": issue_metrics,
             }
 
             return runner_state, metric
@@ -771,11 +808,28 @@ def log_losses(config, metrics):
         # Log omce for each update (i-1)
         # Take the final epoch (which is axis 1)
         # And the mean over the minibatches for that epoch
-        for a in ["rep", "issue"]:
-            log_dict[f"{a}/total_loss"] = metrics[a]["loss"][0][i - 1, -1, :].mean()
-            log_dict[f"{a}/value_loss"] = metrics[a]["loss"][1][0][i - 1, -1, :].mean()
-            log_dict[f"{a}/loss_actor"] = metrics[a]["loss"][1][1][i - 1, -1, :].mean()
-            log_dict[f"{a}/entropy"] = metrics[a]["loss"][1][2][i - 1, -1, :].mean()
+        if config["training"]["replenishment"]["train"]:
+            log_dict["rep/total_loss"] = metrics["rep"]["loss"][0][i - 1, -1, :].mean()
+            log_dict["rep/value_loss"] = metrics["rep"]["loss"][1][0][
+                i - 1, -1, :
+            ].mean()
+            log_dict["rep/loss_actor"] = metrics["rep"]["loss"][1][1][
+                i - 1, -1, :
+            ].mean()
+            log_dict["rep/entropy"] = metrics["rep"]["loss"][1][2][i - 1, -1, :].mean()
+        if config["training"]["issuing"]["train"]:
+            log_dict["issue/total_loss"] = metrics["issue"]["loss"][0][
+                i - 1, -1, :
+            ].mean()
+            log_dict["issue/value_loss"] = metrics["issue"]["loss"][1][0][
+                i - 1, -1, :
+            ].mean()
+            log_dict["issue/loss_actor"] = metrics["issue"]["loss"][1][1][
+                i - 1, -1, :
+            ].mean()
+            log_dict["issue/entropy"] = metrics["issue"]["loss"][1][2][
+                i - 1, -1, :
+            ].mean()
 
         log_dict["rep/steps"] = rep_steps
         log_dict["issue/steps"] = issue_steps

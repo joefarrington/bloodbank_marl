@@ -3,5 +3,7 @@
 wandb:
   init:
     project: "de_moor_m2_exp2"
+    tags:
+      - "fit_both"
 
 plot_policy: True

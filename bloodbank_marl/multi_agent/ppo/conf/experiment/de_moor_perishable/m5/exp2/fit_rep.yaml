@@ -1,0 +1,18 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: heuristic_oufo
+
+wandb:
+  init:
+    project: "de_moor_m5_exp2"
+    tags:
+      - "fit_rep"
+
+training:
+  issuing:
+    train: False
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
