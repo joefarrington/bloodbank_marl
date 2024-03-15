@@ -22,9 +22,9 @@ policies:
     param_key: rep_best_params
     checkpoint_id: 0
     checkpoint_manager:
-      directory: "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/multi_agent/ppo/outputs/2024-03-07/17-03-11/wandb/latest-run/files"
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_replenishment_order_up_to/m5/exp2/ppo"
   load_issuing_policy_params:
     param_key: issue_best_params
     checkpoint_id: 0
     checkpoint_manager:
-      directory: "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/multi_agent/ppo/outputs/2024-03-07/17-03-11/wandb/latest-run/files"
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_replenishment_order_up_to/m5/exp2/ppo"
