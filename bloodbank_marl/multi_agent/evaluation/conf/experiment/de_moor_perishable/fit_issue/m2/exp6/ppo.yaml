@@ -27,4 +27,4 @@ policies:
     param_key: issue_best_params
     checkpoint_id: 0
     checkpoint_manager:
-      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_issue/m2/exp2/ppo"
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_issue/m2/exp6/ppo"
