@@ -23,4 +23,4 @@ policies:
     param_key: policy_params
     checkpoint_id: 0
     checkpoint_manager:
-      directory: "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/single_agent_replenishment/ppo/outputs/2024-03-07/16-44-41/wandb/run-20240307_164442-sy83qfho/files"
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_replenishment_order_up_to/m2/exp6/ppo"
