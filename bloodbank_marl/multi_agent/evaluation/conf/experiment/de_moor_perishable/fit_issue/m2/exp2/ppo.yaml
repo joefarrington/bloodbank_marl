@@ -20,7 +20,7 @@ policies:
       filepath: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/value_iteration_replenishment/m2_exp2.npy"
       reshape_for_fitness: False
   load_issuing_policy_params:
-    param_key: policy_params
+    param_key: issue_best_params
     checkpoint_id: 0
     checkpoint_manager:
       directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_issue/m2/exp2/ppo"
