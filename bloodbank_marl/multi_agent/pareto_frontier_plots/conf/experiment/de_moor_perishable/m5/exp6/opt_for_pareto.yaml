@@ -10,3 +10,15 @@ environment:
   env_kwargs:
     max_useful_life: 5
     lead_time: 2
+
+kpi_ranges:
+  wastage_pc:
+    _target_: numpy.linspace
+    start: 1e-4
+    stop: 2
+    num: 25
+  service_level_pc:
+    _target_: numpy.linspace
+    start: 75
+    stop: 99.9
+    num: 25
