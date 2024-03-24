@@ -36,6 +36,7 @@ def calculate_loss(state, params, batch):
     predictions = state.apply_fn(params, data_input).astype(jnp.float32)
     # Calculate the loss and accuracy
     loss = optax.l2_loss(predictions, labels).mean()
+
     return loss
 
 
@@ -58,12 +59,24 @@ def train_step(state, batch):
 def eval_step(state, rng, cfg, nn_policy):
     # Roll out the heuristic policy
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
+    policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
     test_evaluator.set_apply_fn(nn_policy.apply)
+    test_evaluator.set_issuing_fn(policy_issue.apply)
+
+    policy_params = {
+        0: jax.tree_util.tree_map(lambda x: x.reshape((1,) + x.shape), state.params),
+        1: jnp.array([[0]]),
+    }
+
     fitness, cum_infos, kpis = test_evaluator.rollout(
         rng,
-        jax.tree_util.tree_map(lambda x: x.reshape((1,) + x.shape), state.params),
+        policy_params,
     )
-    return kpis["mean_daily_reward"].mean()
+    return kpis["mean_daily_reward"].mean(), {
+        "eval/wastage": kpis["wastage_%"].mean(),
+        "eval/service_level": kpis["service_level_%"].mean(),
+        "eval/exact_match": kpis["exact_match_%"].mean(),
+    }
 
 
 def train_model(
@@ -90,7 +103,7 @@ def train_model(
             },
         )
         if epoch % cfg.evaluation.eval_freq == 0:
-            fitness = eval_step(
+            fitness, kpis = eval_step(
                 state, jax.random.PRNGKey(cfg.evaluation.seed), cfg, nn_policy
             )
             performance_gap = (fitness - heuristic_fitness) * 100 / heuristic_fitness
@@ -100,6 +113,7 @@ def train_model(
                     "eval/performance_gap_%": performance_gap,
                 }
             )
+            log_to_wandb.update(kpis)
             if performance_gap < best_performance_gap:
                 best_performance_gap = performance_gap
                 # TODO Add this as an artifact to W&B
@@ -124,13 +138,18 @@ def main(cfg):
     # Do a rollout to log the performance of the heuristic policy
 
     print("a")
-    heuristic_policy = hydra.utils.instantiate(cfg.heuristic.policy)
-    heuristic_params = hydra.utils.instantiate(cfg.heuristic.params).reshape(
-        1, -1, 1
-    )  # Intended for S params for SRep policy with multiple products
-    print(heuristic_params)
+    heuristic_policy = hydra.utils.instantiate(cfg.heuristic_policy)
+    heuristic_params = hydra.utils.instantiate(
+        cfg.heuristic_policy.fixed_policy_params
+    )  # Useful for exploration
+    policy_params = {
+        0: jnp.array(heuristic_params),
+        1: jnp.array([[0]]),
+    }  # Issuing is placeholder and not used
+    policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
     test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
     test_evaluator.set_apply_fn(heuristic_policy.apply)
+    test_evaluator.set_issuing_fn(policy_issue.apply)
     fitness, cum_infos, kpis = test_evaluator.rollout(
         jax.random.PRNGKey(cfg.evaluation.seed), heuristic_params
     )
@@ -146,7 +165,8 @@ def main(cfg):
 
     # Label the obervations
     rng, _rng = jax.random.split(rng)
-    labels = heuristic_policy.apply(heuristic_params, all_obs, _rng)
+    labelling_policy = hydra.utils.instantiate(cfg.labelling_policy)
+    labels = labelling_policy.apply(heuristic_params, all_obs, _rng)
 
     # Apply preprocessing to the observations so that it does not need to be repeated during training
     all_obs = hydra.utils.call(cfg.pretraining.preprocess_observations, all_obs)
@@ -165,8 +185,10 @@ def main(cfg):
     env, default_env_params = make(
         cfg.environment.env_name, **cfg.environment.env_kwargs
     )
+    env.set_issuing_fn(policy_issue.apply)
     nn_model = hydra.utils.instantiate(
-        cfg.pretraining.nn_model, n_actions=env.num_actions
+        cfg.pretraining.nn_model,
+        n_actions=env.num_actions,
     )
     rng, _rng = jax.random.split(rng)
     nn_params = nn_model.init(_rng, all_obs)
@@ -174,7 +196,7 @@ def main(cfg):
     # Instantiate the nn replenishment policy and change the apply function of test evaluator.
     # This does have preprocessing because we use it in the eval steps to roll out the policy
     # compare to heuristic
-    nn_policy = hydra.utils.instantiate(cfg.evaluation.replenishment_policy)
+    nn_policy = hydra.utils.instantiate(cfg.policies.replenishment)
     test_evaluator.set_apply_fn(nn_policy.apply)
 
     # Instantiate the optimizer

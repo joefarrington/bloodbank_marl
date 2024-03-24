@@ -179,16 +179,12 @@ def get_obs_rs_multiproduct(cfg):
 
     # Workaround because we need to instaniate the issuing policy
     resolved_env_kwargs_cfg = OmegaConf.to_container(cfg.environment.env_kwargs)
-    resolved_env_kwargs_cfg["issuing_policy"] = hydra.utils.instantiate(
-        cfg.environment.env_kwargs.issuing_policy
-    )
-
+    policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
     env, default_env_params = make(cfg.environment.env_name, **resolved_env_kwargs_cfg)
+    env.set_issuing_fn(policy_issue.apply)
     env_params = default_env_params.create_env_params(**cfg.environment.env_params)
 
-    policy_params = hydra.utils.instantiate(cfg.heuristic.params).reshape(
-        1, -1, 1
-    )  # Intended for S params for SRep policy with multiple products
+    policy_params = hydra.utils.instantiate(cfg.heuristic_policy.fixed_policy_params)
 
     rng_v = jax.random.split(rng, cfg.obs_collection.num_envs)
     _, observations = collect_samples(
@@ -208,6 +204,16 @@ def get_obs(x):
     return x.obs
 
 
+def get_obs_total_per_product(x):
+    """Enable the use of EnvObs.obs_total_per_product as a preprocessing function."""
+    return x.obs_total_per_product
+
+
+def get_obs_total_per_product_and_weekday(x):
+    """Enable the use of EnvObs.obs_total_per_product_and_weekday as a preprocessing function."""
+    return x.obs_total_per_product_and_weekday
+
+
 def passthrough(x):
     """Used when no preprocessing is required."""
     return x
@@ -221,6 +227,10 @@ def transform_integer_target(
     out = out / (max_order_quantity - min_order_quantity)
     out = out * (clip_max - clip_min)
     out = out + clip_min
+    # We want the target to be the middle of the band rather than at the boundary
+    out = out - (
+        (clip_max - clip_min) / (2 * (max_order_quantity - min_order_quantity))
+    )
     return out
 
 

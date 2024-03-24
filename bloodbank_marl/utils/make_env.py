@@ -39,6 +39,9 @@ from bloodbank_marl.scenarios.simple_two_product.gymnax_env_limit_demand import 
 from bloodbank_marl.scenarios.simple_two_product.gymnax_env_try_issue_too import (
     SimpleTwoProductPerishableIncIssueGymnax,
 )
+from bloodbank_marl.scenarios.rs_perishable.gymnax_env_four_try_issue_too import (
+    RSPerishableFourIncIssueGymnax,
+)
 
 
 def make(env_name, **env_kwargs):
@@ -73,6 +76,11 @@ def make(env_name, **env_kwargs):
         return (
             RSPerishableIncIssueGymnax(**env_kwargs),
             RSPerishableIncIssueGymnax().default_params,
+        )
+    elif env_name == "RSPerishableFourIncIssueGymnax":
+        return (
+            RSPerishableFourIncIssueGymnax(**env_kwargs),
+            RSPerishableFourIncIssueGymnax().default_params,
         )
     elif env_name == "RSPerishableFourGymnax":
         return (

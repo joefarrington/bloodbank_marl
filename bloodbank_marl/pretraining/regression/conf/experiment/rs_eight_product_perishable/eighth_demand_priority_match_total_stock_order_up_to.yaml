@@ -1,0 +1,69 @@
+# @package _global_
+
+defaults:
+  - override /policies/replenishment: single_agent_multi_product_order_up_to_mlp
+
+environment:
+  env_kwargs:
+    max_order_quantity: 5
+  env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 3250
+
+obs_collection:
+  policy:
+    epsilon: 0.05
+
+pretraining:
+  preprocess_observations:
+    _target_: bloodbank_marl.utils.pretraining.get_obs_total_per_product_and_weekday
+
+heuristic_policy:
+  fixed_policy_params:
+    _target_: jax.numpy.array
+    # O-, O+, A-, A+, B-, B+, AB-, AB+
+    object: 
+    - [1]
+    - [4]
+    - [1]
+    - [4]
+    - [1]
+    - [1]
+    - [0]
+    - [1]
+
+labelling_policy:
+  _target_: bloodbank_marl.policies.replenishment.heuristic.SRepLabellingPolicy
+  env_name: ${environment.env_name}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  fixed_policy_params: ${heuristic_policy.fixed_policy_params}
+
+policies:
+  optimize:
+    - 0
+  replenishment:
+    model_kwargs:
+      n_hidden: [64,64]
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.obs_total_per_product_and_weekday
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0, 4, 2, -1, -1, -1, -1, -1] # O- patient
+        - [1, 0, 5, 4, 3, 2, -1, -1] # O+ patient
+        - [2, 6, 4, 0, 3, 7, -1, -1] # A- patient
+        - [3, 2, 7, 6, 5, 4, -1, -1] # A+ patient
+        - [4, 6, 2, 0, 5, 7, -1, -1] # B- patient
+        - [5,4, 7, 6, 3, 2, -1, -1] #B+ patient
+        - [6, 2, 4, 0, 7, 3, -1, -1] # AB- patient
+        - [7, 6, 3, 2, 5, 4, -1, -1] # AB+ patient

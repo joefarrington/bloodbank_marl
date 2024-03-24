@@ -20,7 +20,7 @@ from bloodbank_marl.scenarios.simple_two_product.gymnax_env_try_issue_too import
 
 n_products = 8
 M = 1e10  # invalid substitution cost
-max_useful_life = 8
+max_useful_life = 3
 
 # Base on Yu Suen et al (2023)
 substitution_cost_ratios = [
@@ -111,7 +111,7 @@ class EnvParams:
     substitution_costs: chex.Array
     action_mask_per_request_type: chex.Array
     initial_weekday: int
-    max_expiry_pc_target: float
+    max_wastage_pc_target: float
     min_service_level_pc_target: float
     min_exact_match_pc_target: float
     target_kpi_breach_penalty: float
@@ -142,7 +142,7 @@ class EnvParams:
         max_substitution_cost: float = 3250.0,
         action_mask_per_request_type: List[int] = action_mask_per_request_type,
         initial_weekday: int = -1,
-        max_expiry_pc_target: float = 100.0,  # Effectively no limit by default
+        max_wastage_pc_target: float = 100.0,  # Effectively no limit by default
         min_service_level_pc_target: float = 0.0,  # Effectively no limit by default
         min_exact_match_pc_target: float = 0.0,  # Effectively no limit by default
         target_kpi_breach_penalty: float = 0.0,  # Set penalty to 0 for now, was having issue with this
@@ -161,7 +161,7 @@ class EnvParams:
             jnp.array(substitution_cost_ratios) * max_substitution_cost,
             jnp.array(action_mask_per_request_type),
             initial_weekday,
-            max_expiry_pc_target,
+            max_wastage_pc_target,
             min_service_level_pc_target,
             min_exact_match_pc_target,
             target_kpi_breach_penalty,
@@ -191,15 +191,23 @@ class EnvObs:
     @property
     def obs_total_per_product(self):
         batch_dims = self.in_transit.shape[:-2]
-        inv = self.stock.sum(axis=-1) + self.in_transit.sum(axis=-1)
+        return self.total_per_product().reshape(batch_dims + (-1,))
+
+    @property
+    def obs_total_per_product_and_weekday(self):
+        batch_dims = self.in_transit.shape[:-2]
         return jnp.hstack(
             [
-                inv.reshape(batch_dims + (-1,)),
+                self.one_hot_day_of_week().reshape(batch_dims + (-1,)),
+                self.total_per_product().reshape(batch_dims + (-1,)),
             ]
         )
 
     def one_hot_day_of_week(self):
         return jax.nn.one_hot(self.weekday, 7)
+
+    def total_per_product(self):
+        return self.stock.sum(axis=-1) + self.in_transit.sum(axis=-1)
 
 
 @struct.dataclass

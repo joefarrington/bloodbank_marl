@@ -232,32 +232,6 @@ def main(cfg: omegaconf.DictConfig):
             overall_metrics = cfg.environment.scalar_kpis_to_log
 
             for idx, p in enumerate(["top_1", "mean_params"]):
-                # Store group metrics in dataframe for W&B Table if we have them
-                if group_metrics is not None:
-                    df = pd.DataFrame()
-                    for m in group_metrics:
-                        df = pd.concat(
-                            [
-                                df,
-                                pd.DataFrame(
-                                    kpis[m][idx].mean(axis=(0)).reshape(1, -1)
-                                ),
-                            ],
-                            axis=0,
-                        )
-                        df = pd.concat(
-                            [
-                                df,
-                                pd.DataFrame(kpis[m][idx].std(axis=(0)).reshape(1, -1)),
-                            ],
-                            axis=0,
-                        )
-                    df.columns = types
-                    row_labels = [
-                        f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]
-                    ]
-                    df.insert(loc=0, column="metric", value=row_labels)
-                    wandb.log({f"eval/{p}/group_metrics": wandb.Table(dataframe=df)})
 
                 # Add aggregate metrics and return to dict to be logged to W&B
                 if overall_metrics is not None:
@@ -269,6 +243,30 @@ def main(cfg: omegaconf.DictConfig):
                 log_to_wandb[f"eval/{p}/return_std"] = fitness[idx].std()
 
         wandb.log(log_to_wandb)
+
+    # Record group metrics for top 1 params
+    if group_metrics is not None:
+        df = pd.DataFrame()
+        for m in group_metrics:
+            df = pd.concat(
+                [
+                    df,
+                    pd.DataFrame(kpis[m][idx].mean(axis=(0)).reshape(1, -1)),
+                ],
+                axis=0,
+            )
+            df = pd.concat(
+                [
+                    df,
+                    pd.DataFrame(kpis[m][idx].std(axis=(0)).reshape(1, -1)),
+                ],
+                axis=0,
+            )
+        df.columns = types
+        row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
+        df.insert(loc=0, column="metric", value=row_labels)
+        df.to_csv("group_metrics.csv")
+        wandb.log({f"eval/group_metrics": wandb.Table(dataframe=df)})
 
     policy_params_mean = test_param_reshaper.reshape(jnp.array([mean_params]))
     policy_params_top_1 = test_param_reshaper.reshape(jnp.array([best_params]))

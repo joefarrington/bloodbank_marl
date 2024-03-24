@@ -61,7 +61,10 @@ class SRepPolicy(HeuristicPolicy):
             "RSPerishableIncIssueGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
-        elif self.env_name == "RSPerishableFourGymnax":
+        elif self.env_name in [
+            "RSPerishableFourGymnax",
+            "RSPerishableFourIncIssueGymnax",
+        ]:
             return ["O", "A", "B", "AB"]
         elif self.env_name in ["RSPerishableTwoGymnax", "RSPerishable"]:
             return ["RhD-", "RhD+"]
@@ -97,6 +100,7 @@ class SRepPolicy(HeuristicPolicy):
             "SimpleTwoProductPerishableLimitDemandGymnax",
             "SimpleTwoProductPerishableIncIssueGymnax",
             "RSPerishableIncIssueGymnax",
+            "RSPerishableFourIncIssueGymnax",
         ]:
             return rs_perishable_S_policy
         else:
@@ -216,7 +220,10 @@ class sSRepPolicy(SRepPolicy):
             "RSPerishableIncIssueGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
-        elif self.env_name == "RSPerishableFourGymnax":
+        elif self.env_name in [
+            "RSPerishableFourGymnax",
+            "RSPerishableFourIncIssueGymnax",
+        ]:
             return ["O", "A", "B", "AB"]
         elif self.env_name in ["RSPerishableTwo", "RSPerishableTwoGymnax"]:
             return ["RhD-", "RhD+"]
@@ -227,7 +234,8 @@ class sSRepPolicy(SRepPolicy):
         """Get the forward method for the policy - this is the function that returns the action"""
         if self.env_name in [
             "RSPerishableGymnax",
-            "RSPersihableIncIssueGymnax",
+            "RSPerishableIncIssueGymnax",
+            "RSPerishableFourIncIssueGymnax",
             "RSPerishable",
         ]:
             return rs_perishable_sS_policy
@@ -277,7 +285,10 @@ class SDayOfWeekRepPolicy(SRepPolicy):
             "RSPerishableIncIssueGymnax",
         ]:
             return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
-        elif self.env_name == "RSPerishableFourGymnax":
+        elif self.env_name in [
+            "RSPerishableFourGymnax",
+            "RSPerishableFourIncIssueGymnax",
+        ]:
             return ["O", "A", "B", "AB"]
         elif self.env_name in ["RSPerishableTwo", "RSPerishableTwoGymnax"]:
             return ["RhD-", "RhD+"]
@@ -387,6 +398,13 @@ class SRepLabellingPolicy(SRepPolicy):
         """Get the forward method for the policy - this is the function that returns the action"""
         if self.env_name in ["DeMoorPerishable", "DeMoorPerishableGymnax"]:
             return de_moor_perishable_S_labelling_policy
+        elif self.env_name in [
+            "RSPerishable",
+            "RSPerishableGymnax",
+            "RSPerishableIncIssueGymnax",
+            "RSPerishableFourIncIssueGymnax",
+        ]:
+            return rs_perishable_S_labelling_policy
         else:
             raise NotImplementedError(
                 f"No (S) labelling policy defined for Environment ID {self.env_name}"
@@ -397,3 +415,12 @@ def de_moor_perishable_S_labelling_policy(policy_params, obs, rng):
     """(S) policy for DeMoorPerishable environment"""
     # policy_params = [[S]]
     return policy_params[0, 0]
+
+
+def rs_perishable_S_labelling_policy(policy_params, obs, rng):
+    """(S) policy for RSPerishable environment"""
+    x = obs.stock.sum(axis=-1, keepdims=True) + obs.in_transit.sum(
+        axis=-1, keepdims=True
+    )
+    y = jnp.zeros_like(x)
+    return jnp.clip((policy_params - y), a_min=0).squeeze()

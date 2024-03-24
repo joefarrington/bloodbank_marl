@@ -1,0 +1,54 @@
+# @package _global_
+
+defaults:
+ - override /environment: rs_perishable_gymnax_test_double
+ - override /policies/replenishment: heuristic_order_up_to
+
+wandb:
+  init:
+    project: "rs_eight_perishable_base"
+    tags:
+      - "new_type_env"
+      - "fit_issue"
+      - "simple_ga"
+
+evosax:
+  strategy:
+    sigma_init: 0.07
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+environment:
+  env_kwargs:
+    max_order_quantity: 5
+  env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 3250
+
+policies:
+  optimize:
+    - 1
+  issuing:
+    model_kwargs:
+      n_hidden: [128, 128]
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object: 
+        - [1]
+        - [4]
+        - [1]
+        - [4]
+        - [1]
+        - [1]
+        - [0]
+        - [1]

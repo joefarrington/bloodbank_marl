@@ -1,8 +1,8 @@
 defaults:
-  - heuristic/policy: order_up_to
-  - policies/issuing: heuristic_exact_match
-  - evaluation/replenishment_policy: multi_product_mlp
-  - environment: rs_perishable_gymnax
+  - heuristic_policy: order_up_to
+  - policies/issuing: heuristic_priority_match
+  - policies/replenishment: single_agent_multi_product_mlp
+  - environment: rs_perishable_gymnax_test_double
   - _self_
 
 wandb:
@@ -12,17 +12,14 @@ wandb:
 hydra:
   job:
     chdir: True
-
-heuristic:
-  params:
-    _target_: jax.numpy.array
-    object: [5, 21, 4, 19, 2, 6, 1, 2]
+  searchpath:
+    - pkg://bloodbank_marl.common_config
 
 seed: 12
 
 obs_collection:
   seed: 12345
-  num_envs: 20
+  num_envs: 200
   samples_per_env: 700
   policy:
     _target_: bloodbank_marl.policies.replenishment.heuristic.SRepPolicyExplore
@@ -34,25 +31,20 @@ obs_collection:
 pretraining:
   num_epochs: 100
   batch_size: 64
-  #stock_limit: 15
   preprocess_observations:
     _target_: bloodbank_marl.utils.pretraining.get_obs
   preprocess_labels: 
     _target_: bloodbank_marl.utils.pretraining.transform_integer_target
-    max_order_quantity: 50 # Set this based on the env?
-    min_order_quantity: ${evaluation.replenishment_policy.min_order_quantity}
-    clip_max: ${evaluation.replenishment_policy.clip_max}
-    clip_min: ${evaluation.replenishment_policy.clip_min}
+    max_order_quantity: ${environment.env_kwargs.max_order_quantity}
+    min_order_quantity: 0
+    clip_max: ${policies.replenishment.clip_max}
+    clip_min: ${policies.replenishment.clip_min}
   optimizer:
     _target_: optax.adam
-    learning_rate:
-      _target_: optax.cosine_decay_schedule
-      init_value: 0.05
-      decay_steps: 1000
-      alpha: 0.05
+    learning_rate: 0.005
   nn_model:
     _target_: bloodbank_marl.policies.models.flax_deterministic.RepMultiProductMLP
-    n_hidden: ${evaluation.replenishment_policy.model_kwargs.n_hidden}
+    n_hidden: ${policies.replenishment.model_kwargs.n_hidden}
     preprocess_observation:
       _target_: hydra.utils.get_method
       path: bloodbank_marl.utils.pretraining.passthrough
@@ -71,10 +63,10 @@ evaluation:
   seed: 67
   eval_freq: 10
   test_evaluator:
-    _target_: bloodbank_marl.utils.single_agent_gymnax_fitness.GymnaxFitness
+    _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
-    num_rollouts: 100
+    num_rollouts: 1000
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
     test: True
