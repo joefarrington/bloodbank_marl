@@ -25,6 +25,9 @@ log = logging.getLogger(__name__)
 
 M = 1e8  # Large constant to use as a penalty for infeasible solutions
 
+# NOTE, For here and the other appraoch -> should we take mean and then impose penalty, or impose penalty and then take mean?
+# I think if we're taking a fitness score for a paramterization, we should impose the penalty afterwards (as we've been doing)
+
 
 # Adapted from bloodbank_marl/single_agent_replenishment/run_simopt.py to include KPIs
 def simopt_grid_sampler(
@@ -146,7 +149,10 @@ def run_neuro_opt_one_kpi(
     rows = []
     best_params_last_round = None
     if penalty_kpi_name == "service_level_%":
-        limit_range = hydra.utils.instantiate(cfg.kpi_ranges.service_level_pc)
+        # We flip so that the higher minimum is first
+        # This way, when we allow prev best solution to be used as part of instantiation,
+        # we start with a valid solution.
+        limit_range = jnp.flip(hydra.utils.instantiate(cfg.kpi_ranges.service_level_pc))
     elif penalty_kpi_name == "wastage_%":
         limit_range = hydra.utils.instantiate(cfg.kpi_ranges.wastage_pc)
     else:
@@ -190,21 +196,28 @@ def run_neuro_opt_one_kpi(
         fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
         rng, rng_state_init = jax.random.split(rng, 2)
 
+        # Logger
+        es_logging = hydra.utils.instantiate(
+            cfg.evosax.logging, num_dims=param_reshaper.total_params
+        )
+        es_log = es_logging.initialize()
+
         # If this isn't the first policy to be optimized for this KPI,
         # use the previous best params as a starting point for optimization
         if cfg.evosax.init_prev_best == True and best_params_last_round is not None:
             state = strategy.initialize(
                 rng_state_init,
                 init_mean=param_reshaper.flatten_single(best_params_last_round),
+                init_fitness=best_fitness_last_round,
+            )
+            # We want to put this combination into the log
+            es_log = es_logging.update(
+                es_log,
+                param_reshaper.flatten_single(policy_params),
+                best_fitness_last_round,
             )
         else:
             state = strategy.initialize(rng_state_init)
-
-        # Logger
-        es_logging = hydra.utils.instantiate(
-            cfg.evosax.logging, num_dims=param_reshaper.total_params
-        )
-        es_log = es_logging.initialize()
 
         rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
@@ -218,25 +231,40 @@ def run_neuro_opt_one_kpi(
 
             # New, use the KPIs to get the fitness of a trial
             if penalty_kpi_limit == "max":
-                fitness = (
-                    kpis[fitness_kpi_name].mean(axis=-1)
-                    - (kpis[penalty_kpi_name].mean(axis=-1) > penalty_kpi_threshold) * M
-                    - (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc) * M
+                penalty = (
+                    jnp.logical_or(
+                        (kpis[penalty_kpi_name].mean(axis=-1) > penalty_kpi_threshold),
+                        (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc),
+                    ).astype(float)
+                    * M
                 )
             elif penalty_kpi_limit == "min":
-                fitness = (
-                    kpis[fitness_kpi_name].mean(axis=-1)
-                    + (kpis[penalty_kpi_name].mean(axis=-1) < penalty_kpi_threshold) * M
-                    + (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc) * M
+                penalty = (
+                    jnp.logical_or(
+                        (kpis[penalty_kpi_name].mean(axis=-1) < penalty_kpi_threshold),
+                        (kpis["exact_match_%"].mean(axis=-1) < cfg.min_exact_match_pc),
+                    ).astype(float)
+                    * M
                 )
+
             else:
                 raise ValueError("penalty_kpi_limit must be 'max' or 'min'")
+
+            if fitness_kpi_direction == "max":
+                fitness = kpis[fitness_kpi_name].mean(axis=-1) - penalty
+            else:
+                fitness = kpis[fitness_kpi_name].mean(axis=-1) + penalty
+
+            print(
+                f"Generation {gen}, max fitness: {fitness.max()}, upper quartile fitness: {jnp.percentile(fitness, 75)}, median fitness: {jnp.median(fitness)}, lower quartile fitness: {jnp.percentile(fitness, 25)},  min fitness: {fitness.min()}"
+            )
 
             fit_re = fitness_shaper.apply(x, fitness)
 
             state = strategy.tell(x, fit_re, state)
             es_log = es_logging.update(es_log, x, fitness)
             best_params = es_log["top_params"][0]
+            best_fitness = es_log["top_fitness"][0]
             mean_params = state.mean
 
         store = {}
@@ -267,6 +295,7 @@ def run_neuro_opt_one_kpi(
         ]
         rows.append(row)
         best_params_last_round = best_params
+        best_fitness_last_round = best_fitness
     res_df = pd.DataFrame(
         rows,
         columns=[

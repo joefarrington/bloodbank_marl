@@ -87,6 +87,7 @@ class OpenES(Strategy):
         rng: chex.PRNGKey,
         params: EvoParams,
         init_mean: Optional[Union[chex.Array, chex.ArrayTree]] = None,
+        init_fitness: Optional[chex.Array] = None,
     ) -> EvoState:
         """`initialize` the evolution strategy."""
         initialization = jax.random.uniform(

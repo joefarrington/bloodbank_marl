@@ -165,27 +165,6 @@ def main(cfg):
         wandb.run.dir, orbax_checkpointer, checkpoint_options
     )
 
-    # Strategy and fitness shaper
-    strategy = hydra.utils.instantiate(
-        cfg.evosax.strategy, num_dims=param_reshaper.total_params
-    )
-    fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
-    rng, rng_state_init = jax.random.split(rng, 2)
-    if (
-        cfg.policies.pretrained.replenishment.enable
-        or cfg.policies.pretrained.issuing.enable
-    ):
-        state = strategy.initialize(
-            rng_state_init, init_mean=param_reshaper.flatten_single(policy_params)
-        )
-    else:
-        state = strategy.initialize(rng_state_init)
-
-    # Logger
-    es_logging = hydra.utils.instantiate(
-        cfg.evosax.logging, num_dims=param_reshaper.total_params
-    )
-    log = es_logging.initialize()
     rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
     # Start by rolling out the pretrained policy
@@ -216,6 +195,43 @@ def main(cfg):
                 log_to_wandb[f"eval/{p}/{k}"] = v[idx]
 
         wandb.log(log_to_wandb)
+
+        rng, rng_fitness = jax.random.split(rng)
+        # And get fitness on the training eval to warm-start the process
+        init_fitness, cum_infos, kpis = train_evaluator.rollout(
+            rng_fitness,
+            jax.tree_util.tree_map(lambda x: x.reshape((1,) + x.shape), policy_params),
+        )
+        init_fitness = init_fitness.mean(axis=-1)
+
+    # Strategy and fitness shaper
+    strategy = hydra.utils.instantiate(
+        cfg.evosax.strategy, num_dims=param_reshaper.total_params
+    )
+    fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
+
+    # Logger
+    es_logging = hydra.utils.instantiate(
+        cfg.evosax.logging, num_dims=param_reshaper.total_params
+    )
+    log = es_logging.initialize()
+
+    rng, rng_state_init = jax.random.split(rng, 2)
+    if (
+        cfg.policies.pretrained.replenishment.enable
+        or cfg.policies.pretrained.issuing.enable
+    ):
+        state = strategy.initialize(
+            rng_state_init,
+            init_mean=param_reshaper.flatten_single(policy_params),
+            init_fitness=init_fitness,
+        )
+        # We want to put this combination into the log
+        log = es_logging.update(
+            log, param_reshaper.flatten_single(policy_params), init_fitness
+        )
+    else:
+        state = strategy.initialize(rng_state_init)
 
     for gen in range(cfg.evosax.num_generations):
         rng, rng_init, rng_ask, rng_train = jax.random.split(rng, 4)

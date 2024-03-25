@@ -76,6 +76,7 @@ class SimpleGA(Strategy):
         rng: chex.PRNGKey,
         params: EvoParams,
         init_mean: Optional[Union[chex.Array, chex.ArrayTree]] = None,
+        init_fitness: Optional[chex.Array] = None,
     ) -> EvoState:
         """`initialize` the differential evolution strategy."""
         rng_init, rng_init_mean_noise = jax.random.split(rng)
@@ -86,35 +87,32 @@ class SimpleGA(Strategy):
             maxval=params.init_max,
         )
 
-        # If we supply an initial mean, replace the first member of the population
-        # Make a fraction of the initial pop based on the initial mean, by adding noise
-        # This should be equal to about half the popsize * the elite ratio to ensure some
-        # randomly generated solutions make it past the first generation
-        # And we assume it's the best member
+        # If we supply an initial mean, then half of the elite population will be that
+        # member, with corresponding fitness already known. Remaining half randomly sampled.
+        # This should keep some diversity.
         if init_mean is not None:
-            init_pop_based_on_init_mean = math.floor(
-                self.popsize / (2 / self.elite_ratio)
-            )
-            epsilon = (
-                jax.random.normal(rng_init_mean_noise, (self.popsize, self.num_dims))
-                * self.sigma_init
-            )
-            based_on_init_mean = init_mean + epsilon
+            init_pop_based_on_init_mean = math.ceil(self.elite_popsize / 2)
+            new_init_pop = self.elite_popsize - init_pop_based_on_init_mean
             initialization = jnp.vstack(
                 [
-                    init_mean,
-                    based_on_init_mean,
-                    initialization[init_pop_based_on_init_mean + 1 :, :],
+                    jnp.tile(init_mean, (init_pop_based_on_init_mean, 1)),
+                    initialization[:new_init_pop, :],
                 ]
             )
+            fitness_for_init_mean = jnp.repeat(
+                init_fitness, init_pop_based_on_init_mean
+            )
+            fitness_for_new = jnp.zeros(new_init_pop) + jnp.finfo(jnp.float32).max
+            fitness = jnp.hstack([fitness_for_init_mean, fitness_for_new])
             best_member = init_mean
         else:
             best_member = initialization.mean(axis=0)
+            fitness = jnp.zeros(self.elite_popsize) + jnp.finfo(jnp.float32).max
 
         state = EvoState(
             mean=initialization.mean(axis=0),
             archive=initialization,
-            fitness=jnp.zeros(self.elite_popsize) + jnp.finfo(jnp.float32).max,
+            fitness=fitness,
             sigma=params.sigma_init,
             best_member=best_member,
         )

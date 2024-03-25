@@ -74,6 +74,7 @@ class Strategy(object):
         rng: chex.PRNGKey,
         params: Optional[EvoParams] = None,
         init_mean: Optional[Union[chex.Array, chex.ArrayTree]] = None,
+        init_fitness: Optional[chex.Array] = None,
     ) -> EvoState:
         """`initialize` the evolution strategy."""
         # Use default hyperparameters if no other settings provided
@@ -87,7 +88,7 @@ class Strategy(object):
             else:
                 init_mean = jnp.asarray(init_mean)
 
-        state = self.initialize_strategy(rng, params, init_mean)
+        state = self.initialize_strategy(rng, params, init_mean, init_fitness)
 
         if init_mean is not None:
             state = state.replace(mean=init_mean)

@@ -24,9 +24,9 @@ evosax:
   num_generations: 100
   popsize: 150
   num_train_rollouts: 100
-  num_test_rollouts: 1000
+  num_test_rollouts: 10000
   seed: 10
-  init_prev_best: False
+  init_prev_best: True
   fitness_shaper:
     _target_: evosax.FitnessShaper
     maximize: True
@@ -40,16 +40,16 @@ evosax:
 kpi_ranges:
   wastage_pc:
     _target_: numpy.linspace
-    start: 0.5
+    start: 1.0
     stop: 20
-    num: 5
+    num: 25
   service_level_pc:
     _target_: numpy.linspace
     start: 50
     stop: 99
-    num: 5
+    num: 25
 
-min_exact_match_pc: 80.0
+min_exact_match_pc: 50.0
 
 heuristic_policies:
   issuing:
