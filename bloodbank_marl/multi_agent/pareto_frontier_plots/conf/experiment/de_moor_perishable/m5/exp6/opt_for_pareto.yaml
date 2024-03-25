@@ -20,5 +20,5 @@ kpi_ranges:
   service_level_pc:
     _target_: numpy.linspace
     start: 75
-    stop: 99.9
+    stop: 99.5
     num: 25

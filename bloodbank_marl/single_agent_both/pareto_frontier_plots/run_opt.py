@@ -255,10 +255,6 @@ def run_neuro_opt_one_kpi(
             else:
                 fitness = kpis[fitness_kpi_name].mean(axis=-1) + penalty
 
-            print(
-                f"Generation {gen}, max fitness: {fitness.max()}, upper quartile fitness: {jnp.percentile(fitness, 75)}, median fitness: {jnp.median(fitness)}, lower quartile fitness: {jnp.percentile(fitness, 25)},  min fitness: {fitness.min()}"
-            )
-
             fit_re = fitness_shaper.apply(x, fitness)
 
             state = strategy.tell(x, fit_re, state)
