@@ -1,19 +1,20 @@
 # @package _global_
 
 defaults:
-  - override /environment: rs_perishable_gymnax_test_double
+  - override /environment: rs_perishable_four_gymnax_test_double
   - override /policies/issuing: heuristic_exact_match
   - override /param_search: nsgaii
 
 wandb:
   init:
-    project: "rs_eight_perishable_base"
+    project: "rs_four_perishable_base"
     tags:
       - "new_type_env"
       - "fit_rep"
       - "simopt"
       - "exact_match"
       - "eighth_demand"
+      - "max_sub_shortage"
 
 param_search:
   num_rollouts: 400
