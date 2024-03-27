@@ -235,12 +235,13 @@ def run_neuro_opt_one_kpi(
 
             state = strategy.tell(x, fit_re, state)
             es_log = es_logging.update(es_log, x, fitness)
-            best_params = es_log["top_params"][0]
-            best_fitness = es_log["top_fitness"][0]
-            mean_params = state.mean
+            # NOTE: Intended to be used with SimpleGA, where state.mean is updated
+            # to be the best member of the population
+            best_params = state.mean
+            best_fitness = state.fitness[0]
 
         store = {}
-        x_test = jnp.stack([best_params, mean_params], axis=0)
+        x_test = jnp.stack([best_params], axis=0)
         reshaped_test_params = test_param_reshaper.reshape(x_test)
 
         fitness, cum_infos, kpis = test_evaluator.rollout(
@@ -254,19 +255,18 @@ def run_neuro_opt_one_kpi(
             for k, v in kpis.items()
             if k in cfg.environment.kpis_log_eval
         }
-        for idx, p in enumerate(["top_1", "mean_params"]):
-            store[f"eval/{p}/return_mean"] = test_fitness_mean[idx]
-            store[f"eval/{p}/return_std"] = test_fitness_std[idx]
-            for k, v in test_kpis.items():
-                store[f"eval/{p}/{k}_mean"] = v[idx]
+
+        store[f"eval/return_mean"] = test_fitness_mean[0]
+        store[f"eval/return_std"] = test_fitness_std[0]
+        for k, v in test_kpis.items():
+            store[f"eval/{k}_mean"] = v[0]
 
         # TODO: Consider if we need to hardcode the names of the KPIs
         row = [
             penalty_kpi_threshold,
-            float(store["eval/top_1/wastage_%_mean"]),
-            float(store["eval/top_1/service_level_%_mean"]),
-            float(store["eval/mean_params/wastage_%_mean"]),
-            float(store["eval/mean_params/service_level_%_mean"]),
+            float(store["eval/wastage_%_mean"]),
+            float(store["eval/service_level_%_mean"]),
+            float(store["eval/return_mean"]),
         ]
         rows.append(row)
         best_params_last_round = best_params
@@ -275,10 +275,9 @@ def run_neuro_opt_one_kpi(
         rows,
         columns=[
             "penalty_kpi_threshold",
-            "top_1_wastage_%_mean",
-            "top_1_service_level_%_mean",
-            "mean_params_wastage_%_mean",
-            "mean_params_service_level_%_mean",
+            "wastage_%_mean",
+            "service_level_%_mean",
+            "return_mean",
         ],
     )
     return res_df
