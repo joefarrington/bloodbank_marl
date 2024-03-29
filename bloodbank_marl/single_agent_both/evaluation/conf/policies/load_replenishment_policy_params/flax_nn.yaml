@@ -1,0 +1,13 @@
+_target_: bloodbank_marl.utils.load_save_policy_params.load_flax_policy_params
+param_key: best_params
+checkpoint_id: 99
+checkpoint_manager:
+  _target_: orbax.checkpoint.CheckpointManager
+  directory:
+  options:
+    _target_: orbax.checkpoint.CheckpointManagerOptions
+    max_to_keep: 1
+    create: True
+  checkpointers:
+    _target_ : orbax.checkpoint.PyTreeCheckpointer
+internal_key:

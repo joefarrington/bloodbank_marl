@@ -1,0 +1,28 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: heuristic_exact_match
+  - override /policies/replenishment: heuristic_order_up_to
+  - override /policies/load_issuing_policy_params: blank
+  - override /policies/load_replenishment_policy_params: blank
+
+wandb:
+  init:
+    project: "simple_two_product_evaluation"
+    tags:
+      - "exact_match"
+      - "sim_opt"
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [3]
+        - [3]
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 

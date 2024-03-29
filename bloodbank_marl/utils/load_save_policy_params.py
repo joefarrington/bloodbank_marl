@@ -2,6 +2,7 @@ from orbax.checkpoint import CheckpointManager
 import jax
 import jax.numpy as jnp
 import pandas as pd
+from typing import Optional
 
 
 def load_flax_policy_params(
@@ -9,9 +10,12 @@ def load_flax_policy_params(
     checkpoint_id: int,
     checkpoint_manager: CheckpointManager,
     reshape_for_fitness: bool = True,
+    internal_key: Optional[str] = None,
 ):
     """Load policy parameters from a checkpoint"""
     policy_params = checkpoint_manager.restore(checkpoint_id)[param_key]
+    if internal_key:
+        policy_params = policy_params[internal_key]
     if reshape_for_fitness:
         # This will add a batch dimension to the policy parameters
         policy_params = jax.tree_map(lambda x: x.reshape((1,) + x.shape), policy_params)
