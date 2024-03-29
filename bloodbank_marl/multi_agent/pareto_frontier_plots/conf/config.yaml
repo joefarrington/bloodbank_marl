@@ -26,7 +26,7 @@ evosax:
   num_train_rollouts: 100
   num_test_rollouts: 10000
   seed: 10
-  init_prev_best: True
+  init_prev_best: False
   fitness_shaper:
     _target_: evosax.FitnessShaper
     maximize: True
