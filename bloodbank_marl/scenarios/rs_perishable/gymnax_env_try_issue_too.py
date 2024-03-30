@@ -158,7 +158,7 @@ class EnvParams:
             jnp.array(shortage_costs),
             jnp.array(wastage_costs),
             jnp.array(holding_costs),
-            jnp.array(substitution_cost_ratios) * max_substitution_cost,
+            jnp.array(substitution_cost_ratios) * (max_substitution_cost / n_products),
             jnp.array(action_mask_per_request_type),
             initial_weekday,
             max_wastage_pc_target,
