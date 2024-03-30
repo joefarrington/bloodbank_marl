@@ -42,8 +42,8 @@ evosax:
     sigma_init: ${evosax.strategy.sigma_init}
     sigma_limit: ${evosax.strategy.sigma_limit}
     sigma_decay: ${evosax.strategy.sigma_decay}
-    init_min: -0.5
-    init_max: 0.5
+    init_min: 0
+    init_max: 0
 
 kpi_ranges:
   wastage_pc:
