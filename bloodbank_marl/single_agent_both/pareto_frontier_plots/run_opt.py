@@ -23,7 +23,7 @@ from bloodbank_marl.single_agent_replenishment.simopt.run_simopt import (
 # Enable logging
 log = logging.getLogger(__name__)
 
-M = 1e8  # Large constant to use as a penalty for infeasible solutions
+M = 1e10  # Large constant to use as a penalty for infeasible solutions
 
 # NOTE, For here and the other appraoch -> should we take mean and then impose penalty, or impose penalty and then take mean?
 # I think if we're taking a fitness score for a paramterization, we should impose the penalty afterwards (as we've been doing)
@@ -204,9 +204,13 @@ def run_neuro_opt_one_kpi(
 
         # If this isn't the first policy to be optimized for this KPI,
         # use the previous best params as a starting point for optimization
+
+        evo_params = hydra.utils.instantiate(cfg.evosax.evo_params)
+
         if cfg.evosax.init_prev_best == True and best_params_last_round is not None:
             state = strategy.initialize(
                 rng_state_init,
+                params=evo_params,
                 init_mean=param_reshaper.flatten_single(best_params_last_round),
                 init_fitness=best_fitness_last_round,
             )
@@ -217,7 +221,7 @@ def run_neuro_opt_one_kpi(
                 best_fitness_last_round,
             )
         else:
-            state = strategy.initialize(rng_state_init)
+            state = strategy.initialize(rng_state_init, params=evo_params)
 
         rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 

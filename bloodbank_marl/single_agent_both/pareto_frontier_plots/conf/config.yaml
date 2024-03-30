@@ -20,10 +20,10 @@ hydra:
 
 evosax:
   strategy:
-    sigma_init: 0.07
+    sigma_init: 0.07 # 0.2 works for 50% exact match for the 1% wastage, get reasonable results
   num_generations: 100
   popsize: 150
-  num_train_rollouts: 100
+  num_train_rollouts: 500
   num_test_rollouts: 10000
   seed: 10
   init_prev_best: False
@@ -36,18 +36,26 @@ evosax:
     num_generations: ${evosax.num_generations}
     top_k: 5
     maximize: ${evosax.fitness_shaper.maximize}
+  
+  evo_params:
+    _target_: bloodbank_marl.utils.evosax.strategies.simple_ga.EvoParams
+    sigma_init: ${evosax.strategy.sigma_init}
+    sigma_limit: ${evosax.strategy.sigma_limit}
+    sigma_decay: ${evosax.strategy.sigma_decay}
+    init_min: -0.5
+    init_max: 0.5
 
 kpi_ranges:
   wastage_pc:
     _target_: numpy.linspace
     start: 1
-    stop: 15 #40
-    num: 5
+    stop: 40
+    num: 1
   service_level_pc:
     _target_: numpy.linspace
     start: 10
     stop: 99.5
-    num: 1
+    num: 25
 
 min_exact_match_pc: 50.0
 
