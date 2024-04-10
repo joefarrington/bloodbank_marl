@@ -30,6 +30,7 @@ evosax:
   fitness_shaper:
     _target_: evosax.FitnessShaper
     maximize: True
+  init_params_abs_max: 0
 
   logging:
     _target_: evosax.utils.ESLog
@@ -42,8 +43,12 @@ evosax:
     sigma_init: ${evosax.strategy.sigma_init}
     sigma_limit: ${evosax.strategy.sigma_limit}
     sigma_decay: ${evosax.strategy.sigma_decay}
-    init_min: 0
-    init_max: 0
+    init_min:
+      _target_: operator.mul
+      _args_:
+        - -1
+        - ${evosax.init_params_abs_max}
+    init_max: ${evosax.init_params_abs_max}
 
 kpi_ranges:
   wastage_pc:

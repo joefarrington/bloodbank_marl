@@ -1,0 +1,25 @@
+# @package _global_
+
+wandb:
+  init:
+    project: "simple_two_product_pareto_frontier_plots"
+    tags:
+     - "wastage_limit_sweep"
+
+evosax:
+  num_train_rollouts: 100
+  num_test_rollouts: 1000
+
+kpi_ranges:
+  wastage_pc:
+    _target_: numpy.linspace
+    start: 5
+    stop: 40
+    num: 1
+  service_level_pc:
+    _target_: numpy.linspace
+    start: 10
+    stop: 99.5
+    num: 0
+
+min_exact_match_pc: 95.0
