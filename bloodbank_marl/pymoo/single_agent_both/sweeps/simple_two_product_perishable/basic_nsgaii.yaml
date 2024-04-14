@@ -4,7 +4,7 @@ metric:
   name: train/min_distance
   goal: minimize
 parameters:
-  pymoo.problem/xu:
+  pymoo.problem.xu:
     distribution: uniform
     min: 0.0
     max: 10.0
