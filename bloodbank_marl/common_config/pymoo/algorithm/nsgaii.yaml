@@ -1,0 +1,13 @@
+_target_: pymoo.algorithms.moo.nsga2.NSGA2
+pop_size: ${pymoo.pop_size}
+n_offsprings: ${pymoo.n_offsprings}
+sampling:
+  _target_: pymoo.operators.sampling.rnd.FloatRandomSampling
+crossover:
+  _target_: pymoo.operators.crossover.sbx.SBX
+  prob: 0.9
+  eta: 15
+mutation:
+  _target_: pymoo.operators.mutation.gauss.GM
+  sigma: 0.07
+eliminate_duplicates: True
