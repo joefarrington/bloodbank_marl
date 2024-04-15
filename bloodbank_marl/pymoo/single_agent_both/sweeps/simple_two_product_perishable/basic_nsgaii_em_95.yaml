@@ -1,0 +1,29 @@
+program: ../run_pymoo.py
+method: bayes
+metric:
+  name: train/min_distance
+  goal: minimize
+parameters:
+  pymoo.problem.xu:
+    distribution: uniform
+    min: 0.0
+    max: 10.0
+  pymoo.algorithm.mutation.sigma:
+    distribution: log_uniform_values
+    min: 0.01
+    max: 2
+  pymoo.algorithm.crossover.prob:
+    distribution: uniform
+    min: 0.1
+    max: 1.0
+  pymoo.algorithm.crossover.eta:
+    distribution: log_uniform_values
+    min: 0.5
+    max: 50
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +pymoo.problem.min_exact_match_pc=95.0
