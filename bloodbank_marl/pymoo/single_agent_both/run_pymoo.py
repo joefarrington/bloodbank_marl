@@ -25,9 +25,9 @@ class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
         train_evaluator,
         param_reshaper,
         scenario_seed,
-        min_service_level_pc=0.0,
-        max_wastage_pc=100.0,
-        min_exact_match_pc=0.0,
+        min_service_level_pc=-1.0,
+        max_wastage_pc=101.0,
+        min_exact_match_pc=-1.0,
         xl=-5.0,
         xu=5.0,
     ):

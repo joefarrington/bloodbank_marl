@@ -10,8 +10,8 @@ parameters:
     max: 10.0
   pymoo.algorithm.mutation.sigma:
     distribution: log_uniform_values
-    min: 0.001
-    max: 0.5
+    min: 0.01
+    max: 2
   pymoo.algorithm.crossover.prob:
     distribution: uniform
     min: 0.1
