@@ -26,4 +26,4 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +pymoo.problem.min_exact_match_pc=95.0
+  - pymoo.problem.min_exact_match_pc=95.0
