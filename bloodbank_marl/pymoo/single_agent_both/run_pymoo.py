@@ -25,6 +25,9 @@ class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
         train_evaluator,
         param_reshaper,
         scenario_seed,
+        # Decide whether to include variable in the optimization problem
+        opt=["wastage", "service_level", "exact_match"],
+        # Control use of constraints with these three arguments
         min_service_level_pc=-1.0,
         max_wastage_pc=101.0,
         min_exact_match_pc=-1.0,
@@ -34,12 +37,18 @@ class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
 
         # The default level of the constaints should always be met
         super().__init__(
-            n_var=param_reshaper.total_params, n_obj=3, n_ieq_constr=3, xl=xl, xu=xu
+            n_var=param_reshaper.total_params,
+            n_obj=len(opt),
+            n_ieq_constr=3,
+            xl=xl,
+            xu=xu,
         )
 
         self.train_evaluator = train_evaluator  #
         self.param_reshaper = param_reshaper
         self.rng = jax.random.PRNGKey(scenario_seed)
+
+        self.opt = opt
 
         self.min_service_level_pc = min_service_level_pc
         self.max_wastage_pc = max_wastage_pc
@@ -64,11 +73,14 @@ class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
         service_level_constraint = service_level_pc_fitness + self.min_service_level_pc
         exact_match_constraint = exact_match_pc_fitness + self.min_exact_match_pc
 
-        out["F"] = [
-            np.array(wastage_pc_fitness),
-            np.array(service_level_pc_fitness),
-            np.array(exact_match_pc_fitness),
-        ]
+        out["F"] = []
+        if "wastage" in self.opt:
+            out["F"].append(np.array(wastage_pc_fitness))
+        if "service_level" in self.opt:
+            out["F"].append(np.array(service_level_pc_fitness))
+        if "exact_match" in self.opt:
+            out["F"].append(np.array(exact_match_pc_fitness))
+
         out["G"] = [
             np.array(wastage_constraint),
             np.array(service_level_constraint),
@@ -134,9 +146,18 @@ def main(cfg: omegaconf.DictConfig):
     F = res.F
 
     # Put results into a df
-    df = pd.DataFrame(F, columns=["Wastage", "Service Level", "Exact Match"])
-    df["Service Level"] = -1 * df["Service Level"]
-    df["Exact Match"] = -1 * df["Exact Match"]
+    cols = []
+    if "wastage" in problem.opt:
+        cols.append("Wastage")
+    if "service_level" in problem.opt:
+        cols.append("Service Level")
+    if "exact_match" in problem.opt:
+        cols.append("Exact Match")
+    df = pd.DataFrame(F, columns=cols)
+    if "service_level" in problem.opt:
+        df["Service Level"] = -1 * df["Service Level"]
+    if "exact_match" in problem.opt:
+        df["Exact Match"] = -1 * df["Exact Match"]
 
     log_to_wandb = {}
 
@@ -149,15 +170,18 @@ def main(cfg: omegaconf.DictConfig):
     log_to_wandb["train/min_distance"] = min_dist
 
     # Plot results
-    log_to_wandb["train/service_level_v_wastage"] = wandb.plot.scatter(
-        table, "Wastage", "Service Level"
-    )
-    log_to_wandb["train/service_level_v_exact_match"] = wandb.plot.scatter(
-        table, "Exact Match", "Service Level"
-    )
-    log_to_wandb["train/exact_match_v_wastage"] = wandb.plot.scatter(
-        table, "Wastage", "Exact Match"
-    )
+    if "wastage" in problem.opt and "service_level" in problem.opt:
+        log_to_wandb["train/service_level_v_wastage"] = wandb.plot.scatter(
+            table, "Wastage", "Service Level"
+        )
+    if "exact_match" in problem.opt and "service_level" in problem.opt:
+        log_to_wandb["train/service_level_v_exact_match"] = wandb.plot.scatter(
+            table, "Exact Match", "Service Level"
+        )
+    if "exact_match" in problem.opt and "wastage" in problem.opt:
+        log_to_wandb["train/exact_match_v_wastage"] = wandb.plot.scatter(
+            table, "Wastage", "Exact Match"
+        )
 
     wandb.log(log_to_wandb)
 
