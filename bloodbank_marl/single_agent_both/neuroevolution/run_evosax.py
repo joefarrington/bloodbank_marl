@@ -270,14 +270,14 @@ def main(cfg: omegaconf.DictConfig):
             df = pd.concat(
                 [
                     df,
-                    pd.DataFrame(kpis[m][idx].mean(axis=(0)).reshape(1, -1)),
+                    pd.DataFrame(kpis[m][0].mean(axis=(0)).reshape(1, -1)),
                 ],
                 axis=0,
             )
             df = pd.concat(
                 [
                     df,
-                    pd.DataFrame(kpis[m][idx].std(axis=(0)).reshape(1, -1)),
+                    pd.DataFrame(kpis[m][0].std(axis=(0)).reshape(1, -1)),
                 ],
                 axis=0,
             )
