@@ -17,6 +17,28 @@ from pymoo.optimize import minimize
 from pymoo.core.problem import Problem
 import numpy as np
 import jax.numpy as jnp
+from pymoo.indicators.hv import Hypervolume
+
+
+def calc_hypervolume(F: np.array, metrics_to_opt: List) -> float:
+
+    ideal = {"wastage": 0, "service_level": -100, "exact_match": -100}
+    nadir = {"wastage": 100, "service_level": 0, "exact_match": 0}
+    ref_point = {"wastage": 100, "service_level": 0, "exact_match": 0}
+
+    ref_point = np.array([ref_point[metric] for metric in metrics_to_opt])
+    ideal = np.array([ideal[metric] for metric in metrics_to_opt])
+    nadir = np.array([nadir[metric] for metric in metrics_to_opt])
+
+    metric = Hypervolume(
+        ref_point=ref_point,
+        norm_ref_point=True,
+        zero_to_one=True,
+        ideal=ideal,
+        nadir=nadir,
+    )
+    hv = metric.do(F)
+    return hv
 
 
 class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
@@ -168,6 +190,10 @@ def main(cfg: omegaconf.DictConfig):
     # Calculate and log distance of best solution from 100% SL, 0% wastage
     min_dist = calc_min_distance(df)
     log_to_wandb["train/min_distance"] = min_dist
+
+    # Calculate and log hypervolume
+    hv = calc_hypervolume(F, problem.opt)
+    log_to_wandb["train/hypervolume"] = hv
 
     # Plot results
     if "wastage" in problem.opt and "service_level" in problem.opt:
