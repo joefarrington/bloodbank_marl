@@ -2,7 +2,7 @@ program: ../run_pymoo.py
 method: bayes
 metric:
   name: train/hypervolume
-  goal: minimize
+  goal: maximize
 parameters:
   pymoo.problem.xu:
     distribution: uniform
