@@ -19,17 +19,17 @@ seed: 12
 
 obs_collection:
   seed: 12345
-  num_envs: 200
+  num_envs: 20
   samples_per_env: 700
   policy:
     _target_: bloodbank_marl.policies.replenishment.heuristic.SRepPolicyExplore
     env_name: ${environment.env_name}
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
-    epsilon: 0.1
+    epsilon: 0.05
 
 pretraining:
-  num_epochs: 100
+  num_epochs: 20
   batch_size: 64
   preprocess_observations:
     _target_: bloodbank_marl.utils.pretraining.get_obs
@@ -61,7 +61,7 @@ checkpoint_manager:
 
 evaluation: 
   seed: 67
-  eval_freq: 10
+  eval_freq: 5
   test_evaluator:
     _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
     env_name: ${environment.env_name}

@@ -102,11 +102,11 @@ def train_model(
                 "training/loss": np.mean(losses),
             },
         )
-        if epoch % cfg.evaluation.eval_freq == 0:
+        if (epoch % cfg.evaluation.eval_freq == 0) or (epoch == cfg.pretraining.num_epochs - 1):
             fitness, kpis = eval_step(
                 state, jax.random.PRNGKey(cfg.evaluation.seed), cfg, nn_policy
             )
-            performance_gap = (fitness - heuristic_fitness) * 100 / heuristic_fitness
+            performance_gap = ((fitness - heuristic_fitness) * 100) / heuristic_fitness
             log_to_wandb.update(
                 {
                     "eval/mean_daily_reward": fitness,
@@ -137,7 +137,6 @@ def main(cfg):
     # Instantiate a heuristic policy for labelling, and the parameters
     # Do a rollout to log the performance of the heuristic policy
 
-    print("a")
     heuristic_policy = hydra.utils.instantiate(cfg.heuristic_policy)
     heuristic_params = hydra.utils.instantiate(
         cfg.heuristic_policy.fixed_policy_params
