@@ -205,6 +205,7 @@ def main(cfg):
         init_fitness = init_fitness.mean(axis=-1)
 
     # Strategy and fitness shaper
+    evo_params = hydra.utils.instantiate(cfg.evosax.evo_params)
     strategy = hydra.utils.instantiate(
         cfg.evosax.strategy, num_dims=param_reshaper.total_params
     )
@@ -225,13 +226,14 @@ def main(cfg):
             rng_state_init,
             init_mean=param_reshaper.flatten_single(policy_params),
             init_fitness=init_fitness,
+            params=evo_params
         )
         # We want to put this combination into the log
         log = es_logging.update(
             log, param_reshaper.flatten_single(policy_params), init_fitness
         )
     else:
-        state = strategy.initialize(rng_state_init)
+        state = strategy.initialize(rng_state_init, params=evo_params)
 
     for gen in range(cfg.evosax.num_generations):
         rng, rng_init, rng_ask, rng_train = jax.random.split(rng, 4)

@@ -27,6 +27,7 @@ evosax:
   num_test_rollouts: 1000
   evaluate_every_k_gens: 10
   seed: 10
+  init_params_abs_max: 0
   
   fitness_shaper:
     _target_: evosax.FitnessShaper
@@ -42,6 +43,18 @@ evosax:
     _target_: orbax.checkpoint.CheckpointManagerOptions
     max_to_keep: 1
     create: True
+
+  evo_params:
+    _target_: bloodbank_marl.utils.evosax.strategies.simple_ga.EvoParams
+    sigma_init: ${evosax.strategy.sigma_init}
+    sigma_limit: ${evosax.strategy.sigma_limit}
+    sigma_decay: ${evosax.strategy.sigma_decay}
+    init_min:
+      _target_: operator.mul
+      _args_:
+        - -1
+        - ${evosax.init_params_abs_max}
+    init_max: ${evosax.init_params_abs_max}
     
 train_evaluator:
   _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness

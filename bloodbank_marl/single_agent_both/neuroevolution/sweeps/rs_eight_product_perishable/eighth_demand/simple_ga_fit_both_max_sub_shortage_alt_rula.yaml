@@ -41,6 +41,10 @@ parameters:
       - 5
       - 10
       - 20
+  evosax.init_params_abs_max:
+    distribution: uniform
+    min: 0.0
+    max: 5.0
 
 command:
   - ${env}
