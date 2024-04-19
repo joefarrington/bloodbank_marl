@@ -1,0 +1,28 @@
+# @package _global_
+
+wandb:
+  init:
+    project: de_moor_pymoo
+    tags:
+      - m5_exp6
+      - fit_both
+      - nsgaii
+
+environment:
+  env_kwargs:
+    lead_time: 2
+    max_useful_life: 5
+pymoo:
+  hypervolume:
+    _target_: pymoo.indicators.hv.Hypervolume
+    ref_point:
+      _target_: numpy.array
+      object: [1.5, 0] # Temp, for comparsion with outer loop
+    norm_ref_point: True
+    zero_to_one: True
+    ideal:
+      _target_: numpy.array
+      object: [0, -100]
+    nadir:
+      _target_: numpy.array
+      object: [1.5, 0] # Temp, for comparsion with outer loop

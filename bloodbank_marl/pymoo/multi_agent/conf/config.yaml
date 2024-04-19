@@ -1,0 +1,90 @@
+defaults:
+  - environment: de_moor_perishable
+  - policies/replenishment: multi_agent_single_product_mlp
+  - policies/issuing: multi_agent_single_product_mlp
+  - pymoo/algorithm: nsgaii
+  - _self_
+
+wandb:
+  init:
+    project: "de_moor_pymoo"
+    tags:
+      - "new_type_env"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+pymoo:
+  num_generations: 100
+  pop_size: 2000
+  n_offsprings: 150
+  num_train_rollouts: 100
+  #num_test_rollouts: 1000
+  #evaluate_every_k_gens: 10
+  seed: 10
+
+  hypervolume:
+    _target_: pymoo.indicators.hv.Hypervolume
+    ref_point:
+      _target_: numpy.array
+      object: [100, 0]
+    norm_ref_point: True
+    zero_to_one: True
+    ideal:
+      _target_: numpy.array
+      object: [0, -100]
+    nadir:
+      _target_: numpy.array
+      object: [100, 0]
+
+  problem:
+    xu: 5.0
+    xl:
+      _target_: operator.mul
+      _args_:
+        - -1.0
+        - ${pymoo.problem.xu}
+
+  termination:
+    _target_: pymoo.termination.get_termination
+    name: "n_gen"
+    n_max_gen: ${pymoo.num_generations}
+  
+  #checkpoint_options:
+  #  _target_: orbax.checkpoint.CheckpointManagerOptions
+  #  max_to_keep: 1
+  #  create: True
+
+policies:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${pymoo.num_train_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  gamma: ${environment.gamma}
+
+# CUrrently not used
+#evaluation:
+#  seed: 1337
+#  test_evaluator:
+#    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+#    env_name: ${environment.env_name}
+#    num_env_steps: ${environment.num_env_steps}
+#    num_rollouts: ${pymoo.num_test_rollouts}
+#    env_kwargs: ${environment.env_kwargs}
+#    env_params: ${environment.env_params}
+#    test: True
+#    n_devices:
+#    num_warmup_days: ${environment.num_warmup_days}
+#    gamma: ${environment.gamma}
