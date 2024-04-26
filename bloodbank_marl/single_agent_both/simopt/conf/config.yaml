@@ -1,6 +1,7 @@
 defaults:
   - policies/replenishment: heuristic_order_up_to
   - policies/issuing: heuristic_priority_match
+  - policies/issuing/fixed_policy_params: 
   - param_search: grid
   - environment: simple_two_product_perishable_gymnax_test_double
   - _self_
@@ -41,5 +42,6 @@ evaluation:
     env_params: ${environment.env_params}
     test: True
     n_devices:
+    
     num_warmup_days: ${environment.num_warmup_days}
     gamma: ${environment.gamma}
