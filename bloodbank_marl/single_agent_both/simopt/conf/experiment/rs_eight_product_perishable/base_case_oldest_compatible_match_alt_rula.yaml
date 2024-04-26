@@ -13,6 +13,7 @@ wandb:
       - "fit_rep"
       - "simopt"
       - "oldest_compatible_match"
+      - "alt_rula"
 
 param_search:
   num_rollouts: 400

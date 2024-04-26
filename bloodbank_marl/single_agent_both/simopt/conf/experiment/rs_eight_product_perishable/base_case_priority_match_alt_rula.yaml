@@ -13,13 +13,24 @@ wandb:
       - "fit_rep"
       - "simopt"
       - "priority_match"
+      - "alt_rula"
 
 param_search:
   num_rollouts: 400
+  early_stopping_rounds: 20
   search_bounds:
     all_params:
       low: 0
-      high: 50
+      high: 60
+  max_parallel_trials: 150
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 25
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 1000
 
 policies:
   issuing:
@@ -41,6 +52,3 @@ environment:
       - 0.5
       - 0.2
       - 0.3
-
-evaluation:
-  num_rollouts: 1000

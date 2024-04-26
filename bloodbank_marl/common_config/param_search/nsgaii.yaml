@@ -9,4 +9,4 @@ search_bounds:
   all_params:
     low: 0
     high: 100
-early_stopping_rounds: 10
+early_stopping_rounds: 20

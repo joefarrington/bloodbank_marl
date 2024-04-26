@@ -4,6 +4,7 @@ defaults:
   - override /environment: rs_perishable_gymnax_test_double
   - override /policies/issuing: heuristic_exact_match
   - override /param_search: nsgaii
+  - override /policies/issuing/fixed_policy_params: eight_product_platelet
 
 wandb:
   init:
@@ -13,6 +14,7 @@ wandb:
       - "fit_rep"
       - "simopt"
       - "exact_match"
+      - "eighth_demand"
       - "alt_rula"
 
 param_search:
@@ -20,14 +22,25 @@ param_search:
   search_bounds:
     all_params:
       low: 0
-      high: 50
+      high: 15
+  max_parallel_trials: 150
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 1000
 
 environment:
   env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 650
     age_on_arrival_distribution_probs:
       - 0.5
       - 0.2
       - 0.3
-
-evaluation:
-  num_rollouts: 1000
