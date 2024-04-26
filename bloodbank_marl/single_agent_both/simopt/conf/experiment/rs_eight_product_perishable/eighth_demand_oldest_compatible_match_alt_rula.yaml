@@ -21,7 +21,12 @@ param_search:
   search_bounds:
     all_params:
       low: 0
-      high: 20 # Low because demand lower
+      high: 15 #20 # Low because demand lower
+  max_parallel_trials: 150
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 1000
 
 environment:
   env_params:
@@ -33,7 +38,7 @@ environment:
       - 5.1 # Fri
       - 3.4 # Sat
       - 3.6 # Sun
-    max_substitution_cost: 3250
+    max_substitution_cost: 650 #3250
     age_on_arrival_distribution_probs:
       - 0.5
       - 0.2

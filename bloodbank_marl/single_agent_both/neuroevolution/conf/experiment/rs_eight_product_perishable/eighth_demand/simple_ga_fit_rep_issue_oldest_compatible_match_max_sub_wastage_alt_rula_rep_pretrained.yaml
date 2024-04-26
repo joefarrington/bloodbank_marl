@@ -20,13 +20,9 @@ wandb:
 evosax:
   strategy:
     sigma_init: 0.07
-  num_train_rollouts: 1000
-  num_test_rollouts: 10000
+  num_train_rollouts: 400
+  num_test_rollouts: 1000
   evaluate_every_k_gens: 25
-
-train_evaluator:
-  num_env_steps: 90
-  num_warmup_days: 30
 
 environment:
   env_kwargs:

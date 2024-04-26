@@ -21,7 +21,12 @@ param_search:
   search_bounds:
     all_params:
       low: 0
-      high: 20 # Low because demand lower
+      high: 15 #20 # Low because demand lower
+  max_parallel_trials: 150
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 1000
 
 environment:
   env_params:
