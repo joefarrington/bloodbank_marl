@@ -242,7 +242,7 @@ class IssueObs:
             [
                 self.one_hot_day_of_week().reshape(batch_dims + (-1,)),
                 self.request_time.reshape(batch_dims + (-1,)),
-                self.request_type.reshape(batch_dims + (-1,)),
+                self.one_hot_request_type.reshape(batch_dims + (-1,)),
                 self.in_transit.reshape(batch_dims + (-1,)),
                 self.stock.reshape(batch_dims + (-1,)),
             ]
@@ -250,6 +250,9 @@ class IssueObs:
 
     def one_hot_day_of_week(self):
         return jax.nn.one_hot(self.weekday, 7)
+
+    def one_hot_request_type(self):
+        return jax.nn.one_hot(self.request_type, n_products)
 
 
 class RSPerishableIncIssueGymnax(SimpleTwoProductPerishableIncIssueGymnax):
