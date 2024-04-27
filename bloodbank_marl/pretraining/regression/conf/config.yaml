@@ -1,6 +1,7 @@
 defaults:
   - heuristic_policy: order_up_to
   - policies/issuing: heuristic_priority_match
+  - policies/issuing/fixed_policy_params:
   - policies/replenishment: single_agent_multi_product_mlp
   - environment: rs_perishable_gymnax_test_double
   - _self_
