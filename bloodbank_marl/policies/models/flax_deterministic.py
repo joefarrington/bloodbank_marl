@@ -129,7 +129,7 @@ class IssueMultiProductMLP(nn.Module):
     # And will be all zeros if no products are issued.
 
     n_hidden: Union[int, list]
-    n_actions: int  # This will be the number of products
+    n_actions: int  # This will be the number of products + 1
     action_pad: int = 0
     preprocess_observation: callable = lambda obs: obs.obs
 
@@ -141,9 +141,30 @@ class IssueMultiProductMLP(nn.Module):
             x = nn.Dense(h)(x)
             x = nn.relu(x)
         x = nn.Dense(self.n_actions)(x)
-        x = x + jnp.where(obs.action_mask == 1, 0, -1e9)
-        a = jnp.where(x == x.max(), 1, 0)
-        a = (
-            a * obs.action_mask
-        )  # Catch the case where no stock and so first element is argmax by default
+        action_mask = jnp.hstack(
+            [1, obs.action_mask]
+        )  # Issue nothing is always possible
+        x = x + jnp.where(action_mask == 1, 0, -1e9)
+        raw_action = jnp.argmax(x, axis=-1)
+        a = jnp.zeros(self.n_actions - 1)  # This is the action for each product
+        a = jax.lax.select(raw_action == 0, a, a.at[raw_action - 1].add(1))
         return a
+
+
+class IssueMultiProductPretrainMLP(nn.Module):
+    # Version without action masking and padding for more efficient pretraining,
+    # and return the logits so can be used with cross entropy loss
+    n_hidden: Union[int, list]
+    n_actions: int  # This will be the number of products + 1
+    action_pad: int = 0
+    preprocess_observation: callable = lambda obs: obs.obs
+
+    @nn.compact
+    def __call__(self, obs, rng: Optional[chex.PRNGKey] = jax.random.PRNGKey(0)):
+        x = self.preprocess_observation(obs)
+        n_hidden = [self.n_hidden] if isinstance(self.n_hidden, int) else self.n_hidden
+        for h in n_hidden:
+            x = nn.Dense(h)(x)
+            x = nn.relu(x)
+        x = nn.Dense(self.n_actions)(x)
+        return x

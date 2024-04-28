@@ -1,0 +1,37 @@
+# @package _global_
+
+defaults:
+  - override /obs_collection/policies/issuing: heuristic_oldest_compatible_match
+
+environment:
+  env_kwargs:
+    max_order_quantity: 5
+  env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 650
+    age_on_arrival_distribution_probs:
+      - 0.5
+      - 0.2
+      - 0.3
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      # O-, O+, A-, A+, B-, B+, AB-, AB+
+      object: 
+      - [1]
+      - [0]
+      - [2]
+      - [2]
+      - [0]
+      - [2]
+      - [0]
+      - [0]

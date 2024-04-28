@@ -42,7 +42,7 @@ env_kwargs:
   n_products: 8
   max_useful_life: 3
   lead_time: 0
-  max_order_quantity: 50
+  max_order_quantity: 60
   max_demand: 100
 gamma: 1.0
 types: ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]

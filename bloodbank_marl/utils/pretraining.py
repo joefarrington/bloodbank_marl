@@ -12,6 +12,7 @@ from functools import partial
 from omegaconf import OmegaConf
 import hydra
 from bloodbank_marl.policies.replenishment.heuristic import SRepPolicyExplore
+from bloodbank_marl.policies.policy_manager import PolicyManager
 
 
 def collate_fn_pytree(batch):
@@ -198,6 +199,80 @@ def get_obs_rs_multiproduct(cfg):
     return jax.tree_util.tree_map(reshape_obs_element, observations)
 
 
+@partial(jax.vmap, in_axes=(0, None, None, None, None, None), out_axes=0)
+def collect_samples_multiagent_env(
+    rng: jnp.ndarray,
+    n_samples: int,
+    collection_policy_manager: PolicyManager,
+    heuristic_policy_params: jnp.ndarray,
+    env: RSEnvObs,
+    env_params: jnp.ndarray,
+):
+
+    rng, reset_key = jax.random.split(rng)
+    obs, state = env.reset(reset_key, env_params)
+
+    def one_step(carry, x):
+        rng, state, obs = carry
+        rng, rng_policy, rng_step = jax.random.split(rng, 3)
+        action = collection_policy_manager.apply(
+            heuristic_policy_params, obs, rng_policy
+        )
+        obs, state, _, _, _, _ = env.step(rng_step, state, action, env_params)
+        return (rng, state, obs), obs
+
+    return jax.lax.scan(one_step, (rng, state, obs), None, length=n_samples)
+
+
+def get_obs_rs_multiproduct_issuing(cfg):
+    rng = jax.random.PRNGKey(cfg.obs_collection.seed)
+
+    replenishment_collection_policy = hydra.utils.instantiate(
+        cfg.obs_collection.policies.replenishment
+    )
+    issuing_collection_policy = hydra.utils.instantiate(
+        cfg.obs_collection.policies.issuing
+    )
+    policies = [replenishment_collection_policy.apply, issuing_collection_policy.apply]
+    collection_policy_manager = hydra.utils.instantiate(
+        cfg.obs_collection.policies.policy_manager, policies=policies
+    )
+
+    # Workaround because we need to instaniate the issuing policy
+    env, default_env_params = make(
+        cfg.obs_collection.environment.env_name,
+        **cfg.obs_collection.environment.env_kwargs
+    )
+    env_params = default_env_params.create_env_params(
+        **cfg.obs_collection.environment.env_params
+    )
+
+    policy_params = {
+        0: hydra.utils.instantiate(
+            cfg.obs_collection.policies.replenishment.fixed_policy_params
+        ),
+        1: hydra.utils.instantiate(
+            cfg.obs_collection.policies.issuing.fixed_policy_params
+        ),
+    }
+
+    rng_v = jax.random.split(rng, cfg.obs_collection.num_envs)
+    _, observations = collect_samples_multiagent_env(
+        rng_v,
+        cfg.obs_collection.samples_per_env,
+        collection_policy_manager,
+        policy_params,
+        env,
+        env_params,
+    )
+    reshaped_obs = jax.tree_util.tree_map(reshape_obs_element, observations)
+    # Just get the observations for issuing
+    issue_obs = jax.tree_util.tree_map(
+        lambda x: x[reshaped_obs.agent_id == 1], reshaped_obs
+    )
+    return issue_obs
+
+
 # Preprocessing
 def get_obs(x):
     """Enable the use of EnvObs.obs as a preprocessing function."""
@@ -212,6 +287,11 @@ def get_obs_total_per_product(x):
 def get_obs_total_per_product_and_weekday(x):
     """Enable the use of EnvObs.obs_total_per_product_and_weekday as a preprocessing function."""
     return x.obs_total_per_product_and_weekday
+
+
+def get_issue_obs(x):
+    """Enable the use of EnvObs.obs as a preprocessing function."""
+    return x.issue_obs_with_one_hot_request_type_and_day_of_week
 
 
 def passthrough(x):
@@ -245,3 +325,10 @@ def transform_model_output_to_integer(
     out = out + min_order_quantity
     out = jnp.ceil(out)
     return out.astype(jnp.int32)
+
+
+def transform_issue_action_to_integer_label(issue_actions):
+    # NN output zero is issue nothing
+    return jnp.where(
+        issue_actions.sum(axis=-1) == 0, 0, issue_actions.argmax(axis=-1) + 1
+    )

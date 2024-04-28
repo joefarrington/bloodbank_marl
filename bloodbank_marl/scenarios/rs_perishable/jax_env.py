@@ -22,46 +22,47 @@ jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
 # and we need them to have the same dimensions.
 
 n_products = 8
-C = 1e10  # invalid substitution cost
+M = 1e10  # invalid substitution cost
 max_useful_life = 3
-# Based on Ensafian et al (2017)
+
+# Base on Yu Suen et al (2023)
 substitution_cost_ratios = [
     # Unit O-, O+, A-, A+, B-, B+, AB-, AB+
     [
         0,
-        4 / 8,
-        2 / 8,
-        6 / 8,
-        1 / 8,
-        5 / 8,
-        3 / 8,
-        7 / 8,
-    ],  # O- pt
-    [1 / 8, 0, 5 / 8, 4 / 8, 3 / 8, 2 / 8, 7 / 8, 6 / 8],  # O+ pt
+        M,
+        2,
+        M,
+        1,
+        M,
+        M,
+        M,
+    ],  # O- patient
+    [1, 0, 5, 4, 3, 2, M, M],  # O+ patient
     [
-        3 / 8,
-        7 / 8,
+        3,
+        M,
         0,
-        4 / 8,
-        2 / 8,
-        6 / 8,
-        1 / 8,
-        5 / 8,
-    ],  # A- pt
-    [7 / 8, 6 / 8, 1 / 8, 0, 5 / 8, 4 / 8, 3 / 8, 2 / 8],  # A+ pt
+        4,
+        2,
+        M,
+        1,
+        5,
+    ],  # A- patient
+    [M, M, 1, 0, 5, 4, 3, 2],  # A+ patient
     [
-        3 / 8,
-        7 / 8,
-        2 / 8,
-        6 / 8,
+        3,
+        M,
+        2,
+        M,
         0,
-        4 / 8,
-        1 / 8,
-        5 / 8,
+        4,
+        1,
+        5,
     ],  # B- pt
-    [7 / 8, 6 / 8, 5 / 8, 4 / 8, 1 / 8, 0, 3 / 8, 2 / 8],  # B+ pt
-    [3 / 8, 7 / 8, 1 / 8, 5 / 8, 2 / 8, 6 / 8, 0, 4 / 8],  # AB- pt
-    [7 / 8, 6 / 8, 3 / 8, 2 / 8, 5 / 8, 4 / 8, 1 / 8, 0],  # AB+ pt
+    [M, M, 5, 4, 1, 0, 3, 2],  # B+ patient
+    [3, M, 1, 5, 2, M, 0, 4],  # AB- patient
+    [M, M, 3, 2, 5, 4, 1, 0],  # AB+ patient
 ]
 # These are from Ensafian et al (2017) - and similar to those in Meneses
 product_probabilities = [
@@ -75,9 +76,9 @@ product_probabilities = [
     0.03,
 ]
 
-
-# NOTE: For now, based on Ensafian, all can be issued to all
-action_mask_per_request_type = np.array((n_products, n_products), dtype=np.int32)
+action_mask_per_request_type = jnp.where(
+    jnp.array(substitution_cost_ratios) > n_products, 0, 1
+)
 
 
 # TODO: Recheck all defaults
@@ -86,7 +87,7 @@ class EnvParams:
     poisson_demand_mean: float
     product_probabilities: chex.Array
     age_on_arrival_distribution_probs: chex.Array
-    fixed_order_costs: float
+    fixed_order_cost: float
     variable_order_costs: chex.Array
     shortage_costs: chex.Array
     wastage_costs: chex.Array
@@ -97,7 +98,7 @@ class EnvParams:
     substitution_costs: chex.Array
     action_mask_per_request_type: chex.Array
     initial_weekday: int  # 0 Monday, 6, Sunday, -1 random on each reset
-    max_expiry_pc_target: float
+    max_wastage_pc_target: float
     min_service_level_pc_target: float
     min_exact_match_pc_target: float
     target_kpi_breach_penalty: float
@@ -120,7 +121,7 @@ class EnvParams:
         product_probabilities: List[float] = product_probabilities,
         age_on_arrival_distribution_probs: List[float] = [1]
         + [0] * (max_useful_life - 1),  # All fresh
-        fixed_order_costs: float = 225.0,
+        fixed_order_cost: float = 225.0,
         variable_order_costs: List[float] = [650] * n_products,
         shortage_costs: List[float] = [3250] * n_products,
         wastage_costs: List[float] = [650] * n_products,
@@ -129,7 +130,7 @@ class EnvParams:
         max_substitution_cost: float = 3250,
         action_mask_per_request_type: chex.Array = action_mask_per_request_type,
         initial_weekday: int = 0,  # Start on Monday morning; equiv to starting on Sunday evening before
-        max_expiry_pc_target: float = 100.0,  # No limit by default
+        max_wastage_pc_target: float = 100.0,  # No limit by default
         min_service_level_pc_target: float = 0.0,  # No limit by default
         min_exact_match_pc_target: float = 0.0,
         target_kpi_breach_penalty: float = 0.0,  # No penalty for now
@@ -141,15 +142,15 @@ class EnvParams:
             jnp.array(poisson_demand_mean),
             jnp.array(product_probabilities),
             jnp.array(age_on_arrival_distribution_probs),
-            fixed_order_costs,
+            fixed_order_cost,
             jnp.array(variable_order_costs),
             jnp.array(shortage_costs),
             jnp.array(wastage_costs),
             jnp.array(holding_costs),
-            jnp.array(substitution_cost_ratios) * max_substitution_cost,
+            jnp.array(substitution_cost_ratios) * (max_substitution_cost / n_products),
             jnp.array(action_mask_per_request_type),
             initial_weekday,
-            max_expiry_pc_target,
+            max_wastage_pc_target,
             min_service_level_pc_target,
             min_exact_match_pc_target,
             target_kpi_breach_penalty,
@@ -241,7 +242,7 @@ class EnvInfo:
         # 100% service level or 0% expriries for example to avoid issues with floating
         # point precision
         expiry_penalty = (
-            jnp.where(kpis["expiries_%"] > params.max_expiry_pc_target, 1, 0)
+            jnp.where(kpis["expiries_%"] > params.max_wastage_pc_target, 1, 0)
             * -params.target_kpi_breach_penalty
         )
 
@@ -374,6 +375,19 @@ class EnvObs:
             ]
         )
 
+    @property
+    def issue_obs_with_one_hot_request_type_and_day_of_week(self):
+        batch_dims = self.in_transit.shape[:-2]
+        return jnp.hstack(
+            [
+                self.one_hot_day_of_week().reshape(batch_dims + (-1,)),
+                self.time.reshape(batch_dims + (1,)),
+                self.one_hot_request_type().reshape(batch_dims + (-1,)),
+                self.in_transit.reshape(batch_dims + (-1,)),
+                self.stock.reshape(batch_dims + (-1,)),
+            ]
+        )
+
     @classmethod
     def create_empty_obs(
         cls,
@@ -382,7 +396,7 @@ class EnvObs:
             "n_products": n_products,
             "max_useful_life": max_useful_life,
             "lead_time": 0,
-            "max_order_quantities": [50] * 8,
+            "max_order_quantity": 60,
             "max_demand": 100,
         },
         num_actions=None,
@@ -418,6 +432,9 @@ class EnvObs:
     def one_hot_day_of_week(self):
         return jax.nn.one_hot(self.weekday, 7)
 
+    def one_hot_request_type(self):
+        return jax.nn.one_hot(self.request_type, n_products)
+
 
 class RSPerishableEnv(MarlEnvironment):
     def __init__(
@@ -426,13 +443,13 @@ class RSPerishableEnv(MarlEnvironment):
         n_products: int = n_products,
         max_useful_life: int = max_useful_life,
         lead_time: int = 0,
-        max_order_quantities: list = [50] * 8,
+        max_order_quantity: int = 60,
         max_demand=100,
     ):
         self.n_products = n_products
         self.max_useful_life = max_useful_life
         self.lead_time = lead_time
-        self.max_order_quantities = jnp.array(max_order_quantities)
+        self.max_order_quantities = jnp.array([max_order_quantity] * self.n_products)
         self.max_demand = max_demand
 
         self.possible_agents = agent_names
@@ -844,7 +861,7 @@ class RSPerishableEnv(MarlEnvironment):
 
         # Place the order
         variable_order_cost = jnp.dot(orders, -params.variable_order_costs)
-        fixed_order_cost = order_placed * -params.fixed_order_costs
+        fixed_order_cost = order_placed * -params.fixed_order_cost
         cumulative_rewards = cumulative_rewards + variable_order_cost + fixed_order_cost
 
         in_transit = in_transit.at[0 : self.n_products, 0].set(orders)

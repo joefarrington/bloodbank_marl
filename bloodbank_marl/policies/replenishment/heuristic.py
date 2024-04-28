@@ -153,9 +153,10 @@ class SRepPolicyExplore(SRepPolicy):
         env_kwargs={},
         env_params={},
         fixed_policy_params=None,  # Enables us to fix policy params for convenience
+        epsilon=0.05,
+        exploration_sampling="poisson",  # "poisson" or "uniform"
         params_min=None,
         params_max=None,
-        epsilon=0.05,
     ):
 
         self.env_name = env_name
@@ -175,9 +176,23 @@ class SRepPolicyExplore(SRepPolicy):
         self.param_shape = self
 
         # Set up apply method
+
         self._apply = self._get_apply_method()
 
         self.apply = self.apply_with_exploration_noise
+
+        if exploration_sampling == "poisson":
+            self._sample_exploration = self._sample_exploration_poisson
+        elif exploration_sampling == "uniform":
+            if self.params_min is None or self.params_max is None:
+                raise ValueError(
+                    "`params_min` and `params_max` must be set for uniform exploration"
+                )
+            self._sample_exploration = self._sample_exploration_uniform
+        else:
+            raise ValueError(
+                f"Exploration sampling method {exploration_sampling} not recognised"
+            )
 
     def apply_with_exploration_noise(self, policy_params, obs, rng):
         """Apply the policy to the observation, adding noise to the action"""
@@ -191,9 +206,7 @@ class SRepPolicyExplore(SRepPolicy):
 
         # What will we replace each S parameter with?
         rng, _rng = jax.random.split(rng)
-        sample_replacement_S = jax.random.poisson(
-            _rng, shape=policy_params.shape, lam=policy_params
-        )
+        sample_replacement_S = self._sample_exploration(_rng, policy_params)
         S = jnp.where(
             sample_exploration_noise < self.epsilon, sample_replacement_S, policy_params
         )
@@ -201,6 +214,44 @@ class SRepPolicyExplore(SRepPolicy):
         tr_action = self._apply(S, obs, _rng)
         action = self._postprocess_action(obs, tr_action)
         return action
+
+    def _sample_exploration_poisson(self, rng, policy_params):
+        return jax.random.poisson(rng, shape=policy_params.shape, lam=policy_params)
+
+    def _sample_exploration_uniform(self, rng, policy_params):
+        return jax.random.randint(
+            rng,
+            shape=policy_params.shape,
+            minval=self.params_min,
+            maxval=self.params_max,
+        )
+
+
+class SRepPolicyExploreMA(SRepPolicyExplore):
+    # For Multiagent evironment, using when collecting issuing observations
+
+    def apply_with_exploration_noise(self, policy_params, obs, rng):
+        """Apply the policy to the observation, adding noise to the action"""
+        rng, _rng = jax.random.split(rng)
+        # Just take rep params
+        policy_params = policy_params[0]
+
+        # Will we replace each S parameter?
+        rng, _rng = jax.random.split(rng)
+        sample_exploration_noise = jax.random.uniform(
+            _rng, shape=self.params_shape, minval=0, maxval=1
+        )
+
+        # What will we replace each S parameter with?
+        rng, _rng = jax.random.split(rng)
+        sample_replacement_S = self._sample_exploration(_rng, policy_params)
+        S = jnp.where(
+            sample_exploration_noise < self.epsilon, sample_replacement_S, policy_params
+        )
+
+        tr_action = self._apply(S, obs, _rng)
+        action = self._postprocess_action(obs, tr_action)
+        return action.astype(jnp.int32)
 
 
 class sSRepPolicy(SRepPolicy):

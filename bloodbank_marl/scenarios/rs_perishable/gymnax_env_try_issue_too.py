@@ -242,7 +242,7 @@ class IssueObs:
             [
                 self.one_hot_day_of_week().reshape(batch_dims + (-1,)),
                 self.request_time.reshape(batch_dims + (-1,)),
-                self.one_hot_request_type.reshape(batch_dims + (-1,)),
+                self.one_hot_request_type().reshape(batch_dims + (-1,)),
                 self.in_transit.reshape(batch_dims + (-1,)),
                 self.stock.reshape(batch_dims + (-1,)),
             ]
@@ -263,7 +263,7 @@ class RSPerishableIncIssueGymnax(SimpleTwoProductPerishableIncIssueGymnax):
         n_products: int = n_products,
         max_useful_life: int = 3,
         lead_time: int = 0,
-        max_order_quantity: int = 50,  # Applies to any individual product, rather than in total
+        max_order_quantity: int = 60,  # Applies to any individual product, rather than in total
         max_demand: int = 100,
     ):
         super().__init__()

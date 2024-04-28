@@ -30,7 +30,9 @@ class FlaxMultiProductIssuePolicySingleAgentEnv(FlaxPolicy):
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.create_env_params(**env_params)
         self.obs = env.default_issue_obs(self.env_params)
-        self.model = model_class(n_actions=env.num_issue_actions, **model_kwargs)
+        self.model = model_class(
+            n_actions=env.num_issue_actions + 1, **model_kwargs
+        )  # Adding one for the no-issue action
 
 
 class FlaxStochasticMultiProductIssuePolicy(FlaxStochasticMAPolicy):

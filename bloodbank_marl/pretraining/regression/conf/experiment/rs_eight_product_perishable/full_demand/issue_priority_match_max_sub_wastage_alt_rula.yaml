@@ -40,8 +40,6 @@ labelling_policy:
   fixed_policy_params: ${heuristic_policy.fixed_policy_params}
 
 policies:
-  optimize:
-    - 0
   replenishment:
     model_kwargs:
       n_hidden: [64]
