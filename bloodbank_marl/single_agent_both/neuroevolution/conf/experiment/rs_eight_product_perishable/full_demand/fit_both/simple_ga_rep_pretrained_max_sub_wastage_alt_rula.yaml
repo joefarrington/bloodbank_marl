@@ -7,7 +7,7 @@ defaults:
 
 wandb:
   init:
-    project: "rs_eight_perishable_base"
+    project: "rs_eight_perishable_full_demand"
     tags:
       - "new_type_env"
       - "fit_both"
