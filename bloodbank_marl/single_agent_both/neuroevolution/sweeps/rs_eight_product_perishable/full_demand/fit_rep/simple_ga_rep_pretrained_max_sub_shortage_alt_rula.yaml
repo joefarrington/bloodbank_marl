@@ -26,4 +26,4 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=rs_eight_product_perishable/full_demand/simple_ga_rep_pretrained_max_sub_shortage_alt_rula
+  - +experiment=rs_eight_product_perishable/full_demand/fit_rep/simple_ga_rep_pretrained_max_sub_shortage_alt_rula
