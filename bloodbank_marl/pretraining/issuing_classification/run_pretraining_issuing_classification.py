@@ -130,9 +130,8 @@ def train_model(
             log_to_wandb.update(kpis)
             if performance_gap < best_performance_gap:
                 best_performance_gap = performance_gap
-                # TODO Add this as an artifact to W&B
                 checkpoint_manager.save(
-                    0, {"state": state, "trained_params": state.params}
+                    epoch, {"state": state, "trained_params": state.params}
                 )
         wandb.log(log_to_wandb)
     return state
