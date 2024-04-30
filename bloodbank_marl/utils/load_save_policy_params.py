@@ -7,12 +7,20 @@ from typing import Optional
 
 def load_flax_policy_params(
     param_key: str,
-    checkpoint_id: int,
     checkpoint_manager: CheckpointManager,
     reshape_for_fitness: bool = True,
     internal_key: Optional[str] = None,
+    checkpoint_id: Optional[int] = None,
+    latest_checkpoint: bool = False,
 ):
     """Load policy parameters from a checkpoint"""
+
+    if latest_checkpoint and checkpoint_id is not None:
+        raise ValueError("Choose either latest_checkpoint or checkpoint_id, not both")
+
+    if latest_checkpoint:
+        checkpoint_id = checkpoint_manager.latest_step()
+
     policy_params = checkpoint_manager.restore(checkpoint_id)[param_key]
     if internal_key:
         policy_params = policy_params[internal_key]

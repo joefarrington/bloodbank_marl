@@ -101,9 +101,8 @@ def main(cfg: omegaconf.DictConfig):
             rep_cpm = hydra.utils.instantiate(
                 cfg.policies.pretrained.replenishment.checkpoint_manager
             )
-            rep_params = rep_cpm.restore(
-                cfg.policies.pretrained.replenishment.checkpoint_id
-            )["trained_params"]
+            rep_checkpoint_id = rep_cpm.latest_step()
+            rep_params = rep_cpm.restore(rep_checkpoint_id)["trained_params"]
         else:
             rep_params = policy_rep.get_initial_params(rng_rep)
     else:
@@ -118,9 +117,8 @@ def main(cfg: omegaconf.DictConfig):
             issue_cpm = hydra.utils.instantiate(
                 cfg.policies.pretrained.issuing.checkpoint_manager
             )
-            issue_params = issue_cpm.restore(
-                cfg.policies.pretrained.issuing.checkpoint_id
-            )["trained_params"]
+            issue_checkpoint_id = issue_cpm.latest_step()
+            issue_params = issue_cpm.restore(issue_checkpoint_id)["trained_params"]
         else:
             issue_params = policy_issue.get_initial_params(rng_issue)
     else:
@@ -207,7 +205,7 @@ def main(cfg: omegaconf.DictConfig):
             rng_state_init,
             init_mean=param_reshaper.flatten_single(policy_params),
             init_fitness=init_fitness,
-            params=evo_params
+            params=evo_params,
         )
         # We want to put this combination into the log
         es_log = es_logging.update(
