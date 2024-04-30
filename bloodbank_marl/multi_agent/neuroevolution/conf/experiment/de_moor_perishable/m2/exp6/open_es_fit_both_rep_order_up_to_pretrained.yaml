@@ -22,8 +22,8 @@ policies:
   pretrained:
     replenishment:
       enable: True
-      checkpoint_id: 0
-      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/pretrained_replenishment_order_up_to/m2/exp6
+      latest_checkpoint: True
+      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/pretrained_replenishment_order_up_to/m2/exp6/checkpoints
       checkpoint_manager:
         _target_: orbax.checkpoint.CheckpointManager
         directory: ${policies.pretrained.replenishment.checkpoint_dir}

@@ -2,7 +2,6 @@ import bloodbank_marl
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness, make
 
-# from bloodbank_marl.policies.replenishment import FlaxRepPolicy
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
@@ -19,8 +18,6 @@ import omegaconf
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-# TODO We could subclass the logger or find another way to log the KPIs (especially for the best current params)
 
 
 def plot_policies(policy_rep, policy_issue, policy_params, params_label="mean_params"):
@@ -108,8 +105,6 @@ def main(cfg):
     rng = jax.random.PRNGKey(cfg.evosax.seed)
     rng, rng_rep, rng_issue = jax.random.split(rng, 3)
 
-    # TODO: Think about how best to flag up whether policy is to be optimized
-    # For now, raise an error if no policies are to be optimized
     # THere's no point in running this script, we can direct to a pure eval script
     if not cfg.policies.optimize:
         raise ValueError("No policies to optimize")
@@ -123,9 +118,8 @@ def main(cfg):
             rep_cpm = hydra.utils.instantiate(
                 cfg.policies.pretrained.replenishment.checkpoint_manager
             )
-            rep_params = rep_cpm.restore(
-                cfg.policies.pretrained.replenishment.checkpoint_id
-            )["trained_params"]
+            rep_checkpoint_id = rep_cpm.latest_step()
+            rep_params = rep_cpm.restore(rep_checkpoint_id)["trained_params"]
         else:
             rep_params = policy_rep.get_initial_params(rng_rep)
         policy_params[0] = rep_params
@@ -137,9 +131,8 @@ def main(cfg):
             issue_cpm = hydra.utils.instantiate(
                 cfg.policies.pretrained.issuing.checkpoint_manager
             )
-            issue_params = issue_cpm.restore(
-                cfg.policies.pretrained.issuing.checkpoint_id
-            )["trained_params"]
+            issue_checkpoint_id = issue_cpm.latest_step()
+            issue_params = issue_cpm.restore(issue_checkpoint_id)["trained_params"]
         else:
             issue_params = policy_issue.get_initial_params(rng_issue)
         policy_params[1] = issue_params
@@ -180,7 +173,7 @@ def main(cfg):
         )
         test_fitness_mean = fitness.mean(axis=-1)
         test_fitness_std = fitness.std(axis=-1)
-        # NOTE: Mean KPIs assume single value per rollout (vs others that
+        # Mean KPIs assume single value per rollout (vs others that
         # are by product type etc; so we specifiy in config which ones should
         # be used here)
         test_kpis = {
@@ -226,7 +219,7 @@ def main(cfg):
             rng_state_init,
             init_mean=param_reshaper.flatten_single(policy_params),
             init_fitness=init_fitness,
-            params=evo_params
+            params=evo_params,
         )
         # We want to put this combination into the log
         log = es_logging.update(
@@ -262,7 +255,7 @@ def main(cfg):
             )
             test_fitness_mean = fitness.mean(axis=-1)
             test_fitness_std = fitness.std(axis=-1)
-            # NOTE: Mean KPIs assume single value per rollout (vs others that
+            # Mean KPIs assume single value per rollout (vs others that
             # are by product type etc; so we specifiy in config which ones should
             # be used here)
             test_kpis = {
@@ -277,8 +270,6 @@ def main(cfg):
                     log_to_wandb[f"eval/{p}/{k}"] = v[idx]
 
         wandb.log(log_to_wandb)
-
-    # TEMP: Plotting policies
 
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
     policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
