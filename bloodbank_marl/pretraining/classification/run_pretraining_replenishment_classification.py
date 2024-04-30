@@ -120,7 +120,7 @@ def train_model(
             if performance_gap < best_performance_gap:
                 best_performance_gap = performance_gap
                 checkpoint_manager.save(
-                    0, {"state": state, "trained_params": state.params}
+                    epoch, {"state": state, "trained_params": state.params}
                 )
         wandb.log(log_to_wandb)
     return state
