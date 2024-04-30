@@ -18,6 +18,7 @@ import omegaconf
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from omegaconf import OmegaConf
 
 
 def plot_policies(policy_rep, policy_issue, policy_params, params_label="mean_params"):
@@ -198,9 +199,11 @@ def main(cfg):
         init_fitness = init_fitness.mean(axis=-1)
 
     # Strategy and fitness shaper
-    evo_params = hydra.utils.instantiate(cfg.evosax.evo_params)
     strategy = hydra.utils.instantiate(
         cfg.evosax.strategy, num_dims=param_reshaper.total_params
+    )
+    evo_params = strategy.params_strategy.replace(
+        **hydra.utils.instantiate(cfg.evosax.evo_params)
     )
     fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
 
