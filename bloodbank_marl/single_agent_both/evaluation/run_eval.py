@@ -73,6 +73,19 @@ def main(cfg):
     log_to_wandb[f"eval/return_std"] = fitness[0].std()
     wandb.log(log_to_wandb)
 
+    # Record the overall KPIs for the top 1 params for each eval rollout, for pairwise comparisons
+    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+        overall_metrics_per_eval_rollout_df = pd.DataFrame()
+        for m in overall_metrics:
+            overall_metrics_per_eval_rollout_df[m] = kpis[m][0]
+        wandb.log(
+            {
+                f"eval/overall_metrics_per_eval_rollout": wandb.Table(
+                    dataframe=overall_metrics_per_eval_rollout_df
+                )
+            }
+        )
+
     if group_metrics is not None:
         df = pd.DataFrame()
         for m in group_metrics:
@@ -93,8 +106,15 @@ def main(cfg):
         df.columns = types
         row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
         df.insert(loc=0, column="metric", value=row_labels)
-        df.to_csv("group_metrics.csv")
         wandb.log({f"eval/group_metrics": wandb.Table(dataframe=df)})
+
+    if "all_allocations" in kpis:
+        allocations_df = pd.DataFrame(
+            kpis["all_allocations"][0].mean(axis=(0)), columns=types
+        )
+        row_labels = types
+        allocations_df.insert(loc=0, column="product", value=row_labels)
+        wandb.log({"eval/all_allocations": wandb.Table(dataframe=allocations_df)})
 
 
 if __name__ == "__main__":

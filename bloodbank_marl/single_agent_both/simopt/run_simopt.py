@@ -285,38 +285,63 @@ def main(cfg: DictConfig) -> None:
     group_metrics = cfg.environment.vector_kpis_to_log
     overall_metrics = cfg.environment.scalar_kpis_to_log
 
-    types = cfg.environment.types
-    # Create a dataframe of KPIs by type and log to W&B as a table
-    df = pd.DataFrame()
-    if cfg.environment.vector_kpis_to_log is not None:
-        for m in group_metrics:
-            df = pd.concat(
-                [df, pd.DataFrame(kpis[m].mean(axis=(0, 1)).reshape(1, -1))], axis=0
-            )
-            df = pd.concat(
-                [df, pd.DataFrame(kpis[m].std(axis=(0, 1)).reshape(1, -1))], axis=0
-            )
-        df.columns = types
-        row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
-        df.insert(loc=0, column="metric", value=row_labels)
-        wandb.log({"eval/group_metrics": wandb.Table(dataframe=df)})
+    # Log aggregate metrics to W&B, plus return
+    if overall_metrics is not None:
+        for m in overall_metrics:
+            wandb.run.summary[f"eval/{m}_mean"] = kpis[m].mean()
+            wandb.run.summary[f"eval/{m}_std"] = kpis[m].std()
+    wandb.run.summary["eval/return_mean"] = fitness.mean()
+    wandb.run.summary["eval/return_std"] = fitness.std()
 
-    # TODO: Put this into config etc?
-    if "all_allocations" in kpis:
-        df = pd.DataFrame(
-            kpis["all_allocations"].mean(axis=(0, 1)), columns=types, index=types
+    # Record the overall KPIs for the top 1 params for each eval rollout, for pairwise comparisons
+    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+        overall_metrics_per_eval_rollout_df = pd.DataFrame()
+        for m in overall_metrics:
+            overall_metrics_per_eval_rollout_df[m] = kpis[m][0]
+        wandb.log(
+            {
+                f"eval/overall_metrics_per_eval_rollout": wandb.Table(
+                    dataframe=overall_metrics_per_eval_rollout_df
+                )
+            }
         )
-        wandb.log({"eval/all_allocations": wandb.Table(dataframe=df)})
+
+    types = cfg.environment.types
+
+    # Create a dataframe of KPIs by type and log to W&B as a table
+    if group_metrics is not None:
+        group_metrics_df = pd.DataFrame()
+        for m in group_metrics:
+            group_metrics_df = pd.concat(
+                [
+                    group_metrics_df,
+                    pd.DataFrame(kpis[m].mean(axis=(0, 1)).reshape(1, -1)),
+                ],
+                axis=0,
+            )
+            group_metrics_df = pd.concat(
+                [
+                    group_metrics_df,
+                    pd.DataFrame(kpis[m].std(axis=(0, 1)).reshape(1, -1)),
+                ],
+                axis=0,
+            )
+        group_metrics_df.columns = types
+        row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
+        group_metrics_df.insert(loc=0, column="metric", value=row_labels)
+        wandb.log({"eval/group_metrics": wandb.Table(dataframe=group_metrics_df)})
+
+    if "all_allocations" in kpis:
+        allocations_df = pd.DataFrame(
+            kpis["all_allocations"][0].mean(axis=(0)), columns=types
+        )
+        row_labels = types
+        allocations_df.insert(loc=0, column="product", value=row_labels)
+        wandb.log({"eval/all_allocations": wandb.Table(dataframe=allocations_df)})
 
     # Save the params for loading into other scripts
     jnp.save(Path(wandb.run.dir) / "best_params.npy", best_params)
 
-    # Log aggregate metrics to W&B, plus return
-    for m in overall_metrics:
-        wandb.run.summary[f"eval/{m}_mean"] = kpis[m].mean()
-        wandb.run.summary[f"eval/{m}_std"] = kpis[m].std()
-    wandb.run.summary["eval/return_mean"] = fitness.mean()
-    wandb.run.summary["eval/return_std"] = fitness.std()
     log.info(f"Done.")
 
 

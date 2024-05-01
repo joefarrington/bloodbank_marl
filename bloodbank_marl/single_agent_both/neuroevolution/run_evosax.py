@@ -263,29 +263,50 @@ def main(cfg: omegaconf.DictConfig):
 
         wandb.log(log_to_wandb)
 
+    # Record the overall KPIs for the top 1 params for each eval rollout, for pairwise comparisons
+    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+        overall_metrics_per_eval_rollout_df = pd.DataFrame()
+        for m in overall_metrics:
+            overall_metrics_per_eval_rollout_df[m] = kpis[m][0]
+        wandb.log(
+            {
+                f"eval/overall_metrics_per_eval_rollout": wandb.Table(
+                    dataframe=overall_metrics_per_eval_rollout_df
+                )
+            }
+        )
+
     # Record group metrics for top 1 params
     if group_metrics is not None:
-        df = pd.DataFrame()
+        group_metrics_df = pd.DataFrame()
         for m in group_metrics:
-            df = pd.concat(
+            group_metrics_df = pd.concat(
                 [
-                    df,
+                    group_metrics_df,
                     pd.DataFrame(kpis[m][0].mean(axis=(0)).reshape(1, -1)),
                 ],
                 axis=0,
             )
-            df = pd.concat(
+            group_metrics_df = pd.concat(
                 [
-                    df,
+                    group_metrics_df,
                     pd.DataFrame(kpis[m][0].std(axis=(0)).reshape(1, -1)),
                 ],
                 axis=0,
             )
-        df.columns = types
+        group_metrics_df.columns = types
         row_labels = [f"{m}_{x}" for m in group_metrics for x in ["mean", "std"]]
-        df.insert(loc=0, column="metric", value=row_labels)
-        df.to_csv("group_metrics.csv")
-        wandb.log({f"eval/group_metrics": wandb.Table(dataframe=df)})
+        group_metrics_df.insert(loc=0, column="metric", value=row_labels)
+        wandb.log({f"eval/group_metrics": wandb.Table(dataframe=group_metrics_df)})
+
+    # Record allocation metrics for top 1 params
+    if "all_allocations" in kpis:
+        allocations_df = pd.DataFrame(
+            kpis["all_allocations"][0].mean(axis=(0)), columns=types
+        )
+        row_labels = types
+        allocations_df.insert(loc=0, column="product", value=row_labels)
+        wandb.log({"eval/all_allocations": wandb.Table(dataframe=allocations_df)})
 
     policy_params_mean = test_param_reshaper.reshape(jnp.array([mean_params]))
     policy_params_top_1 = test_param_reshaper.reshape(jnp.array([best_params]))

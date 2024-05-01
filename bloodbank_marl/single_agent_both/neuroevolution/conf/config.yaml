@@ -30,6 +30,7 @@ evosax:
   init_params_abs_max: 0
   
   fitness_shaper:
+  
     _target_: evosax.FitnessShaper
     maximize: True
 
@@ -70,6 +71,7 @@ train_evaluator:
 
 evaluation:
   seed: 1337
+  record_overall_metrics_per_eval_rollout: False
   test_evaluator:
     _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
     env_name: ${environment.env_name}

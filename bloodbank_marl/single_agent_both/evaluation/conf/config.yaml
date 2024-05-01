@@ -21,6 +21,7 @@ hydra:
 
 evaluation:
   seed: 24601
+  record_overall_metrics_per_eval_rollout: True
   test_evaluator:
     _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
     env_name: ${environment.env_name}
