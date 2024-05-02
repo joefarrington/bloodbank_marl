@@ -38,7 +38,7 @@ policies:
   pretrained:
     replenishment:
       enable: True
-      checkpoint_id: 0
+      latest_checkpoint: True
       checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/pretrained_replenishment/full_demand/issue_priority_match_max_sub_wastage_alt_rula/checkpoints
       checkpoint_manager:
         _target_: orbax.checkpoint.CheckpointManager

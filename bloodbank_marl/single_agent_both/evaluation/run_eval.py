@@ -73,7 +73,7 @@ def main(cfg):
     log_to_wandb[f"eval/return_std"] = fitness[0].std()
     wandb.log(log_to_wandb)
 
-    # Record the overall KPIs for the top 1 params for each eval rollout, for pairwise comparisons
+    # Record the overall KPIs for each eval rollout, for pairwise comparisons
     if cfg.evaluation.record_overall_metrics_per_eval_rollout:
         overall_metrics_per_eval_rollout_df = pd.DataFrame()
         for m in overall_metrics:
