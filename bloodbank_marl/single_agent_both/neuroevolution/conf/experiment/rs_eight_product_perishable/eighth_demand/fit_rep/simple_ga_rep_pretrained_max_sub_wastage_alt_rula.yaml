@@ -45,7 +45,7 @@ policies:
     replenishment:
       enable: True
       latest_checkpoint: True
-      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/eighth_demand/issue_oldest_compatible_match_max_sub_wastage_alt_rula/checkpoints
+      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/pretrained_replenishment/eighth_demand/issue_oldest_compatible_match_max_sub_wastage_alt_rula/checkpoints
       checkpoint_manager:
         _target_: orbax.checkpoint.CheckpointManager
         directory: ${policies.pretrained.replenishment.checkpoint_dir}
