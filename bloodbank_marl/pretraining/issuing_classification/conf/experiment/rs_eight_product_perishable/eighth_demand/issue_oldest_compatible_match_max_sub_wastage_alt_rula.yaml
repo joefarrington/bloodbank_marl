@@ -20,6 +20,8 @@ environment:
       - 0.5
       - 0.2
       - 0.3
+pretraining:
+  num_epochs: 50
 
 policies:
   replenishment:

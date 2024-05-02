@@ -8,7 +8,7 @@ defaults:
 
 wandb:
   init:
-    project: "pretrain_issue"
+    project: "rs_eight_product_pretrain_issue"
 
 hydra:
   job:
@@ -36,7 +36,7 @@ obs_collection:
       epsilon: 0.05
       exploration_sampling: "uniform"
       params_min: 0
-      params_max: 20 # TO CONFIRM
+      params_max: ${environment.env_kwargs.max_order_quantity}
       fixed_policy_params: ${policies.replenishment.fixed_policy_params}
     issuing:
       fixed_policy_params:
