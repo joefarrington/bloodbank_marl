@@ -1,6 +1,6 @@
 _target_: bloodbank_marl.utils.load_save_policy_params.load_flax_policy_params
 param_key: best_params
-checkpoint_id: 99
+latest_checkpoint: True
 checkpoint_manager:
   _target_: orbax.checkpoint.CheckpointManager
   directory:
