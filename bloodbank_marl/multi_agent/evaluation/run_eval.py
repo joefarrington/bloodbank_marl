@@ -2,7 +2,6 @@ import bloodbank_marl
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness, make
 
-# from bloodbank_marl.policies.replenishment import FlaxRepPolicy
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
@@ -20,9 +19,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# TODO: Probably want to adjust exactly which KPIs we store etc for consistency with single agent
 
-# TODO: The heuristic policies aren't set up to take params in MA env, it was assumed they'd be fixed.
+# NOTE: The heuristic policies aren't set up to take params in MA env, it was assumed they'd be fixed.
 # So, can load using similar function but provide to the fixed_params arg in the policy __init__ method.
 
 
@@ -84,6 +82,19 @@ def main(cfg):
         for k, v in kpis.items()
         if k in cfg.environment.kpis_log_eval
     }
+
+    # Record the overall KPIs for each eval rollout, for pairwise comparisons
+    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+        overall_metrics_per_eval_rollout_df = pd.DataFrame()
+        for m in kpis.keys():
+            overall_metrics_per_eval_rollout_df[m] = kpis[m][0]
+        wandb.log(
+            {
+                f"eval/overall_metrics_per_eval_rollout": wandb.Table(
+                    dataframe=overall_metrics_per_eval_rollout_df
+                )
+            }
+        )
 
     log_to_wandb[f"eval/return_mean"] = test_fitness_mean
     log_to_wandb[f"eval/return_std"] = test_fitness_std
