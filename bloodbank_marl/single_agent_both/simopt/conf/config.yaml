@@ -43,6 +43,5 @@ evaluation:
     env_params: ${environment.env_params}
     test: True
     n_devices:
-    
     num_warmup_days: ${environment.num_warmup_days}
     gamma: ${environment.gamma}
