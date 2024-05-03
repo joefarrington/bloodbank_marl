@@ -16,6 +16,8 @@ evosax:
     elite_ratio: 0.5
     sigma_init: 0.07
     sigma_decay: 1.0
+  num_test_rollouts: 10000
+  evaluate_every_k_gens: 100
 
 policies:
   optimize:
@@ -31,3 +33,4 @@ policies:
 evaluation:
   seed: 24601
   record_overall_metrics_per_eval_rollout: True
+

@@ -20,3 +20,5 @@ policies:
 
 evaluation:
   seed: 24601
+  evosax:
+    num_test_rollouts: 10000
