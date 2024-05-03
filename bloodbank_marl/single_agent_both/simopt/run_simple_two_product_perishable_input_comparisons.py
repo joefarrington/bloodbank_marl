@@ -76,7 +76,7 @@ max_order_quantity = [10, 17, 28, 49]
 tags = base_tags + ["change_mean_daily_demand"]
 additional_args = [
     [
-        f"environment.env_params.mean_daily_demand={x}",
+        f"environment.env_params.poisson_demand_mean={x}",
         f"environment.env_kwargs.max_order_quantity={y}",
     ]
     for x, y in zip(vals, max_order_quantity)

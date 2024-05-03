@@ -21,4 +21,4 @@ policies:
 evaluation:
   seed: 24601
   test_evaluator:
-    num_test_rollouts: 10000
+    num_rollouts: 10000
