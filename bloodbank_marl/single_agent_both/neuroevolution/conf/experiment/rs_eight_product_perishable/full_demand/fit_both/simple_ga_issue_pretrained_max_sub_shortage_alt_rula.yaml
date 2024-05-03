@@ -13,9 +13,8 @@ wandb:
       - "fit_both"
       - "simple_ga"
       - "full_demand"
-      - "rep_pretrained"
       - "issue_pretrained"
-
+      
 evosax:
   strategy:
     sigma_init: 0.07
@@ -37,19 +36,6 @@ train_evaluator:
 
 policies:
   pretrained:
-    replenishment:
-      enable: True
-      latest_checkpoint: True
-      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/pretrained_replenishment/full_demand/issue_priority_match_max_sub_shortage_alt_rula/checkpoints
-      checkpoint_manager:
-        _target_: orbax.checkpoint.CheckpointManager
-        directory: ${policies.pretrained.replenishment.checkpoint_dir}
-        checkpointers:
-          _target_: orbax.checkpoint.PyTreeCheckpointer
-        options:
-          _target_: orbax.checkpoint.CheckpointManagerOptions
-          max_to_keep: 1
-          create: True
     issuing:
       enable: True
       latest_checkpoint: True

@@ -7,12 +7,12 @@ defaults:
 
 wandb:
   init:
-    project: "rs_eight_perishable_full_demand"
+    project: "rs_eight_perishable_eighth_demand"
     tags:
       - "new_type_env"
       - "fit_both"
       - "simple_ga"
-      - "full_demand"
+      - "eighth_demand"
       - "rep_pretrained"
       - "issue_pretrained"
 
@@ -23,37 +23,28 @@ evosax:
 
 environment:
   env_kwargs:
-    max_order_quantity: 25
+    max_order_quantity: 5
   env_params:
-    max_substitution_cost: 3250
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 650
     age_on_arrival_distribution_probs:
       - 0.5
       - 0.2
       - 0.3
 
-train_evaluator:
-  num_env_steps: 90
-  num_warmup_days: 25
-
 policies:
   pretrained:
-    replenishment:
-      enable: True
-      latest_checkpoint: True
-      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/pretrained_replenishment/full_demand/issue_priority_match_max_sub_shortage_alt_rula/checkpoints
-      checkpoint_manager:
-        _target_: orbax.checkpoint.CheckpointManager
-        directory: ${policies.pretrained.replenishment.checkpoint_dir}
-        checkpointers:
-          _target_: orbax.checkpoint.PyTreeCheckpointer
-        options:
-          _target_: orbax.checkpoint.CheckpointManagerOptions
-          max_to_keep: 1
-          create: True
     issuing:
       enable: True
       latest_checkpoint: True
-      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/pretrained_issuing/full_demand/issue_priority_match_max_sub_shortage_alt_rula/checkpoints
+      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/pretrained_issuing/eighth_demand/issue_oldest_compatible_match_max_sub_wastage_alt_rula/checkpoints
       checkpoint_manager:
         _target_: orbax.checkpoint.CheckpointManager
         directory: ${policies.pretrained.issuing.checkpoint_dir}
