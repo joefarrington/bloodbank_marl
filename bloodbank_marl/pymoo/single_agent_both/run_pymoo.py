@@ -1,8 +1,3 @@
-# For now, we want to log a plot, and then also the distance between the best point and 100% SL, 0% wastage -> that's the area we're having trouble getting coverage of
-# Later can amend to include eval vs training etc
-# Can also deal with constraints by including a penalty etc
-# Also think about seeding, especially inside the problem class
-
 import wandb
 import hydra
 import omegaconf
@@ -18,13 +13,14 @@ from pymoo.core.problem import Problem
 import numpy as np
 import jax.numpy as jnp
 from pymoo.indicators.hv import Hypervolume
+import pickle
 
 
 def calc_hypervolume(F: np.array, metrics_to_opt: List) -> float:
 
-    ideal = {"wastage": 0, "service_level": -100, "exact_match": -100}
-    nadir = {"wastage": 100, "service_level": 0, "exact_match": 0}
-    ref_point = {"wastage": 100, "service_level": 0, "exact_match": 0}
+    ideal = {"wastage_%": 0, "service_level_%": -100, "exact_match_%": -100}
+    nadir = {"wastage_%": 100, "service_level_%": 0, "exact_match_%": 0}
+    ref_point = {"wastage_%": 100, "service_level_%": 0, "exact_match_%": 0}
 
     ref_point = np.array([ref_point[metric] for metric in metrics_to_opt])
     ideal = np.array([ideal[metric] for metric in metrics_to_opt])
@@ -48,7 +44,7 @@ class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
         param_reshaper,
         scenario_seed,
         # Decide whether to include variable in the optimization problem
-        opt=["wastage", "service_level", "exact_match"],
+        opt=["wastage_%", "service_level_%", "exact_match_%"],
         # Control use of constraints with these three arguments
         min_service_level_pc=-1.0,
         max_wastage_pc=101.0,
@@ -96,11 +92,11 @@ class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
         exact_match_constraint = exact_match_pc_fitness + self.min_exact_match_pc
 
         out["F"] = []
-        if "wastage" in self.opt:
+        if "wastage_%" in self.opt:
             out["F"].append(np.array(wastage_pc_fitness))
-        if "service_level" in self.opt:
+        if "service_level_%" in self.opt:
             out["F"].append(np.array(service_level_pc_fitness))
-        if "exact_match" in self.opt:
+        if "exact_match_%" in self.opt:
             out["F"].append(np.array(exact_match_pc_fitness))
 
         out["G"] = [
@@ -108,15 +104,6 @@ class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
             np.array(service_level_constraint),
             np.array(exact_match_constraint),
         ]
-
-
-# TODO: This is a very simple way to estimate whether we're able to get up into the corners
-# ATM< we can get good EM%, but not good SL% and wastage together compared to what we know is possible
-def calc_min_distance(df: pd.DataFrame) -> float:
-    # Calculate the distance of the best point from 100% SL, 0% wastage
-    # This is the area we're having trouble getting coverage of
-    distance = np.sqrt((df["Wastage"] - 0) ** 2 + (df["Service Level"] - 100) ** 2)
-    return np.min(distance)
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -151,7 +138,7 @@ def main(cfg: omegaconf.DictConfig):
         scenario_seed=cfg.pymoo.seed,
         **wandb_config["pymoo"][
             "problem"
-        ]  # Use wandb config as has already been resolved
+        ],  # Use wandb config as has already been resolved
     )
 
     algorithm = hydra.utils.instantiate(cfg.pymoo.algorithm)
@@ -169,45 +156,95 @@ def main(cfg: omegaconf.DictConfig):
 
     # Put results into a df
     cols = []
-    if "wastage" in problem.opt:
+    if "wastage_%" in problem.opt:
         cols.append("Wastage")
-    if "service_level" in problem.opt:
+    if "service_level_%" in problem.opt:
         cols.append("Service Level")
-    if "exact_match" in problem.opt:
+    if "exact_match_%" in problem.opt:
         cols.append("Exact Match")
     df = pd.DataFrame(F, columns=cols)
-    if "service_level" in problem.opt:
+    if "service_level_%" in problem.opt:
         df["Service Level"] = -1 * df["Service Level"]
-    if "exact_match" in problem.opt:
+    if "exact_match_%" in problem.opt:
         df["Exact Match"] = -1 * df["Exact Match"]
 
     log_to_wandb = {}
 
     # Save results as wandb table
     table = wandb.Table(dataframe=df)
-    # log_to_wandb["train/kpis"] = table
-
-    # Calculate and log distance of best solution from 100% SL, 0% wastage
-    min_dist = calc_min_distance(df)
-    log_to_wandb["train/min_distance"] = min_dist
 
     # Calculate and log hypervolume
     hv = calc_hypervolume(F, problem.opt)
     log_to_wandb["train/hypervolume"] = hv
 
     # Plot results
-    if "wastage" in problem.opt and "service_level" in problem.opt:
+    if "wastage_%" in problem.opt and "service_level_%" in problem.opt:
         log_to_wandb["train/service_level_v_wastage"] = wandb.plot.scatter(
             table, "Wastage", "Service Level"
         )
-    if "exact_match" in problem.opt and "service_level" in problem.opt:
+    if "exact_match_%" in problem.opt and "service_level_%" in problem.opt:
         log_to_wandb["train/service_level_v_exact_match"] = wandb.plot.scatter(
             table, "Exact Match", "Service Level"
         )
-    if "exact_match" in problem.opt and "wastage" in problem.opt:
+    if "exact_match_%" in problem.opt and "wastage" in problem.opt:
         log_to_wandb["train/exact_match_v_wastage"] = wandb.plot.scatter(
             table, "Wastage", "Exact Match"
         )
+
+    # Eval runs
+    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
+    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
+    test_evaluator.set_apply_fn(policy_rep.apply)
+    test_evaluator.set_issuing_fn(policy_issue.apply)
+
+    # Get the params out
+    x = res.X
+    reshaped_params = param_reshaper.reshape(x)
+
+    fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, reshaped_params)
+    eval_df = pd.DataFrame(
+        {
+            "Wastage": kpis["wastage_%"].mean(axis=-1),
+            "Service Level": kpis["service_level_%"].mean(axis=-1),
+            "Exact Match": kpis["exact_match_%"].mean(axis=-1),
+        }
+    )
+
+    # Save results as wandb table
+    eval_table = wandb.Table(dataframe=eval_df)
+
+    # Plot results
+    log_to_wandb["eva;/service_level_v_wastage"] = wandb.plot.scatter(
+        eval_table, "Wastage", "Service Level"
+    )
+    log_to_wandb["eval/service_level_v_exact_match"] = wandb.plot.scatter(
+        eval_table, "Exact Match", "Service Level"
+    )
+    log_to_wandb["eval/exact_match_v_wastage"] = wandb.plot.scatter(
+        eval_table, "Wastage", "Exact Match"
+    )
+
+    eval_hv_input = np.array(
+        [
+            (
+                -1 * kpis[metric].mean(axis=-1)
+                if metric in ["service_level_%", "exact_match_%"]
+                else kpis[metric].mean(axis=-1)
+            )
+            for metric in problem.opt
+        ]
+    ).T
+    eval_hv = calc_hypervolume(eval_hv_input, problem.opt)
+    log_to_wandb["eval/hypervolume"] = eval_hv
+
+    # if we need KPIs for each eval episode, extract relevant KPIs and save them with pickle
+    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+        # Do some work hereto save, we'd only use this when doing eval with best hps
+        kpis_to_save = problem.opt
+        eval_kpis = {}
+        for kpi in kpis_to_save:
+            eval_kpis[kpi] = kpis[kpi]
+        pickle.dump(eval_kpis, open(f"{wandb.run.dir}/eval_kpis.pkl", "wb"))
 
     wandb.log(log_to_wandb)
 

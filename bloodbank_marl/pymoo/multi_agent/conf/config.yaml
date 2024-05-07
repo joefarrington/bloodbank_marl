@@ -22,8 +22,7 @@ pymoo:
   pop_size: 2000
   n_offsprings: 150
   num_train_rollouts: 100
-  #num_test_rollouts: 1000
-  #evaluate_every_k_gens: 10
+  num_test_rollouts: 1000
   seed: 10
 
   hypervolume:
@@ -53,11 +52,6 @@ pymoo:
     name: "n_gen"
     n_max_gen: ${pymoo.num_generations}
   
-  #checkpoint_options:
-  #  _target_: orbax.checkpoint.CheckpointManagerOptions
-  #  max_to_keep: 1
-  #  create: True
-
 policies:
   policy_manager:
     _target_: bloodbank_marl.policies.policy_manager.PolicyManager
@@ -74,17 +68,17 @@ train_evaluator:
   num_warmup_days: ${environment.num_warmup_days}
   gamma: ${environment.gamma}
 
-# CUrrently not used
-#evaluation:
-#  seed: 1337
-#  test_evaluator:
-#    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
-#    env_name: ${environment.env_name}
-#    num_env_steps: ${environment.num_env_steps}
-#    num_rollouts: ${pymoo.num_test_rollouts}
-#    env_kwargs: ${environment.env_kwargs}
-#    env_params: ${environment.env_params}
-#    test: True
-#    n_devices:
-#    num_warmup_days: ${environment.num_warmup_days}
-#    gamma: ${environment.gamma}
+evaluation:
+  seed: 1337
+  record_overall_metrics_per_eval_rollout: False
+  test_evaluator:
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: ${pymoo.num_test_rollouts}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}

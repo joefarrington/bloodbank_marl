@@ -18,6 +18,7 @@ from pymoo.core.problem import Problem
 import numpy as np
 import jax.numpy as jnp
 from pymoo.indicators.hv import Hypervolume
+import pickle
 
 
 class DeMoorPerishableMultiAgentProbelem(Problem):
@@ -80,15 +81,6 @@ class DeMoorPerishableMultiAgentProbelem(Problem):
         ]
 
 
-# TODO: This is a very simple way to estimate whether we're able to get up into the corners
-# ATM< we can get good EM%, but not good SL% and wastage together compared to what we know is possible
-def calc_min_distance(df: pd.DataFrame) -> float:
-    # Calculate the distance of the best point from 100% SL, 0% wastage
-    # This is the area we're having trouble getting coverage of
-    distance = np.sqrt((df["Wastage"] - 0) ** 2 + (df["Service Level"] - 100) ** 2)
-    return np.min(distance)
-
-
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: omegaconf.DictConfig):
     wandb_config = omegaconf.OmegaConf.to_container(
@@ -107,7 +99,7 @@ def main(cfg: omegaconf.DictConfig):
 
     policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
     policy_params[1] = policy_issue.get_initial_params(rng_rep)
-    
+
     policies = [policy_rep.apply, policy_issue.apply]
     policy_manager = hydra.utils.instantiate(
         cfg.policies.policy_manager, policies=policies
@@ -125,7 +117,7 @@ def main(cfg: omegaconf.DictConfig):
         scenario_seed=cfg.pymoo.seed,
         **wandb_config["pymoo"][
             "problem"
-        ]  # Use wandb config as has already been resolved
+        ],  # Use wandb config as has already been resolved
     )
 
     algorithm = hydra.utils.instantiate(cfg.pymoo.algorithm)
@@ -149,18 +141,58 @@ def main(cfg: omegaconf.DictConfig):
     # Save results as wandb table
     table = wandb.Table(dataframe=df)
 
-    # Calculate and log distance of best solution from 100% SL, 0% wastage
-    min_dist = calc_min_distance(df)
-    log_to_wandb["train/min_distance"] = min_dist
-
     # Calculate and log hypervolume
     hv = hydra.utils.instantiate(cfg.pymoo.hypervolume).do(F)
     log_to_wandb["train/hypervolume"] = hv
 
     # Plot results
     log_to_wandb["train/service_level_v_wastage"] = wandb.plot.scatter(
-            table, "Wastage", "Service Level"
-        )
+        table, "Wastage", "Service Level"
+    )
+
+    # Eval runs
+    rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
+    test_evaluator = hydra.utils.instantiate(cfg.evaluation.test_evaluator)
+    test_evaluator.set_apply_fn(policy_manager.apply)
+
+    # Get the params out
+    x = res.X
+    reshaped_params = param_reshaper.reshape(x)
+
+    fitness, cum_infos, kpis = test_evaluator.rollout(rng_eval, reshaped_params)
+    eval_df = pd.DataFrame(
+        {
+            "Wastage": kpis["wastage_%"].mean(axis=-1),
+            "Service Level": kpis["service_level_%"].mean(axis=-1),
+        }
+    )
+
+    # Save results as wandb table
+    eval_table = wandb.Table(dataframe=eval_df)
+
+    # Plot results
+    log_to_wandb["eval/service_level_v_wastage"] = wandb.plot.scatter(
+        table, "Wastage", "Service Level"
+    )
+
+    # Calculate and log hypervolume
+    eval_hv_input = np.array(
+        [
+            kpis["wastage_%"].mean(axis=-1),
+            -1 * (kpis["service_level_%"].mean(axis=-1)),
+        ]
+    ).T
+    eval_hv = hydra.utils.instantiate(cfg.pymoo.hypervolume).do(eval_hv_input)
+    log_to_wandb["eval/hypervolume"] = eval_hv
+
+    # if we need KPIs for each eval episode, extract relevant KPIs and save them with pickle
+    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+        # Do some work hereto save, we'd only use this when doing eval with best hps
+        kpis_to_save = ["service_level_%", "wastage_%"]
+        eval_kpis = {}
+        for kpi in kpis_to_save:
+            eval_kpis[kpi] = kpis[kpi]
+        pickle.dump(eval_kpis, open(f"{wandb.run.dir}/eval_kpis.pkl", "wb"))
 
     wandb.log(log_to_wandb)
 

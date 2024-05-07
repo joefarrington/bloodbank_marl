@@ -4,5 +4,5 @@ pymoo:
   problem:
     min_exact_match_pc: 50.0
     opt:
-      - wastage
-      - service_level
+      - wastage_%
+      - service_level_%

@@ -11,6 +11,7 @@ import wandb
 import omegaconf
 import jax.numpy as jnp
 import numpy as np
+import pickle
 
 # Enable logging
 log = logging.getLogger(__name__)
@@ -71,7 +72,12 @@ def run_vi_and_eval_one_cost_combination(cfg: DictConfig) -> DictConfig:
         float(store["eval/wastage_%_mean"]),
         float(store["eval/return_mean"]),
     ]
-    return row
+    metrics_per_eval_rollout_one_policy = {}
+    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+        metrics_per_eval_rollout_one_policy = {
+            m: kpis[m] for m in ["wastage_%", "service_level_%"]
+        }
+    return row, metrics_per_eval_rollout_one_policy
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -102,18 +108,40 @@ def main(cfg: DictConfig) -> None:
 
     # Run value iteration and evaluation for each cost combination
     rows = []
+    metrics_per_eval_rollout = {m: None for m in ["wastage_%", "service_level_%"]}
     for w, s in zip(wastage_costs, shortage_costs):
 
         # Set costs in the config to current combinatiom
         cfg.environment.env_params.wastage_cost = float(w)
         cfg.environment.env_params.shortage_cost = float(s)
 
-        row = np.array([w, s] + run_vi_and_eval_one_cost_combination(cfg)).reshape(
-            1, -1
+        row, metrics_per_eval_rollout_one_policy = run_vi_and_eval_one_cost_combination(
+            cfg
         )
+        row = np.array([w, s] + row).reshape(1, -1)
         vi_df = pd.concat([vi_df, pd.DataFrame(row, columns=vi_df.columns)])
         # Save after each iteration, because this can be time consuming
         vi_df.to_csv("vi_df.csv")
+
+        if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+            for kpi_name in metrics_per_eval_rollout.keys():
+                if metrics_per_eval_rollout[kpi_name] is None:
+                    metrics_per_eval_rollout[kpi_name] = (
+                        metrics_per_eval_rollout_one_policy[kpi_name]
+                    )
+                else:
+                    metrics_per_eval_rollout[kpi_name] = np.vstack(
+                        [
+                            metrics_per_eval_rollout[kpi_name],
+                            metrics_per_eval_rollout_one_policy[kpi_name],
+                        ]
+                    )
+            # Save after each iteration, because this can be time consuming
+            pickle.dump(
+                metrics_per_eval_rollout,
+                open(f"{wandb.run.dir}/eval_kpis.pkl", "wb"),
+            )
+
     wandb.log({f"heuristic": wandb.Table(dataframe=vi_df)})
 
 

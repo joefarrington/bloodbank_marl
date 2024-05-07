@@ -48,7 +48,7 @@ shortage_costs:
   stop:
     _target_: math.log10
     _args_:
-      - 400
+      - 1200
   num: 100
 
 wastage_costs:
@@ -69,7 +69,8 @@ policies:
     _target_: bloodbank_marl.policies.policy_manager.PolicyManager
 
 evaluation: 
-  seed: 10191 
+  seed: 10191
+  record_overall_metrics_per_eval_rollout: True
   test_evaluator:
     _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
     env_name: ${environment.env_name}

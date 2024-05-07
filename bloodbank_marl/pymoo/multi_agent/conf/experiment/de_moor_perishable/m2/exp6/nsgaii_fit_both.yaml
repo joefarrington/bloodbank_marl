@@ -12,12 +12,13 @@ environment:
   env_kwargs:
     lead_time: 2
     max_useful_life: 2
+
 pymoo:
   hypervolume:
     _target_: pymoo.indicators.hv.Hypervolume
     ref_point:
       _target_: numpy.array
-      object: [20, 0] # Temp, for comparsion with outer loop
+      object: [30, -50] # Temp, for comparsion with outer loop
     norm_ref_point: True
     zero_to_one: True
     ideal:
@@ -25,4 +26,4 @@ pymoo:
       object: [0, -100]
     nadir:
       _target_: numpy.array
-      object: [20, 0] # Temp, for comparsion with outer loop
+      object: [30, -50] # Temp, for comparsion with outer loop

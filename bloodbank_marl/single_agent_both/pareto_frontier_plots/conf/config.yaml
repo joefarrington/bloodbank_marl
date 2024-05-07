@@ -4,7 +4,6 @@ defaults:
   - policies/replenishment: single_agent_multi_product_mlp
   - policies/issuing: single_agent_multi_product_mlp
   - param_search: grid
-  - evosax/strategy: simple_ga
   - environment: simple_two_product_perishable_gymnax_test_double
   - _self_
 
@@ -18,52 +17,6 @@ hydra:
   searchpath:
     - pkg://bloodbank_marl.common_config
 
-evosax:
-  strategy:
-    sigma_init: 0.07 # 0.2 works for 50% exact match for the 1% wastage, get reasonable results
-  num_generations: 100
-  popsize: 150
-  num_train_rollouts: 500
-  num_test_rollouts: 10000
-  seed: 10
-  init_prev_best: False
-  fitness_shaper:
-    _target_: evosax.FitnessShaper
-    maximize: True
-  init_params_abs_max: 0
-
-  logging:
-    _target_: evosax.utils.ESLog
-    num_generations: ${evosax.num_generations}
-    top_k: 5
-    maximize: ${evosax.fitness_shaper.maximize}
-  
-  evo_params:
-    _target_: bloodbank_marl.utils.evosax.strategies.simple_ga.EvoParams
-    sigma_init: ${evosax.strategy.sigma_init}
-    sigma_limit: ${evosax.strategy.sigma_limit}
-    sigma_decay: ${evosax.strategy.sigma_decay}
-    init_min:
-      _target_: operator.mul
-      _args_:
-        - -1
-        - ${evosax.init_params_abs_max}
-    init_max: ${evosax.init_params_abs_max}
-
-kpi_ranges:
-  wastage_pc:
-    _target_: numpy.linspace
-    start: 1
-    stop: 40
-    num: 1
-  service_level_pc:
-    _target_: numpy.linspace
-    start: 10
-    stop: 99.5
-    num: 25
-
-min_exact_match_pc: 50.0
-
 heuristic_policies:
   issuing:
     fixed_policy_params:
@@ -72,25 +25,14 @@ heuristic_policies:
         - [0,-1]
         - [1,0] 
 
-train_evaluator:
-  _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
-  env_name: ${environment.env_name}
-  num_env_steps: ${environment.num_env_steps}
-  num_rollouts: ${evosax.num_train_rollouts}
-  env_kwargs: ${environment.env_kwargs}
-  env_params: ${environment.env_params}
-  test: False
-  n_devices:
-  num_warmup_days: ${environment.num_warmup_days}
-  gamma: ${environment.gamma}
-
 evaluation: 
   seed: 10191
+  record_overall_metrics_per_eval_rollout: True
   test_evaluator:
     _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
-    num_rollouts: ${evosax.num_test_rollouts}
+    num_rollouts: 10000
     env_kwargs: ${environment.env_kwargs}
     env_params: ${environment.env_params}
     test: True

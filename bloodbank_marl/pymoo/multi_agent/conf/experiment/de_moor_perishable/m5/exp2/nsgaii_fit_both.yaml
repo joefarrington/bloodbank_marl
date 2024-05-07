@@ -17,7 +17,7 @@ pymoo:
     _target_: pymoo.indicators.hv.Hypervolume
     ref_point:
       _target_: numpy.array
-      object: [1.5, 0] # Temp, for comparsion with outer loop
+      object: [3, -75] # Temp, for comparsion with outer loop
     norm_ref_point: True
     zero_to_one: True
     ideal:
@@ -25,4 +25,4 @@ pymoo:
       object: [0, -100]
     nadir:
       _target_: numpy.array
-      object: [1.5, 0] # Temp, for comparsion with outer loop
+      object: [3, -75] # Temp, for comparsion with outer loop
