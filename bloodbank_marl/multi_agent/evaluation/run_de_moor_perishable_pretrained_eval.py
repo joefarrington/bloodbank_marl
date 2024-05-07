@@ -1,14 +1,16 @@
 import subprocess
 from typing import List
 
-action_output = ["order_up_to", "direct_action"]
 scenario_settings = ["m2/exp6", "m5/exp6"]
-fit_method = ["simple_ga", "simopt"]
+action_output = ["order_up_to", "direct_action"]
+fit_method = ["simple_ga", "open_es"]
 
 args_per_exp = [
-    ["+experiment=de_moor_perishable/fit_both_from_pretrained_{a}/{s}/{f}.yaml"]
-    for a in action_output
+    [
+        f"+experiment=de_moor_perishable/fit_both_from_pretrained_replenishment_{a}/{s}/{f}.yaml"
+    ]
     for s in scenario_settings
+    for a in action_output
     for f in fit_method
 ]
 
