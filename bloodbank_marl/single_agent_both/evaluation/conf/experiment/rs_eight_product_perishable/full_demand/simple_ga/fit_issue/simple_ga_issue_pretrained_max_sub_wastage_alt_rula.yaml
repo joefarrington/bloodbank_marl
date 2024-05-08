@@ -1,0 +1,47 @@
+# @package _global_
+
+defaults:
+ - override /environment: rs_perishable_gymnax_test_double
+ - override /policies/replenishment: heuristic_order_up_to
+ - override /policies/load_replenishment_policy_params: blank
+
+wandb:
+  init:
+    project: "rs_eight_perishable_evaluation"
+    tags:
+      - "new_type_env"
+      - "fit_issue"
+      - "simple_ga"
+      - "full_demand"
+      - "issue_pretrained"
+
+environment:
+  env_kwargs:
+    max_order_quantity: 25
+  env_params:
+    max_substitution_cost: 650
+    age_on_arrival_distribution_probs:
+      - 0.5
+      - 0.2
+      - 0.3
+
+policies:
+  pretrained:
+  load_issuing_policy_params:
+    param_key: best_params
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/full_demand/fit_issue/simple_ga_issue_pretrained_max_sub_wastage_alt_rula.yaml"
+    internal_key: '1'
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      # O-, O+, A-, A+, B-, B+, AB-, AB+
+      object: 
+      - [0]
+      - [16]
+      - [4]
+      - [18]
+      - [6]
+      - [3]
+      - [0]
+      - [1]

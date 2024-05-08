@@ -1,0 +1,54 @@
+# @package _global_
+
+defaults:
+ - override /environment: rs_perishable_gymnax_test_double
+ - override /policies/replenishment: single_agent_multi_product_mlp
+
+
+wandb:
+  init:
+    project: "rs_eight_perishable_evaluation"
+    tags:
+      - "new_type_env"
+      - "simple_ga"
+      - "eighth_demand"
+      - "rep_pretrained"
+      - "fit_both"
+
+environment:
+  env_kwargs:
+    max_order_quantity: 5
+  env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 650
+    age_on_arrival_distribution_probs:
+      - 0.5
+      - 0.2
+      - 0.3
+
+policies:
+  load_replenishment_policy_params:
+    param_key: best_params
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/eighth_demand/fit_both/simple_ga_rep_pretrained_max_sub_wastage_alt_rula.yaml"
+    internal_key: '0'
+  load_issuing_policy_params:
+    param_key: best_params
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/eighth_demand/fit_both/simple_ga_rep_pretrained_max_sub_wastage_alt_rula.yaml"
+    internal_key: '1'
+  replenishment:
+    model_kwargs:
+      n_hidden: [64]
+      preprocess_observation:
+        _target_: hydra.utils.get_method
+        path: bloodbank_marl.policies.models.utils.obs_basic
+    clip_min: -2
+    clip_max: 2
