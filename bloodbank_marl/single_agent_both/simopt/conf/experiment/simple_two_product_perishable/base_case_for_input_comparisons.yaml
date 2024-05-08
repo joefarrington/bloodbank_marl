@@ -20,5 +20,6 @@ policies:
 
 evaluation:
   seed: 24601
+  record_overall_metrics_per_eval_rollout: True
   test_evaluator:
     num_rollouts: 10000
