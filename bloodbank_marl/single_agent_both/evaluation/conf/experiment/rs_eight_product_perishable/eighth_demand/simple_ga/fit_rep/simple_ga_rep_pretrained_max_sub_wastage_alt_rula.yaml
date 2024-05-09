@@ -2,7 +2,7 @@
 
 defaults:
  - override /environment: rs_perishable_gymnax_test_double
- - override /policies/issuing: heuristic_priority_match
+ - override /policies/issuing: heuristic_oldest_compatible_match
  - override /policies/replenishment: single_agent_multi_product_mlp
  - override /policies/load_issuing_policy_params: blank
 
@@ -12,7 +12,7 @@ wandb:
     project: "rs_eight_perishable_evaluation"
     tags:
       - "new_type_env"
-      - "priority_match"
+      - "oldest_compatible_match"
       - "fit_rep"
       - "rep_pretrained"
       - "simple_ga"
