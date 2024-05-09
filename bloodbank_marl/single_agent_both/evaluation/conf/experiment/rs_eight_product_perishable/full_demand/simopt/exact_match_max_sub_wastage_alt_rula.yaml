@@ -19,7 +19,6 @@ wandb:
 
 environment:
   env_params:
-    poisson_demand_mean:
     max_substitution_cost: 650
     age_on_arrival_distribution_probs:
       - 0.5
