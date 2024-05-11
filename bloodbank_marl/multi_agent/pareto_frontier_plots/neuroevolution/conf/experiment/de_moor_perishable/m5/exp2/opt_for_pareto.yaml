@@ -1,0 +1,23 @@
+# @package _global_
+
+wandb:
+  init:
+    tags:
+      - "m5_exp2"
+      - "pareto_plot_opt"
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+
+kpi_ranges:
+  wastage_pc:
+    _target_: numpy.linspace
+    start: 1e-4
+    stop: 2
+    num: 25
+  service_level_pc:
+    _target_: numpy.linspace
+    start: 75
+    stop: 99.5
+    num: 25

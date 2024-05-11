@@ -1,0 +1,78 @@
+defaults:
+  - policies/replenishment: multi_agent_single_product_mlp
+  - policies/issuing: multi_agent_single_product_mlp
+  - evosax/strategy: simple_ga
+  - environment: de_moor_perishable
+  - _self_
+wandb:
+  init:
+    project: "de_moor_pareto_frontier_plots_simplega"
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+evosax:
+  strategy:
+    sigma_init: 0.07
+  num_generations: 100
+  popsize: 150
+  num_train_rollouts: 100
+  num_test_rollouts: 1000
+  seed: 10
+  init_prev_best: False
+  fitness_shaper:
+    _target_: evosax.FitnessShaper
+    maximize: True
+  logging:
+    _target_: evosax.utils.ESLog
+    num_generations: ${evosax.num_generations}
+    top_k: 5
+    maximize: ${evosax.fitness_shaper.maximize}
+
+kpi_ranges:
+  wastage_pc:
+    _target_: numpy.linspace
+    start: 0.5
+    stop: 20
+    num: 5
+  service_level_pc:
+    _target_: numpy.linspace
+    start: 50
+    stop: 99
+    num: 5
+
+train_evaluator:
+  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  env_name: ${environment.env_name}
+  num_env_steps: ${environment.num_env_steps}
+  num_rollouts: ${evosax.num_train_rollouts}
+  env_kwargs: ${environment.env_kwargs}
+  env_params: ${environment.env_params}
+  test: False
+  n_devices:
+  num_warmup_days: ${environment.num_warmup_days}
+  gamma: ${environment.gamma}
+
+evaluation: 
+  seed: 1337
+  record_overall_metrics_per_eval_rollout: True
+  test_evaluator:
+    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: ${evosax.num_test_rollouts}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}
+policies:
+  policy_manager:
+    _target_: bloodbank_marl.policies.policy_manager.PolicyManager
+  pretrained:
+    replenishment:
+      enable: False
+    issuing:
+      enable: False
