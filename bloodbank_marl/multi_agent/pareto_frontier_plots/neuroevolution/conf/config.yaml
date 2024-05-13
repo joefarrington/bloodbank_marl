@@ -18,7 +18,7 @@ evosax:
   num_generations: 100
   popsize: 150
   num_train_rollouts: 100
-  num_test_rollouts: 1000
+  num_test_rollouts: 10000
   seed: 10
   init_prev_best: False
   fitness_shaper:
