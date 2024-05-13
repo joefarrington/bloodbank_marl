@@ -40,8 +40,14 @@ pymoo:
     _target_: pymoo.termination.get_termination
     name: "n_gen"
     n_max_gen: ${pymoo.num_generations}
-  
-    
+
+# For NN, leave blank
+# Use to provide placeholders of correct shape if using heuristic policy 
+policies:
+  initial_params:
+    replenishment:
+    issuing:
+
 train_evaluator:
   _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
   env_name: ${environment.env_name}
@@ -58,6 +64,7 @@ train_evaluator:
 evaluation:
   seed: 1337
   record_overall_metrics_per_eval_rollout: False
+  save_params: False
   test_evaluator:
     _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
     env_name: ${environment.env_name}

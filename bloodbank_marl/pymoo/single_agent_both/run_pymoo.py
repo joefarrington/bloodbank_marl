@@ -16,6 +16,10 @@ from pymoo.indicators.hv import Hypervolume
 import pickle
 
 
+# TODO: At the moment, if we use this with a heuristic rep policy, we end up with an extra parameter being optimized - the placeholder for the issuing policy
+# it has no effect on performance. Could eliminate this by rethinking how we do param reshaping.
+
+
 def calc_hypervolume(F: np.array, metrics_to_opt: List) -> float:
 
     ideal = {"wastage_%": 0, "service_level_%": -100, "exact_match_%": -100}
@@ -37,7 +41,8 @@ def calc_hypervolume(F: np.array, metrics_to_opt: List) -> float:
     return hv
 
 
-class SimpleTwoProductPerishableMultiAgentProbelem(Problem):
+class MultiProductPerishableMultiAgentProbelem(Problem):
+    # This can be used with SimpleTwoProductPerishableIncIssueGymnax and RSPerishableIncIssueGymnax (with eight products)
     def __init__(
         self,
         train_evaluator,
@@ -120,10 +125,18 @@ def main(cfg: omegaconf.DictConfig):
 
     policy_params = {}
     policy_rep = hydra.utils.instantiate(cfg.policies.replenishment)
-    policy_params[0] = policy_rep.get_initial_params(rng_rep)
+    if cfg.policies.initial_params.replenishment is None:
+        policy_params[0] = policy_rep.get_initial_params(rng_rep)
+    else:
+        policy_params[0] = hydra.utils.instantiate(
+            cfg.policies.initial_params.replenishment
+        )
 
     policy_issue = hydra.utils.instantiate(cfg.policies.issuing)
-    policy_params[1] = policy_issue.get_initial_params(rng_rep)
+    if cfg.policies.initial_params.issuing is None:
+        policy_params[1] = policy_issue.get_initial_params(rng_rep)
+    else:
+        policy_params[1] = hydra.utils.instantiate(cfg.policies.initial_params.issuing)
 
     param_reshaper = ParameterReshaper(policy_params)
 
@@ -131,8 +144,8 @@ def main(cfg: omegaconf.DictConfig):
     train_evaluator.set_apply_fn(policy_rep.apply)
     train_evaluator.set_issuing_fn(policy_issue.apply)
 
-    # TODO: Enable specifying problem in cofig by defining in a separate file
-    problem = SimpleTwoProductPerishableMultiAgentProbelem(
+    # TODO: Enable specifying problem in config by defining in a separate file
+    problem = MultiProductPerishableMultiAgentProbelem(
         train_evaluator=train_evaluator,
         param_reshaper=param_reshaper,
         scenario_seed=cfg.pymoo.seed,
@@ -214,7 +227,7 @@ def main(cfg: omegaconf.DictConfig):
     eval_table = wandb.Table(dataframe=eval_df)
 
     # Plot results
-    log_to_wandb["eva;/service_level_v_wastage"] = wandb.plot.scatter(
+    log_to_wandb["eval/service_level_v_wastage"] = wandb.plot.scatter(
         eval_table, "Wastage", "Service Level"
     )
     log_to_wandb["eval/service_level_v_exact_match"] = wandb.plot.scatter(
@@ -242,6 +255,8 @@ def main(cfg: omegaconf.DictConfig):
         # Do some work hereto save, we'd only use this when doing eval with best hps
         kpis_to_save = problem.opt
         eval_kpis = {}
+        if cfg.evaluation.save_params:
+            eval_kpis["params"] = reshaped_params
         for kpi in kpis_to_save:
             eval_kpis[kpi] = kpis[kpi]
         pickle.dump(eval_kpis, open(f"{wandb.run.dir}/eval_kpis.pkl", "wb"))

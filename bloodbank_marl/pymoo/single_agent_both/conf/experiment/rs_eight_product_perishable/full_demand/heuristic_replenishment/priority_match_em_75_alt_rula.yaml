@@ -1,0 +1,71 @@
+# @package _global_
+
+defaults:
+  - override /environment: rs_perishable_gymnax_test_double
+  - override /policies/issuing: heuristic_priority_match
+  - override /policies/replenishment: heuristic_order_up_to
+  - override /pymoo/algorithm: nsgaii_discrete
+
+wandb:
+  init:
+    project: "rs_eight_product_perishable_pymoo_heuristic_replenishment"
+    tags:
+      - "new_type_env"
+
+pymoo:
+  problem:
+    min_exact_match_pc: 75.0
+    opt:
+      - wastage_%
+      - service_level_%
+    xu: 60.0
+    xl: # Slightly convoluted way of setting this to zero
+      _args_:
+        - 0.0
+        - ${pymoo.problem.xu}
+
+environment:
+  env_params:
+    age_on_arrival_distribution_probs:
+      - 0.5
+      - 0.2
+      - 0.3
+
+policies:
+  # Initial params are placeholders so that param reshaper works
+  initial_params:
+    replenishment:
+      _target_: jax.numpy.array
+      object:
+      - [0]
+      - [0]
+      - [0]
+      - [0]
+      - [0]
+      - [0]
+      - [0]
+      - [0]
+    issuing:
+      _target_: jax.numpy.array
+      object:
+        - [0]
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0, 4, 2, -1, -1, -1, -1, -1] # O- patient
+        - [1, 0, 5, 4, 3, 2, -1, -1] # O+ patient
+        - [2, 6, 4, 0, 3, 7, -1, -1] # A- patient
+        - [3, 2, 7, 6, 5, 4, -1, -1] # A+ patient
+        - [4, 6, 2, 0, 5, 7, -1, -1] # B- patient
+        - [5,4, 7, 6, 3, 2, -1, -1] #B+ patient
+        - [6, 2, 4, 0, 7, 3, -1, -1] # AB- patient
+        - [7, 6, 3, 2, 5, 4, -1, -1] # AB+ patient
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 25
+
+evaluation:
+  record_overall_metrics_per_eval_rollout: True
+  save_params: True
