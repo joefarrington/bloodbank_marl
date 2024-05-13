@@ -1,0 +1,18 @@
+_target_: pymoo.algorithms.moo.nsga2.NSGA2
+pop_size: ${pymoo.pop_size}
+n_offsprings: ${pymoo.n_offsprings}
+sampling:
+  _target_: pymoo.operators.sampling.rnd.IntegerRandomSampling
+crossover:
+  _target_: pymoo.operators.crossover.sbx.SBX
+  prob: 1.0
+  eta: 3.0
+  repair:
+    _target_: pymoo.operators.repair.rounding.RoundingRepair
+mutation:
+  _target_: pymoo.operators.mutation.pm.PM
+  prob: 1.0
+  eta: 3.0
+  repair:
+    _target_: pymoo.operators.repair.rounding.RoundingRepair
+eliminate_duplicates: True
