@@ -51,12 +51,12 @@ kpi_ranges:
     _target_: numpy.linspace
     start: 1
     stop: 40
-    num: 10
+    num: 25
   service_level_pc:
     _target_: numpy.linspace
     start: 10
     stop: 99.5
-    num: 10
+    num: 25
 
 min_exact_match_pc: 50.0
 
