@@ -179,6 +179,16 @@ def run_neuro_opt_one_kpi(
         rows.append(row)
         best_params_last_round = best_params
         best_fitness_last_round = best_fitness
+
+        if cfg.evaluation.record_overall_metrics_per_eval_rollout:
+            # Save the KPIS
+            for kpi_name in ["wastage_%", "service_level_%"]:
+                if metrics_per_eval_rollout[kpi_name] is None:
+                    metrics_per_eval_rollout[kpi_name] = kpis[kpi_name]
+                else:
+                    metrics_per_eval_rollout[kpi_name] = np.vstack(
+                        [metrics_per_eval_rollout[kpi_name], kpis[kpi_name]]
+                    )
     res_df = pd.DataFrame(
         rows,
         columns=[
@@ -188,15 +198,7 @@ def run_neuro_opt_one_kpi(
             "return_mean",
         ],
     )
-    if cfg.evaluation.record_overall_metrics_per_eval_rollout:
-        # Save the KPIS
-        for kpi_name in ["wastage_%", "service_level_%"]:
-            if metrics_per_eval_rollout[kpi_name] is None:
-                metrics_per_eval_rollout[kpi_name] = kpis[kpi_name]
-            else:
-                metrics_per_eval_rollout[kpi_name] = np.vstack(
-                    [metrics_per_eval_rollout[kpi_name], kpis[kpi_name]]
-                )
+
     return res_df, metrics_per_eval_rollout
 
 
