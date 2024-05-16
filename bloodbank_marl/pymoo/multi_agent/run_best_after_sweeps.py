@@ -9,7 +9,7 @@ eval_args = [
 
 basic_command = [
     "python",
-    "/home/joefarrington/CDT/bloodbank_marl/bloodbank_marl/pymoo/multi_agent/run_pymoo.py",
+    "run_pymoo.py",
 ]
 
 # m=2, L=1
