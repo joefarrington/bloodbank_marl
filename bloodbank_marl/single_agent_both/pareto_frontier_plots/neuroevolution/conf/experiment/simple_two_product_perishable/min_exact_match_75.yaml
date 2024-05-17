@@ -4,4 +4,4 @@ wandb:
   init:
     project: "simple_two_product_pareto_frontier_plots"
     
-min_exact_match_pc: 75.0
+min_exact_match_pc: 75.5
