@@ -43,7 +43,7 @@ kpi_ranges:
     num: 25
 
 train_evaluator:
-  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  _target_: bloodbank_marl.utils.marl_fitness.MarlFitness
   env_name: ${environment.env_name}
   num_env_steps: ${environment.num_env_steps}
   num_rollouts: ${evosax.num_train_rollouts}
@@ -58,7 +58,7 @@ evaluation:
   seed: 10191
   record_overall_metrics_per_eval_rollout: True
   test_evaluator:
-    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    _target_: bloodbank_marl.utils.marl_fitness.MarlFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
     num_rollouts: ${evosax.num_test_rollouts}

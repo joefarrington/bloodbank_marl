@@ -53,7 +53,7 @@ evosax:
     init_max: ${evosax.init_params_abs_max}
     
 train_evaluator:
-  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  _target_: bloodbank_marl.utils.marl_fitness.MarlFitness
   env_name: ${environment.env_name}
   num_env_steps: ${environment.num_env_steps}
   num_rollouts: ${evosax.num_train_rollouts}
@@ -67,7 +67,7 @@ train_evaluator:
 evaluation:
   seed: 1337
   test_evaluator:
-    _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+    _target_: bloodbank_marl.utils.marl_fitness.MarlFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
     num_rollouts: ${evosax.num_test_rollouts}

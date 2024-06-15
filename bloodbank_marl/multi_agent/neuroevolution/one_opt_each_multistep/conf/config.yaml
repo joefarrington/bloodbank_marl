@@ -49,7 +49,7 @@ evosax:
     create: True
 
 train_evaluator:
-  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  _target_: bloodbank_marl.utils.marl_fitness.MarlFitness
   env_name: ${environment.env_name}
   num_env_steps: ${environment.num_env_steps}
   num_rollouts: ${environment.num_rollouts}
@@ -61,7 +61,7 @@ train_evaluator:
   gamma: ${environment.gamma}
 
 test_evaluator:
-  _target_: bloodbank_marl.utils.gymnax_fitness.GymnaxFitness
+  _target_: bloodbank_marl.utils.marl_fitness.MarlFitness
   env_name: ${environment.env_name}
   num_env_steps: ${environment.num_env_steps}
   num_rollouts: 10000

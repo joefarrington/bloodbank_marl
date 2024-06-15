@@ -198,7 +198,8 @@ updated
 
 ---
 Code in bloodbank_marl/utils/single_agent_gymnax_fitness.py,
-bloodbank_marl/utils/adapted_single_agent_fitness.py adapted from
+bloodbank_marl/utils/adapted_single_agent_fitness.py,
+bloodbank_marl/utils/marl_fitness.py adapted from
 https://github.com/RobertTLange/evosax/blob/main/evosax/problems/control_gym.py
 
 License: https://github.com/RobertTLange/evosax/blob/main/LICENSE
