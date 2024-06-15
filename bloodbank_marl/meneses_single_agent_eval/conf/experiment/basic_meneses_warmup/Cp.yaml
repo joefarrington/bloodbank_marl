@@ -1,7 +1,0 @@
-# @package _global_
-
-defaults:
-  - override /policies/replenishment_policy_params: Cp
-  - override /policies/issuing: heuristic_priority_match
-
-exp_name: Cp_warmup

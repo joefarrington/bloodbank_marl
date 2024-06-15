@@ -1,4 +1,0 @@
-# @package _global_
-
-defaults:
-  - override /policies/issuing: heuristic_exact_match

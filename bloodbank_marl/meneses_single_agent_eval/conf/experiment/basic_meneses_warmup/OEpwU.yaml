@@ -1,6 +1,0 @@
-# @package _global_
-
-defaults:
-  - override /policies/replenishment_policy_params: OEpwU
-
-exp_name: OEpwU_warmup

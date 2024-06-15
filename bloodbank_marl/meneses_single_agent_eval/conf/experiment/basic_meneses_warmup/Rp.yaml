@@ -1,7 +1,0 @@
-# @package _global_
-
-defaults:
-  - override /policies/replenishment_policy_params: Rp
-  - override /policies/issuing: heuristic_priority_match
-
-exp_name: Rp_warmup
