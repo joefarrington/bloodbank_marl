@@ -1,5 +1,4 @@
-# Initial basic working version of MARL for DeMoor based on PureJAXRL.
-# Wuite a bit TODO, but moving this out of notebook now to version control future changes.
+# Adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/ppo.py
 
 import jax
 import jax.numpy as jnp
@@ -12,8 +11,6 @@ from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishable
 from bloodbank_marl.policies import replenishment, issuing, policy_manager, common
 from bloodbank_marl.utils.gymnax_wrappers import LogEnvState, LogWrapper, LogInfo
 
-# from bloodbank_marl.ppo_multi_agent.ppo_models import DiscreteActorCritic
-# from bloodbank_marl.ppo_multi_agent.ppo_policies import FlaxStochasticPolicy
 import flax.linen as nn
 import numpy as np
 import optax
@@ -39,10 +36,6 @@ import plotly
 
 import orbax
 from flax.training import checkpoints
-
-
-# TODO: Automate creation of Transition based on information about the env
-# Specifically, the shape of the EnvObs object (plus env_args)
 
 
 @struct.dataclass
@@ -248,7 +241,6 @@ def make_train(config):
             // config["training"][agent]["num_minibatches"]
         )
 
-    # TODO There is probably a better way to enfore this but this will do for now
     if (
         config["training"]["replenishment"]["train"]
         and config["training"]["issuing"]["train"]
@@ -279,7 +271,6 @@ def make_train(config):
     def empty_transitions(n_steps):
         return Transition(
             done=jnp.array([False] * n_steps, dtype=jnp.bool_),
-            # TODO: This also needs to be based on the env, currently for Meneses (1D for DeMoor and integer)
             action=-1
             * jnp.ones(
                 (n_steps,) + action_shape
@@ -523,7 +514,6 @@ def make_train(config):
                 cond_fn = partial(cond_fn_base, n_rep=n_rep, n_issue=n_issue)
                 return jax.lax.while_loop(cond_fn, _env_step, vals)
 
-            # TODO: Make sure we aren't spending time rejitting etc each training iteration
             # NOTE: Add two steps, as below we remove the first and last.
             get_ma_samples = jax.jit(
                 partial(
@@ -544,7 +534,7 @@ def make_train(config):
             # So, we take the last observation in each trajectory as "last obs" for the purposes of calculating last value and GAE
             last_obs, env_state = rollout_output[5], rollout_output[6]
 
-            # TODO: We might want to store the other elements of rollout_outputs, they will tell us the total number of steps we did
+            # NOTE: We might want to store the other elements of rollout_outputs, they will tell us the total number of steps we did
             # To match the exisiting work, we want to change this so that the first axis is number of steps,
             # then no of envs, then size of thing
             # For last obs, take the final observation
@@ -642,9 +632,8 @@ def make_train(config):
                     config["training"]["replenishment"]["update_epochs"],
                 )
                 train_state_rep = update_state_rep[0]
-                # TODO: Not collecting info at the moment
+                # NOTE: Not collecting info at the moment
             metric_rep = traj_batch_rep.info
-            # TODO: Sort this out, will be needed when we want to continue collection instead of resetting
 
             # And for issuing
             rng, _rng = jax.random.split(rng)
@@ -786,9 +775,9 @@ def plot_policies(policy_rep, policy_issue, policy_params):
 def log_losses(config, metrics):
     for i in range(
         1, config["training"]["replenishment"]["num_updates"] + 1
-    ):  # TODO: Again using rep but we have forced them to be the same
+    ):  # NOTE: Again using rep but we have forced them to be the same
         # These are all approximate, they ignore extra steps we have to take and
-        # just count the ones we trained on. We can adjust later.
+        # just count the ones we trained on.
         rep_steps = (
             i
             * config["training"]["replenishment"]["num_steps"]
@@ -800,7 +789,6 @@ def log_losses(config, metrics):
             * config["training"]["issuing"]["num_envs"]
         )
         total_steps = rep_steps + issue_steps
-        # TODO: Simple logging of losses, may be worth thinking about it more detail
         log_dict = {}
 
         # Log omce for each update (i-1)

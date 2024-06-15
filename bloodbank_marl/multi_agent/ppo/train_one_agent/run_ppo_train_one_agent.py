@@ -1,5 +1,4 @@
-# Initial basic working version of MARL for DeMoor based on PureJAXRL.
-# Wuite a bit TODO, but moving this out of notebook now to version control future changes.
+# Adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/ppo.py
 
 # NOTE
 # -> We're still collecting trajectories for both, even through only one trained, because easiest to report
@@ -10,7 +9,6 @@
 
 import jax
 import jax.numpy as jnp
-import distrax
 from flax import struct
 from functools import partial
 
@@ -456,9 +454,8 @@ def make_train(config):
                 cond_fn = partial(cond_fn_base, n_rep=n_rep, n_issue=n_issue)
                 return jax.lax.while_loop(cond_fn, _env_step, vals)
 
-            # TODO: Make sure we aren't spending time rejitting etc each training iteration
             # NOTE: Add two steps, as below we remove the first and last.
-            # TODO: Would be better to just be able to customize number of steps for the one being optimized, rather than both.
+            # NOTE: Would be better to just be able to customize number of steps for the one being optimized, rather than both.
             get_ma_samples = jax.jit(
                 partial(
                     _collect_ma_trajectories,
@@ -476,7 +473,7 @@ def make_train(config):
             # So, we take the last observation in each trajectory as "last obs" for the purposes of calculating last value and GAE
             last_obs, env_state = rollout_output[5], rollout_output[6]
 
-            # TODO: We might want to store the other elements of rollout_outputs, they will tell us the total number of steps we did
+            # NOTE: We might want to store the other elements of rollout_outputs, they will tell us the total number of steps we did
             # To match the exisiting work, we want to change this so that the first axis is number of steps,
             # then no of envs, then size of thing
             # For last obs, take the final observation
@@ -558,7 +555,7 @@ def make_train(config):
                 config["training"]["update_epochs"],
             )
             train_state = update_state[0]
-            # TODO: Not collecting info at the moment
+            # NOTE: Not collecting info at the moment
             metric_rep = traj_batch_rep.info
             metric_issue = None
 
@@ -592,8 +589,7 @@ def make_train(config):
     return train
 
 
-# Just temporary, quite rough, useful to be able to see policies when
-# there is only a small obs space
+# Useful to be able to see policies when there is only a small obs space
 def plot_policies(policy_rep, policy_issue, policy_params):
     # For simplicity, redefine here without incluing in_transit
     # because for the simple example we can plot there is no in-transit
@@ -673,9 +669,8 @@ def plot_policies(policy_rep, policy_issue, policy_params):
 
 def log_losses(config, metrics):
     for i in range(1, config["training"]["num_updates"] + 1):
-        # TODO: This isn't env steps, just steps take for training
+        # NOTE: This isn't env steps, just steps take for training
         steps = i * config["training"]["num_steps"] * config["training"]["num_envs"]
-        # TODO: This is just one way to log the losses, can return to and edit later
         log_dict = {}
 
         # Log omce for each update (i-1)

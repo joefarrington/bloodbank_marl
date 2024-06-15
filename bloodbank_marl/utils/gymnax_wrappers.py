@@ -1,4 +1,4 @@
-# Based on  https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
+# Adapted from  https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
 
 import jax
 import jax.numpy as jnp
