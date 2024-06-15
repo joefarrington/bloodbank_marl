@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from gymnax.environments import spaces
 import numpy as np
 import distrax
-from bloodbank_marl.environments.environment import (
+from bloodbank_marl.environments.marl_environment import (
     MarlEnvironment,
     EnvParams,
     EnvState,

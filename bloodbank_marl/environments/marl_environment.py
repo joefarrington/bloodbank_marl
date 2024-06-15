@@ -1,12 +1,11 @@
+# Adapted from https://github.com/RobertTLange/gymnax/blob/main/gymnax/environments/environment.py
+
 import jax
 import chex
 from typing import Tuple, Union, Optional, Dict
 from functools import partial
 from flax import struct
 import jax.numpy as jnp
-from gymnax.environments import spaces
-import numpy as np
-import gymnax
 from jax import lax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
@@ -40,7 +39,7 @@ class EnvInfo:
 # We're using state to track both the state of the environment in MDP terms and also
 # additional information that in, say, PettingZoo would be stored as attributes of the
 # Env class like the next agent, cumulative rewards, etc.
-# TODO: We COULD split this up a bit more - e.g. have a sub-dataclass just for the MDP state as
+# NOTE: We COULD split this up a bit more - e.g. have a sub-dataclass just for the MDP state as
 # we currently do for info. But, I think given use of EnvObs, this is fine.
 @struct.dataclass
 class EnvState:
@@ -156,7 +155,6 @@ class MarlEnvironment(object):
         infos = infos.reset_infos_one_agent(agent_id)
         state = state.replace(cumulative_rewards=cumulative_rewards, infos=infos)
 
-        # TODO: Handle stepping an agent that is dead, as in PettingZoo
         return jax.lax.cond(
             jax.lax.bitwise_or(
                 state.truncations[agent_id], state.terminations[agent_id]
@@ -243,7 +241,6 @@ class MarlEnvironment(object):
     @property
     def num_actions(self, agent_id: int) -> int:
         """Number of actions possible in environment for agent with id `agent_id`."""
-        # TODO Add in number of actions
         raise NotImplementedError
 
     def action_space(self, params: EnvParams, agent_id: int):

@@ -6,14 +6,20 @@ import jax.numpy as jnp
 from gymnax.environments import spaces
 import numpy as np
 import distrax
-from bloodbank_marl.environments.environment import (
+from bloodbank_marl.environments.marl_environment import (
     MarlEnvironment,
     EnvParams,
     EnvState,
     EnvInfo,
     EnvObs,
 )
-from bloodbank_marl.scenarios.rs_perishable.jax_env import EnvState, EnvObs, EnvInfo, EnvParams, RSPerishableEnv
+from bloodbank_marl.scenarios.rs_perishable.jax_env import (
+    EnvState,
+    EnvObs,
+    EnvInfo,
+    EnvParams,
+    RSPerishableEnv,
+)
 from jax import lax
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
@@ -40,7 +46,7 @@ substitution_cost_ratios = [
 # These are from Ensafian et al (2017) - and similar to those in Meneses
 product_probabilities = [0.16, 0.84]  # RhD-, RhD+
 
-action_mask_per_request_type = np.array([[1,0], [1,1]])
+action_mask_per_request_type = np.array([[1, 0], [1, 1]])
 
 
 # TODO: Recheck all defaults
@@ -150,5 +156,3 @@ class RSPerishableTwoEnv(RSPerishableEnv):
     def name(self) -> str:
         """Environment name."""
         return "RSPerishableTwo"
-
-   

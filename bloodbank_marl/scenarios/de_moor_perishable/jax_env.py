@@ -14,7 +14,7 @@ from evosax.utils import ESLog
 from evosax.problems import GymnaxFitness
 import distrax
 import functools
-from bloodbank_marl.environments.environment import (
+from bloodbank_marl.environments.marl_environment import (
     MarlEnvironment,
     EnvParams,
     EnvState,
