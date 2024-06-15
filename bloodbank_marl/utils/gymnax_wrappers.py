@@ -34,8 +34,7 @@ class GymnaxWrapper(object):
 class LogWrapper(GymnaxWrapper):
     """Log the episode returns and lengths."""
 
-    # TODO This is customised for our setup, so we should probably give it a more specific name
-    # TODO: Check discounting of new_ep_return by using known policies.
+    # NOTE: This is customised for our setup, so could give it a more specific name
 
     def __init__(self, env: environment.Environment):
         super().__init__(env)
