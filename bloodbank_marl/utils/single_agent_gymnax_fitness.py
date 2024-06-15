@@ -1,23 +1,9 @@
-# Taken from our original implementation in jupyter notebook
-# multiagent_demo/20230821_jax_demorr_marl_evosax_fitness.ipynb
-# TODO: Put in a link to the general evosax gymnax fitness class
+# Adapted from https://github.com/RobertTLange/evosax/blob/main/evosax/problems/control_gym.py
 
 import jax
 import chex
-from typing import Tuple, Union, Optional
-from functools import partial
-from flax import struct
+from typing import Optional
 import jax.numpy as jnp
-from gymnax.environments import spaces
-import numpy as np
-import evosax
-import gymnax
-from flax import linen as nn
-from evosax import OpenES, PGPE, ParameterReshaper, FitnessShaper, NetworkMapper
-from evosax.utils import ESLog
-from evosax.problems import GymnaxFitness
-import distrax
-import functools
 from bloodbank_marl.utils.make_env import make
 
 jnp_int = jnp.int64 if jax.config.jax_enable_x64 else jnp.int32
@@ -33,7 +19,7 @@ class GymnaxFitness(object):
         env_params: dict = {},
         test: bool = False,
         n_devices: Optional[int] = None,
-        num_warmup_days: int = 0,  # TODO: Arguments from here down are new, may want to input another way
+        num_warmup_days: int = 0,
         gamma: float = 0.99,
     ):
         self.env_name = env_name
@@ -56,10 +42,6 @@ class GymnaxFitness(object):
         else:
             self.num_env_steps = int(num_env_steps)
         self.steps_per_member = self.num_env_steps * num_rollouts
-
-        ## TODO: Rewrite to make dicts with entries for each agent
-        # self.action_shape = self.env.num_actions
-        # self.input_shape = self.env.observation_space(self.env_params).spaces['obs'].shape
 
         if n_devices is None:
             self.n_devices = jax.local_device_count()
@@ -95,7 +77,7 @@ class GymnaxFitness(object):
         else:
             self.rollout_map = self.rollout_pop
 
-    # TODO Would need to adjust to account for infos
+    # NOTE Would need to adjust to account for infos
     def rollout_pmap(self, rng_input: chex.PRNGKey, policy_params: chex.ArrayTree):
         """Parallelize rollout across devices. Split keys/reshape correctly."""
         keys_pmap = jnp.tile(rng_input, (self.n_devices, 1, 1))
@@ -129,7 +111,7 @@ class GymnaxFitness(object):
                 rng_step, state, action, self.env_params
             )
             warmup_done = jax.lax.ge(state.step, self.num_warmup_days)
-            # TODO: We can probably get rid of the next few lines when using the while loop
+            # NOTE: Can probably get rid of the next few lines when using the while loop
             state = jax.tree_map(
                 lambda x, y: jnp.where(warmup_done, x, y), state, next_s
             )
@@ -144,7 +126,7 @@ class GymnaxFitness(object):
 
         def policy_step(state_input):
             """lax.scan compatible step transition in jax env."""
-            # TODO: We can probably simplify some of this when using the while loop
+            # NOTE: Can probably simplify some of this when using the while loop
             (
                 obs,
                 state,
