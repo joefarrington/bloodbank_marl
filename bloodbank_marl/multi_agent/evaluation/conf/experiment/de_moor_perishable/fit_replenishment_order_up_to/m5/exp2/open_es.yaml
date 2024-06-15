@@ -21,6 +21,5 @@ environment:
 policies:
   load_replenishment_policy_params:
     param_key: rep_best_params
-    checkpoint_id: 99
     checkpoint_manager:
       directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/de_moor_perishable/fit_replenishment_order_up_to/m5/exp2/open_es"
