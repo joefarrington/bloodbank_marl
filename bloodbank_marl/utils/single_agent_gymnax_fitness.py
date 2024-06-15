@@ -215,7 +215,6 @@ class GymnaxFitness(object):
             ],
         )
         # Return the sum of rewards accumulated by agent in episode rollout
-        # ep_mask = scan_out
         cum_reward = carry_out[-4].squeeze()  # Not discounted, one per agent
         cum_return = carry_out[
             -3
@@ -230,4 +229,4 @@ class GymnaxFitness(object):
             kpis, self.env_params
         )
         cum_return = cum_return + target_breached_penalty
-        return cum_return, cum_infos, kpis, None  # jnp.array(ep_mask)
+        return cum_return, cum_infos, kpis, None

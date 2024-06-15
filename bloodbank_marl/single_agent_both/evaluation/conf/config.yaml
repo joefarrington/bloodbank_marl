@@ -23,7 +23,7 @@ evaluation:
   seed: 24601
   record_overall_metrics_per_eval_rollout: True
   test_evaluator:
-    _target_: bloodbank_marl.utils.single_agent_fit_issue_too_fitness_manager.GymnaxFitness
+    _target_: bloodbank_marl.utils.adapted_single_agent_fitness.AdaptedSingleAgentFitness
     env_name: ${environment.env_name}
     num_env_steps: ${environment.num_env_steps}
     num_rollouts: 10000
