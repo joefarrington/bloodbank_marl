@@ -1,8 +1,0 @@
-# @package _global_
-
-defaults:
-- override /algorithm_additional_config/multi_agent/policies/issuing: yufo
-
-algorithm_additional_config:
-  multi_agent:
-    policies_to_train: ["replenishment"]

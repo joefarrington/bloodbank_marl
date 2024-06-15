@@ -1,5 +1,0 @@
-_target_: ray.rllib.policy.policy.PolicySpec
-config:
-  _target_: ray.rllib.algorithms.ppo.PPOConfig.overrides
-  model:
-    custom_model: "TorchActionMaskModel"
