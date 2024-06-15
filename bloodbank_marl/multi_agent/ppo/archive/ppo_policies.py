@@ -10,7 +10,7 @@ import distrax
 import numpy as np
 import chex
 from flax import struct
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
 
 # We want tr_action to be a float (because for rep raw action is sample from Gaussian)

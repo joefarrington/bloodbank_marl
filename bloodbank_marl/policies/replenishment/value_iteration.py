@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from typing import List
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 
 
 class VIPolicy(HeuristicPolicy):

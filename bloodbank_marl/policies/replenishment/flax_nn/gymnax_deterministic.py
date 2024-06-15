@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import flax.linen as nn
 import chex
 from typing import Dict, Optional, Any, List
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 from bloodbank_marl.utils.yaml import from_yaml, to_yaml
 from bloodbank_marl.environments.environment import MarlEnvironment
 from bloodbank_marl.scenarios.meneses_perishable.jax_env import (

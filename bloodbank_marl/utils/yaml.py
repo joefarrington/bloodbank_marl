@@ -1,4 +1,4 @@
-# Based on https://github.com/joefarrington/viso_jax/utils/yaml.py
+# Adapted from https://github.com/joefarrington/viso_jax/utils/yaml.py
 
 import yaml
 from typing import Dict, Any

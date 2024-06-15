@@ -10,7 +10,7 @@ import distrax
 import numpy as np
 import chex
 from flax import struct
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 from typing import Union, Dict, Optional, Any, List
 
 

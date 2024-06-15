@@ -10,8 +10,6 @@ from functools import partial
 
 from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.policies import replenishment, issuing, policy_manager, common
-from bloodbank_marl.utils.gymnax_fitness import GymnaxFitness
-from bloodbank_marl.utils.rollout_manager import RolloutManager
 from bloodbank_marl.utils.gymnax_wrappers import LogEnvState, LogWrapper, LogInfo
 
 # from bloodbank_marl.ppo_multi_agent.ppo_models import DiscreteActorCritic
@@ -28,7 +26,7 @@ import chex
 from functools import partial
 from typing import Optional, Tuple, Union, Any
 from gymnax.environments import environment, spaces
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 import hydra
 import omegaconf
 import wandb

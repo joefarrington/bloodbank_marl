@@ -26,7 +26,7 @@ from bloodbank_marl.utils.pretraining import (
     get_obs_rs_multiproduct,
     get_obs_rs_multiproduct_issuing,
 )
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 from pathlib import Path
 
 

@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 from bloodbank_marl.policies.common import FlaxMAPolicy
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 
 
 class FlaxOrderUpToRepPolicy(FlaxMAPolicy):

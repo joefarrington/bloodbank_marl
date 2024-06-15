@@ -4,7 +4,7 @@ from bloodbank_marl.policies.common import (
     FlaxStochasticPolicy,
     FlaxStochasticMAPolicy,
 )
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 
 
 class FlaxStochasticOrderUpToRepPolicy(FlaxStochasticMAPolicy):

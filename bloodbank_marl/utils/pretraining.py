@@ -5,7 +5,7 @@ from bloodbank_marl.scenarios.de_moor_perishable.gymnax_env import (
     EnvObs as DeMoorEnvObs,
 )
 from bloodbank_marl.scenarios.rs_perishable.gymnax_env import EnvObs as RSEnvObs
-from bloodbank_marl.utils.gymnax_fitness import make
+from bloodbank_marl.utils.make_env import make
 import itertools
 import chex
 from functools import partial
