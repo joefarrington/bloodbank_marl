@@ -1,4 +1,4 @@
-# Modified from https://github.com/RobertTLange/evosax/blob/main/evosax/strategy.py
+# Adapted from https://github.com/RobertTLange/evosax/blob/main/evosax/strategy.py
 
 import jax
 import jax.numpy as jnp

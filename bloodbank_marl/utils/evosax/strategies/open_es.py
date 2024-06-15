@@ -1,4 +1,4 @@
-# Modified from https://github.com/RobertTLange/evosax/blob/main/evosax/strategies/open_es.py
+# Adapted from from https://github.com/RobertTLange/evosax/blob/main/evosax/strategies/open_es.py
 
 from typing import Tuple, Optional, Union
 import jax

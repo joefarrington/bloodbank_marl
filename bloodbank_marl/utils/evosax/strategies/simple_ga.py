@@ -1,4 +1,4 @@
-# Modified from https://github.com/RobertTLange/evosax/blob/main/evosax/strategies/simple_ga.py
+# Adapted from https://github.com/RobertTLange/evosax/blob/main/evosax/strategies/simple_ga.py
 
 from typing import Tuple, Optional, Union
 import jax

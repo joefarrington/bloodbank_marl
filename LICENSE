@@ -202,6 +202,15 @@ bloodbank_marl/utils/adapted_single_agent_fitness.py,
 bloodbank_marl/utils/marl_fitness.py adapted from
 https://github.com/RobertTLange/evosax/blob/main/evosax/problems/control_gym.py
 
+Code in bloodbank_marl/utils/evosax/strategy.py adapted from
+https://github.com/RobertTLange/evosax/blob/main/evosax/strategy.py
+
+Code in bloodbank_marl/utils/evosax/strategies/simple_ga.py adapted from
+https://github.com/RobertTLange/evosax/blob/main/evosax/strategies/simple_ga.py
+
+Code in bloodbank_marl/utils/evosax/strategies/open_es.py adapted from
+https://github.com/RobertTLange/evosax/blob/main/evosax/strategies/open_es.py
+
 License: https://github.com/RobertTLange/evosax/blob/main/LICENSE
 We copy the required statement below, noting that this may have
 not been correctly updated to reflect the author of the repository.
