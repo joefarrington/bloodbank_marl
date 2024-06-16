@@ -1,4 +1,0 @@
-_target_: bloodbank_marl.policies.replenishment.value_iteration.VIPolicy
-env_name: ${environment.env_name}
-env_kwargs: ${environment.env_kwargs}
-env_params: ${environment.env_params}
