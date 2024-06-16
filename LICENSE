@@ -258,9 +258,8 @@ limitations under the License.
 Code in bloodbank_marl/utils/gymnax_wrappers.py adapted from
 https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
 
-Code in bloodbank_marl/multi_agent/ppo/run_ppo.py,
-bloodbank_marl/multi_agent/ppo/train_one_agent/run_ppo_train_one_agent.py
-adapted from https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/ppo.py
+Code in bloodbank_marl/multi_agent/ppo/run_ppo.py adapted from 
+https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/ppo.py
 
 License: https://github.com/luchris429/purejaxrl/blob/main/LICENSE
 
