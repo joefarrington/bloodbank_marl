@@ -16,7 +16,7 @@ from pymoo.indicators.hv import Hypervolume
 import pickle
 
 
-# TODO: At the moment, if we use this with a heuristic rep policy, we end up with an extra parameter being optimized - the placeholder for the issuing policy
+# NOTE: At the moment, if we use this with a heuristic rep policy, we end up with an extra parameter being optimized - the placeholder for the issuing policy
 # it has no effect on performance. Could eliminate this by rethinking how we do param reshaping.
 
 
@@ -42,7 +42,7 @@ def calc_hypervolume(F: np.array, metrics_to_opt: List) -> float:
 
 
 class MultiProductPerishableMultiAgentProbelem(Problem):
-    # This can be used with SimpleTwoProductPerishableIncIssueGymnax and RSPerishableIncIssueGymnax (with eight products)
+    # This can be used with TwoProductPerishableAdapted and EightProductPerishableAdapted
     def __init__(
         self,
         train_evaluator,

@@ -13,7 +13,7 @@ heuristic_issuing_policy_tags = [
     "oldest_compatible_match",
 ]
 
-base_tags = ["new_type_env", "simple_ga", "fit_rep"]
+base_tags = ["new_type_env", "simopt", "fit_rep"]
 
 
 def run_scenario_analysis(additional_args: List[str], tags: List[str]) -> None:
@@ -24,25 +24,13 @@ def run_scenario_analysis(additional_args: List[str], tags: List[str]) -> None:
             args = (
                 [
                     f"policies.issuing._target_={issuing_policy}",
-                    "+experiment=two_product_perishable/base_case_simple_ga_fit_rep_for_input_comparisons_heuristic_issuing",
+                    "+experiment=two_product_perishable/base_case_for_input_comparisons",
                 ]
                 + a
                 + [f"wandb.init.tags={tags+[ip_tag]}"]
             )
-            command = ["python", "run_evosax.py"] + args
+            command = ["python", "run_simopt.py"] + args
             subprocess.call(command)
-
-    ## Fit rep and issuing policies
-    for a in additional_args:
-        args = (
-            [
-                "+experiment=two_product_perishable/base_case_simple_ga_fit_both_for_input_comparisons",
-            ]
-            + a
-            + [f"wandb.init.tags={tags+['fit_issue']}"]
-        )
-        command = ["python", "run_evosax.py"] + args
-        subprocess.call(command)
 
 
 # Lead time

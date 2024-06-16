@@ -31,4 +31,4 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=simple_two_product_perishable/sweep_params_wastage_limit_sl_95
+  - +experiment=two_product_perishable/sweep_params_wastage_limit_sl_95

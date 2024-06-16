@@ -1,7 +1,7 @@
-program: ../sweep_evo_hps.py
+program: ../run_evosax.py
 method: bayes
 metric:
-  name: fitness_on_training
+  name: eval/top_1/return_mean
   goal: maximize
 parameters:
   evosax.strategy.sigma_init:
@@ -23,12 +23,12 @@ parameters:
       - 0.95
   evosax.init_params_abs_max:
     distribution: uniform
-    min: 0
-    max: 2
+    min: 0.0
+    max: 5.0
 
 command:
   - ${env}
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=two_product_perishable/sweep_params_wastage_limit_sl_75
+  - +experiment=eight_product_perishable/full_demand/fit_both/simple_ga_issue_pretrained_max_sub_wastage_alt_rula
