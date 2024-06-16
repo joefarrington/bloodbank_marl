@@ -6,8 +6,6 @@ import distrax
 from flax import struct
 from functools import partial
 
-
-from bloodbank_marl.scenarios.de_moor_perishable.jax_env import DeMoorPerishableMAJAX
 from bloodbank_marl.policies import replenishment, issuing, policy_manager, common
 from bloodbank_marl.utils.gymnax_wrappers import LogEnvState, LogWrapper, LogInfo
 
@@ -28,7 +26,7 @@ import hydra
 import omegaconf
 import wandb
 
-from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
+from bloodbank_marl.scenarios.single_product_perishable.marl_env import EnvObs
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt

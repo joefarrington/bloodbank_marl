@@ -2,7 +2,7 @@ defaults:
   - policies/replenishment: multi_agent_single_product_mlp
   - policies/issuing: multi_agent_single_product_mlp
   - evosax/strategy: simple_ga
-  - environment: de_moor_perishable
+  - environment: single_product_perishable_marl
   - _self_
 wandb:
   init:

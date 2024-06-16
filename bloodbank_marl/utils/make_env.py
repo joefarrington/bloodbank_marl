@@ -1,3 +1,4 @@
+"""
 from bloodbank_marl.scenarios.de_moor_perishable.gymnax_env import (
     DeMoorPerishableGymnax,
 )
@@ -136,6 +137,45 @@ def make(env_name, **env_kwargs):
         return (
             SimpleTwoProductPerishableIncIssueGymnax(**env_kwargs),
             SimpleTwoProductPerishableIncIssueGymnax().default_params,
+        )
+    else:
+        raise ValueError(f"Unknown environment '{env_name}'")
+"""
+
+from bloodbank_marl.scenarios.single_product_perishable.gymnax_env import (
+    SingleProductPerishableGymnaxEnv,
+)
+from bloodbank_marl.scenarios.single_product_perishable.marl_env import (
+    SingleProductPerishableMarlEnv,
+)
+from bloodbank_marl.scenarios.two_product_perishable.adapted_single_agent_env import (
+    TwoProductPerishableAdaptedEnv,
+)
+from bloodbank_marl.scenarios.eight_product_perishable.adapted_single_agent_env import (
+    EightProductPerishableAdaptedEnv,
+)
+
+
+def make(env_name, **env_kwargs):
+    if env_name == "SingleProductPerishableGymnax":
+        return (
+            SingleProductPerishableGymnaxEnv(**env_kwargs),
+            SingleProductPerishableGymnaxEnv().default_params,
+        )
+    elif env_name == "SingleProductPerishableMarl":
+        return (
+            SingleProductPerishableMarlEnv(**env_kwargs),
+            SingleProductPerishableMarlEnv().default_params,
+        )
+    elif env_name == "TwoProductPerishableAdapted":
+        return (
+            TwoProductPerishableAdaptedEnv(**env_kwargs),
+            TwoProductPerishableAdaptedEnv().default_params,
+        )
+    elif env_name == "EightProductPerishableAdapted":
+        return (
+            EightProductPerishableAdaptedEnv(**env_kwargs),
+            EightProductPerishableAdaptedEnv().default_params,
         )
     else:
         raise ValueError(f"Unknown environment '{env_name}'")

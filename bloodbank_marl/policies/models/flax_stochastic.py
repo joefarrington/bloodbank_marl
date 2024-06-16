@@ -1,7 +1,3 @@
-from bloodbank_marl.scenarios.meneses_perishable.jax_env import (
-    MenesesPerishableEnv,
-    EnvObs,
-)
 import jax
 import jax.numpy as jnp
 import flax.linen as nn

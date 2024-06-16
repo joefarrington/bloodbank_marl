@@ -1,0 +1,53 @@
+# @package _global_
+
+defaults:
+  - override /environment: eight_product_perishable_adapted
+  - override /policies/issuing: heuristic_oldest_compatible_match
+  - override /policies/replenishment: heuristic_order_up_to
+  - override /policies/load_issuing_policy_params: blank
+  - override /policies/load_replenishment_policy_params: blank
+
+wandb:
+  init:
+    project: "rs_eight_perishable_evaluation"
+    tags:
+      - "new_type_env"
+      - "simopt"
+      - "oldest_compatible_match"
+      - "full_demand"
+      - "alt_rula"
+
+environment:
+  env_params:
+    max_substitution_cost: 3250
+    age_on_arrival_distribution_probs:
+      - 0.5
+      - 0.2
+      - 0.3
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      # flowing-pyramid-2383
+      _target_: jax.numpy.array
+      object:
+      - [6]
+      - [18]
+      - [5]
+      - [14]
+      - [1]
+      - [3]
+      - [0]
+      - [3]
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0, 4, 2, -1, -1, -1, -1, -1] # O- patient
+        - [1, 0, 5, 4, 3, 2, -1, -1] # O+ patient
+        - [2, 6, 4, 0, 3, 7, -1, -1] # A- patient
+        - [3, 2, 7, 6, 5, 4, -1, -1] # A+ patient
+        - [4, 6, 2, 0, 5, 7, -1, -1] # B- patient
+        - [5,4, 7, 6, 3, 2, -1, -1] #B+ patient
+        - [6, 2, 4, 0, 7, 3, -1, -1] # AB- patient
+        - [7, 6, 3, 2, 5, 4, -1, -1] # AB+ patient

@@ -1,0 +1,70 @@
+# @package _global_
+
+defaults:
+ - override /environment: eight_product_perishable_adapted
+ - override /policies/replenishment: heuristic_order_up_to
+
+
+wandb:
+  init:
+    project: "rs_eight_perishable_eighth_demand"
+    tags:
+      - "new_type_env"
+      - "fit_issue"
+      - "simple_ga"
+      - "eighth_demand"
+      - "issue_pretrained"
+
+evosax:
+  strategy:
+    sigma_init: 0.07
+  evaluate_every_k_gens: 25
+
+environment:
+  env_kwargs:
+    max_order_quantity: 5
+  env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 650
+    age_on_arrival_distribution_probs:
+      - 0.5
+      - 0.2
+      - 0.3
+
+policies:
+  pretrained:
+    issuing:
+      enable: True
+      latest_checkpoint: True
+      checkpoint_dir: /home/joefarrington/CDT/bloodbank_marl/model_cpts/rs_eight_product_perishable/pretrained_issuing/eighth_demand/issue_oldest_compatible_match_max_sub_wastage_alt_rula/checkpoints
+      checkpoint_manager:
+        _target_: orbax.checkpoint.CheckpointManager
+        directory: ${policies.pretrained.issuing.checkpoint_dir}
+        checkpointers:
+          _target_: orbax.checkpoint.PyTreeCheckpointer
+        options:
+          _target_: orbax.checkpoint.CheckpointManagerOptions
+          max_to_keep: 1
+          create: True
+  optimize:
+    - 1
+  replenishment:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      # O-, O+, A-, A+, B-, B+, AB-, AB+
+      object: 
+      - [1]
+      - [0]
+      - [2]
+      - [2]
+      - [0]
+      - [2]
+      - [0]
+      - [0]

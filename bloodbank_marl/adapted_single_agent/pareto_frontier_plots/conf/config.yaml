@@ -1,0 +1,41 @@
+defaults:
+  - heuristic_policies/replenishment: heuristic_order_up_to
+  - heuristic_policies/issuing: heuristic_priority_match
+  - policies/replenishment: single_agent_multi_product_mlp
+  - policies/issuing: single_agent_multi_product_mlp
+  - param_search: grid
+  - environment: two_product_perishable_adapted
+  - _self_
+
+wandb:
+  init:
+    project: "simple_two_product_pareto_frontier_plots"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+heuristic_policies:
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0,-1]
+        - [1,0] 
+
+evaluation: 
+  seed: 10191
+  record_overall_metrics_per_eval_rollout: True
+  test_evaluator:
+    _target_: bloodbank_marl.utils.adapted_single_agent_fitness.AdaptedSingleAgentFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 10000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}

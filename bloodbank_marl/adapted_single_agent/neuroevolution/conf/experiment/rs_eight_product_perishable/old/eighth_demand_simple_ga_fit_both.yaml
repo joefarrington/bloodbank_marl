@@ -1,0 +1,45 @@
+# @package _global_
+
+defaults:
+ - override /environment: eight_product_perishable_adapted
+
+wandb:
+  init:
+    project: "rs_eight_perishable_base"
+    tags:
+      - "new_type_env"
+      - "fit_both"
+      - "simple_ga"
+
+evosax:
+  strategy:
+    sigma_init: 0.07
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+environment:
+  env_kwargs:
+    max_order_quantity: 5
+  env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 3250
+
+policies:
+  optimize:
+    - 0
+    - 1
+  replenishment:
+    model_kwargs:
+      n_hidden: [128, 128]
+  issuing:
+    model_kwargs:
+      n_hidden: [128, 128]

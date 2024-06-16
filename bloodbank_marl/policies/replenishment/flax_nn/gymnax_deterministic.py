@@ -6,13 +6,6 @@ from typing import Dict, Optional, Any, List
 from bloodbank_marl.utils.make_env import make
 from bloodbank_marl.utils.yaml import from_yaml, to_yaml
 from bloodbank_marl.environments.marl_environment import MarlEnvironment
-from bloodbank_marl.scenarios.meneses_perishable.jax_env import (
-    MenesesPerishableEnv,
-    EnvObs,
-    EnvParams,
-    EnvInfo,
-    EnvState,
-)
 import numpy as np
 import pandas as pd
 from bloodbank_marl.policies.common import FlaxPolicy

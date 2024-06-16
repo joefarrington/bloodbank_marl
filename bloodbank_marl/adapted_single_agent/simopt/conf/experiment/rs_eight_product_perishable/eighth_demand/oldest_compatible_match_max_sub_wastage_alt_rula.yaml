@@ -1,0 +1,46 @@
+# @package _global_
+
+defaults:
+  - override /environment: eight_product_perishable_adapted
+  - override /policies/issuing: heuristic_oldest_compatible_match
+  - override /param_search: nsgaii
+  - override /policies/issuing/fixed_policy_params: eight_product_platelet
+
+wandb:
+  init:
+    project: "rs_eight_perishable_base"
+    tags:
+      - "new_type_env"
+      - "fit_rep"
+      - "simopt"
+      - "oldest_compatible_match"
+      - "eighth_demand"
+      - "alt_rula"
+
+param_search:
+  num_rollouts: 400
+  search_bounds:
+    all_params:
+      low: 0
+      high: 15
+  max_parallel_trials: 150
+
+evaluation:
+  test_evaluator:
+    num_rollouts: 1000
+
+environment:
+  env_params:
+    poisson_demand_mean:
+      - 4.7 # Mon
+      - 4.7 # Tue
+      - 4.9 # Wed
+      - 4.7 # Thu
+      - 5.1 # Fri
+      - 3.4 # Sat
+      - 3.6 # Sun
+    max_substitution_cost: 650
+    age_on_arrival_distribution_probs:
+      - 0.5
+      - 0.2
+      - 0.3

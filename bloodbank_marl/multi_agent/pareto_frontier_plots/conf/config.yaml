@@ -4,7 +4,7 @@ defaults:
   - policies/replenishment: multi_agent_single_product_mlp
   - policies/issuing: multi_agent_single_product_mlp
   - param_search: grid
-  - environment: de_moor_perishable
+  - environment: single_product_perishable_marl
   - _self_
 
 wandb:

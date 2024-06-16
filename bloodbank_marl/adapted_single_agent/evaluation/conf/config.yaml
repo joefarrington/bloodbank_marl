@@ -1,0 +1,35 @@
+defaults:
+  - environment: two_product_perishable_adapted
+  - policies/replenishment:  single_agent_multi_product_order_up_to_mlp
+  - policies/issuing: single_agent_multi_product_mlp
+  - policies/load_replenishment_policy_params: flax_nn
+  - policies/load_issuing_policy_params: flax_nn
+  - _self_
+
+wandb:
+  init:
+    project: "simple_two_product_evaluation"
+    tags:
+      - "evaluation"
+      - "new_type_env"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+evaluation:
+  seed: 24601
+  record_overall_metrics_per_eval_rollout: True
+  test_evaluator:
+    _target_: bloodbank_marl.utils.adapted_single_agent_fitness.AdaptedSingleAgentFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 10000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}

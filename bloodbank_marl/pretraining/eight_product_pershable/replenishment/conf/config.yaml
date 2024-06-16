@@ -1,0 +1,76 @@
+defaults:
+  - heuristic_policy: order_up_to
+  - policies/issuing: heuristic_priority_match
+  - policies/issuing/fixed_policy_params:
+  - policies/replenishment: single_agent_multi_product_mlp
+  - environment: eight_product_perishable_adapted
+  - _self_
+
+wandb:
+  init:
+    project: "pretraining"
+
+hydra:
+  job:
+    chdir: True
+  searchpath:
+    - pkg://bloodbank_marl.common_config
+
+seed: 12
+
+obs_collection:
+  seed: 12345
+  num_envs: 20
+  samples_per_env: 700
+  policy:
+    _target_: bloodbank_marl.policies.replenishment.heuristic.SRepPolicyExplore
+    env_name: ${environment.env_name}
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    epsilon: 0.05
+
+pretraining:
+  num_epochs: 20
+  batch_size: 64
+  preprocess_observations:
+    _target_: bloodbank_marl.utils.pretraining.get_obs
+  preprocess_labels: 
+    _target_: bloodbank_marl.utils.pretraining.transform_integer_target
+    max_order_quantity: ${environment.env_kwargs.max_order_quantity}
+    min_order_quantity: 0
+    clip_max: ${policies.replenishment.clip_max}
+    clip_min: ${policies.replenishment.clip_min}
+  optimizer:
+    _target_: optax.adam
+    learning_rate: 0.005
+  nn_model:
+    _target_: bloodbank_marl.policies.models.flax_deterministic.RepMultiProductMLP
+    n_hidden: ${policies.replenishment.model_kwargs.n_hidden}
+    preprocess_observation:
+      _target_: hydra.utils.get_method
+      path: bloodbank_marl.utils.pretraining.passthrough
+
+checkpoint_manager:
+  _target_: orbax.checkpoint.CheckpointManager
+  directory: "checkpoints"
+  checkpointers:
+    _target_: orbax.checkpoint.PyTreeCheckpointer
+  options:
+    _target_: orbax.checkpoint.CheckpointManagerOptions
+    max_to_keep: 1
+    create: True
+
+evaluation: 
+  seed: 67
+  eval_freq: 5
+  test_evaluator:
+    _target_: bloodbank_marl.utils.adapted_single_agent_fitness.AdaptedSingleAgentFitness
+    env_name: ${environment.env_name}
+    num_env_steps: ${environment.num_env_steps}
+    num_rollouts: 1000
+    env_kwargs: ${environment.env_kwargs}
+    env_params: ${environment.env_params}
+    test: True
+    n_devices:
+    num_warmup_days: ${environment.num_warmup_days}
+    gamma: ${environment.gamma}

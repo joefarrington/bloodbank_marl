@@ -1,0 +1,45 @@
+# @package _global_
+
+defaults:
+ - override /environment: eight_product_perishable_adapted
+ - override /policies/issuing: heuristic_priority_match
+
+wandb:
+  init:
+    project: "rs_eight_perishable_base"
+    tags:
+      - "new_type_env"
+      - "priority_match"
+      - "fit_rep"
+      - "simple_ga"
+
+evosax:
+  strategy:
+    sigma_init: 0.07
+
+train_evaluator:
+  num_env_steps: 90
+  num_warmup_days: 30
+
+environment:
+  env_kwargs:
+    max_order_quantity: 25
+
+policies:
+  optimize:
+    - 0
+  replenishment:
+    model_kwargs:
+      n_hidden: [128,128,128]
+  issuing:
+    fixed_policy_params:
+      _target_: jax.numpy.array
+      object:
+        - [0, 4, 2, -1, -1, -1, -1, -1] # O- patient
+        - [1, 0, 5, 4, 3, 2, -1, -1] # O+ patient
+        - [2, 6, 4, 0, 3, 7, -1, -1] # A- patient
+        - [3, 2, 7, 6, 5, 4, -1, -1] # A+ patient
+        - [4, 6, 2, 0, 5, 7, -1, -1] # B- patient
+        - [5,4, 7, 6, 3, 2, -1, -1] #B+ patient
+        - [6, 2, 4, 0, 7, 3, -1, -1] # AB- patient
+        - [7, 6, 3, 2, 5, 4, -1, -1] # AB+ patient

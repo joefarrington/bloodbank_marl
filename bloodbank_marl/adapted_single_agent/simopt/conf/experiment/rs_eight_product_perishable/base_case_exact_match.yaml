@@ -1,0 +1,25 @@
+# @package _global_
+
+defaults:
+  - override /environment: eight_product_perishable_adapted
+  - override /policies/issuing: heuristic_exact_match
+  - override /param_search: nsgaii
+
+wandb:
+  init:
+    project: "rs_eight_perishable_base"
+    tags:
+      - "new_type_env"
+      - "fit_rep"
+      - "simopt"
+      - "exact_match"
+
+param_search:
+  num_rollouts: 400
+  search_bounds:
+    all_params:
+      low: 0
+      high: 50
+
+evaluation:
+  num_rollouts: 1000

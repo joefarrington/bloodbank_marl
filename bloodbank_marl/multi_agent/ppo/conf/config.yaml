@@ -1,5 +1,5 @@
 defaults:
-  - environment: de_moor_perishable
+  - environment: single_product_perishable_marl
   - policies/replenishment: multi_agent_stochastic_single_product_order_up_to_mlp
   - policies/issuing: multi_agent_stochastic_single_product_mlp
   - _self_

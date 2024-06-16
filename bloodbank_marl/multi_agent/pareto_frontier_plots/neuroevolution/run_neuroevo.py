@@ -15,7 +15,7 @@ from bloodbank_marl.policies.common import HeuristicPolicy
 from bloodbank_marl.utils.single_agent_gymnax_fitness import GymnaxFitness
 import logging
 import jax.numpy as jnp
-from bloodbank_marl.single_agent_replenishment.simopt.run_simopt import (
+from bloodbank_marl.utils.simopt import (
     param_search_bounds_from_config,
     grid_search_space_from_config,
 )

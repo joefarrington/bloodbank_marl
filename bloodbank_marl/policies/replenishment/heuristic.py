@@ -54,73 +54,34 @@ class SRepPolicy(HeuristicPolicy):
         """Get the row names for the policy parameters - these are the names of the different levels of a
         given paramter, e.g. for different days of the week or different products"""
         if self.env_name in [
-            "MenesesPerishable",
-            "MenesesPerishableGymnax",
-            "RSPerishable",
-            "RSPerishableGymnax",
-            "RSPerishableIncIssueGymnax",
+            "EightProductPerishableAdapted",
         ]:
-            return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
+            return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]  # Blood types
         elif self.env_name in [
-            "RSPerishableFourGymnax",
-            "RSPerishableFourIncIssueGymnax",
+            "TwoProductPerishableAdapted",
         ]:
-            return ["O", "A", "B", "AB"]
-        elif self.env_name in ["RSPerishableTwoGymnax", "RSPerishable"]:
-            return ["RhD-", "RhD+"]
-        elif self.env_name in [
-            "SimpleTwoProductPerishableGymnax",
-            "SimpleTwoProductPerishable",
-            "SimpleTwoProductPerishableLimitDemand",
-            "SimpleTwoProductPerishableLimitDemandGymnax",
-            "SimpleTwoProductPerishableIncIssueGymnax",
-        ]:
-            return ["A", "B"]  # Temporary names, NOT blood groups
+            return ["A", "B"]  # NOT blood types, arbitrary products
         else:
             return []
 
     def _get_apply_method(self) -> callable:
         """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name in ["DeMoorPerishable"]:
-            return de_moor_perishable_S_policy
-        elif self.env_name in ["DeMoorPerishableGymnax"]:
-            return de_moor_perishable_gymnax_S_policy
-        elif self.env_name in ["MenesesPerishable", "MenesesPerishableGymnax"]:
-            return meneses_perishable_S_policy
+        if self.env_name in ["SingleProductPerishableMarl"]:
+            return single_product_marl_S_policy
+        elif self.env_name in ["SingleProductPerishableGymnax"]:
+            return single_product_gymnax_S_policy
         elif self.env_name in [
-            "RSPerishable",
-            "RSPerishableTwo",
-            "RSPerishableGymnax",
-            "RSPerishableFourGymnax",
-            "RSPerishableTwoGymnax",
-            "RSPerishableOneGymnax",
-            "SimpleTwoProductPerishableGymnax",
-            "SimpleTwoProductPerishable",
-            "SimpleTwoProductPerishableLimitDemand",
-            "SimpleTwoProductPerishableLimitDemandGymnax",
-            "SimpleTwoProductPerishableIncIssueGymnax",
-            "RSPerishableIncIssueGymnax",
-            "RSPerishableFourIncIssueGymnax",
+            "TwoProductPerishableAdapted",
+            "EightProductPerishableAdapted",
         ]:
-            return rs_perishable_S_policy
+            return multiproduct_S_policy
         else:
             raise NotImplementedError(
                 f"No (S) policy defined for Environment ID {self.env_name}"
             )
 
 
-def meneses_perishable_S_policy(policy_params, obs, rng):
-    """S policy for scenario based on Meneses et al 2021"""
-    stock_on_hand_and_in_transit = obs.stock.sum(
-        axis=-1, keepdims=True
-    ) + obs.in_transit.sum(axis=-1, keepdims=True)
-    # Clip because we can't have a negative order
-    # Squeeze because action should be a 1D array
-    return jnp.clip((policy_params - stock_on_hand_and_in_transit), a_min=0).squeeze()
-
-
-# NOTE: We probably want to version of this with params per weekday
-def rs_perishable_S_policy(policy_params, obs, rng):
+def multiproduct_S_policy(policy_params, obs, rng):
     """S policy for scenario based on R&S, but with added blood groups"""
     stock_on_hand_and_in_transit = obs.stock.sum(
         axis=-1, keepdims=True
@@ -130,14 +91,14 @@ def rs_perishable_S_policy(policy_params, obs, rng):
     return jnp.clip((policy_params - stock_on_hand_and_in_transit), a_min=0).squeeze()
 
 
-def de_moor_perishable_gymnax_S_policy(policy_params, obs, rng):
+def single_product_gymnax_S_policy(policy_params, obs, rng):
     """(S) policy for DeMoorPerishable environment"""
     # policy_params = [[S]]
     stock_on_hand_and_in_transit = obs.stock.sum() + obs.in_transit.sum()
     return jnp.clip((policy_params[0, 0] - stock_on_hand_and_in_transit), a_min=0)
 
 
-def de_moor_perishable_S_policy(policy_params, obs, rng):
+def single_product_marl_S_policy(policy_params, obs, rng):
     """(S) policy for DeMoorPerishable environment"""
     # policy_params = {0:[[S]], 1:?}, assume we're using 0 for issuing
     stock_on_hand_and_in_transit = obs.stock.sum() + obs.in_transit.sum()
@@ -254,190 +215,6 @@ class SRepPolicyExploreMA(SRepPolicyExplore):
         return action.astype(jnp.int32)
 
 
-class sSRepPolicy(SRepPolicy):
-    # (s,S) policy with a pair of parameters for each product
-
-    def _get_param_col_names(self) -> List[str]:
-        """Get the column names for the policy parameters - these are the different types
-        of parameters e.g. target stock level or reorder point"""
-        return ["s", "S"]
-
-    def _get_param_row_names(self) -> List[str]:
-        """Get the row names for the policy parameters - these are the names of the different levels of a
-        given paramter, e.g. for different days of the week or different products"""
-        if self.env_name in [
-            "RSPerishableGymnax",
-            "RSPerishable",
-            "RSPerishableIncIssueGymnax",
-        ]:
-            return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
-        elif self.env_name in [
-            "RSPerishableFourGymnax",
-            "RSPerishableFourIncIssueGymnax",
-        ]:
-            return ["O", "A", "B", "AB"]
-        elif self.env_name in ["RSPerishableTwo", "RSPerishableTwoGymnax"]:
-            return ["RhD-", "RhD+"]
-        else:
-            return []
-
-    def _get_apply_method(self) -> callable:
-        """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name in [
-            "RSPerishableGymnax",
-            "RSPerishableIncIssueGymnax",
-            "RSPerishableFourIncIssueGymnax",
-            "RSPerishable",
-        ]:
-            return rs_perishable_sS_policy
-        else:
-            raise NotImplementedError(
-                f"No (s,S) policy defined for Environment ID {self.env_name}"
-            )
-
-
-def rs_perishable_sS_policy(policy_params, obs, rng):
-    """S policy for scenario based on R&S, but with added blood groups"""
-    stock_on_hand_and_in_transit = obs.stock.sum(
-        axis=-1, keepdims=True
-    ) + obs.in_transit.sum(axis=-1, keepdims=True)
-    # Clip because we can't have a negative order
-    # Squeeze because action should be a 1D array
-    order = jnp.clip(
-        jnp.where(
-            stock_on_hand_and_in_transit <= policy_params[:, 0].reshape(-1, 1),
-            (policy_params[:, 1].reshape(-1, 1) - stock_on_hand_and_in_transit),
-            0,
-        ),
-        a_min=0,
-    ).squeeze()
-    # To enforce that s<S, order nothing if any s >= S.
-    return jax.lax.select(
-        jnp.all(policy_params[:, 0] < policy_params[:, 1]),
-        order,
-        jnp.zeros_like(order),
-    )
-
-
-class SDayOfWeekRepPolicy(SRepPolicy):
-    # S policy with a pair of parameters for each product for each day of week
-
-    def _get_param_col_names(self) -> List[str]:
-        """Get the column names for the policy parameters - these are the different types
-        of parameters e.g. target stock level or reorder point"""
-        return [f"S_{w}" for w in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
-
-    def _get_param_row_names(self) -> List[str]:
-        """Get the row names for the policy parameters - these are the names of the different levels of a
-        given paramter, e.g. for different days of the week or different products"""
-        if self.env_name in [
-            "RSPerishable",
-            "RSPerishableGymnax",
-            "RSPerishableIncIssueGymnax",
-        ]:
-            return ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"]
-        elif self.env_name in [
-            "RSPerishableFourGymnax",
-            "RSPerishableFourIncIssueGymnax",
-        ]:
-            return ["O", "A", "B", "AB"]
-        elif self.env_name in ["RSPerishableTwo", "RSPerishableTwoGymnax"]:
-            return ["RhD-", "RhD+"]
-        elif self.env_name == "RSPerishableOneGymnax":
-            return ["Plt"]
-        else:
-            return []
-
-    def _get_apply_method(self) -> callable:
-        """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name in [
-            "RSPerishableGymnax",
-            "RSPerishableFourGymnax",
-            "RSPerishableTwoGymnax",
-            "RSPerishableOneGymnax",
-            "RSPerishable",
-            "RSPerishableIncIssueGymnax",
-        ]:
-            return rs_perishable_S_day_of_week_policy
-        else:
-            raise NotImplementedError(
-                f"No (S) day of week policy defined for Environment ID {self.env_name}"
-            )
-
-
-def rs_perishable_S_day_of_week_policy(policy_params, obs, rng):
-    """S policy for scenario based on R&S, but with added blood groups"""
-    stock_on_hand_and_in_transit = obs.stock.sum(
-        axis=-1, keepdims=True
-    ) + obs.in_transit.sum(axis=-1, keepdims=True)
-    S = policy_params[:, obs.weekday].reshape(-1, 1)
-    return jnp.clip(S - stock_on_hand_and_in_transit, a_min=0).squeeze()
-
-
-class sSDayOfWeekRepPolicy(SRepPolicy):
-    # S policy with a pair of parameters for each product for each day of week
-
-    def _get_param_col_names(self) -> List[str]:
-        """Get the column names for the policy parameters - these are the different types
-        of parameters e.g. target stock level or reorder point"""
-        return ["s", "S"]
-
-    def _get_param_row_names(self) -> List[str]:
-        """Get the row names for the policy parameters - these are the names of the different levels of a
-        given paramter, e.g. for different days of the week or different products"""
-        if self.env_name in [
-            "RSPerishableOneGymnax",
-            "MirjaliliPerishablePlateletGymnax",
-        ]:
-            return [f"S_{w}" for w in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
-        else:
-            return []
-
-    def _get_apply_method(self) -> callable:
-        """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name == "RSPerishableOneGymnax":
-            return rs_perishable_sS_day_of_week_policy
-        elif self.env_name == "MirjaliliPerishablePlateletGymnax":
-            return mirjalili_perishable_sS_day_of_week_policy
-        else:
-            raise NotImplementedError(
-                f"No (S) day of week policy defined for Environment ID {self.env_name}"
-            )
-
-
-def rs_perishable_sS_day_of_week_policy(policy_params, obs, rng):
-    """sS policy for scenario based on R&S, with single product and weekdays"""
-    stock_on_hand_and_in_transit = obs.stock.sum(
-        axis=-1, keepdims=True
-    ) + obs.in_transit.sum(axis=-1, keepdims=True)
-    S = policy_params[obs.weekday, 1]
-    s = policy_params[obs.weekday, 0]
-    order = jnp.clip(
-        jnp.where(
-            stock_on_hand_and_in_transit <= s, S - stock_on_hand_and_in_transit, 0
-        ).squeeze(),
-        a_min=0,
-    )
-    return jax.lax.select(
-        jnp.all(policy_params[:, 0] < policy_params[:, 1]), order, jnp.zeros_like(order)
-    )
-
-
-def mirjalili_perishable_sS_day_of_week_policy(policy_params, obs, rng):
-    stock_on_hand_and_in_transit = obs.stock.sum(axis=-1, keepdims=True)
-    S = policy_params[obs.weekday, 1]
-    s = policy_params[obs.weekday, 0]
-    order = jnp.clip(
-        jnp.where(
-            stock_on_hand_and_in_transit <= s, S - stock_on_hand_and_in_transit, 0
-        ).squeeze(),
-        a_min=0,
-    )
-    return jax.lax.select(
-        jnp.all(policy_params[:, 0] < policy_params[:, 1]), order, jnp.zeros_like(order)
-    )
-
-
 # We just use this to generate labels for pretraining when we want to pretrain an order-up-to-network
 class SRepLabellingPolicy(SRepPolicy):
     def _get_param_row_names(self) -> List[str]:
@@ -447,29 +224,29 @@ class SRepLabellingPolicy(SRepPolicy):
 
     def _get_apply_method(self) -> callable:
         """Get the forward method for the policy - this is the function that returns the action"""
-        if self.env_name in ["DeMoorPerishable", "DeMoorPerishableGymnax"]:
-            return de_moor_perishable_S_labelling_policy
-        elif self.env_name in [
-            "RSPerishable",
-            "RSPerishableGymnax",
-            "RSPerishableIncIssueGymnax",
-            "RSPerishableFourIncIssueGymnax",
+        if self.env_name in [
+            "SingleProductPerishableMarl",
+            "SingleProductPerishableGymnax",
         ]:
-            return rs_perishable_S_labelling_policy
+            return single_product_S_labelling_policy
+        elif self.env_name in [
+            "EightProductPerishableAdapted",
+        ]:
+            return multi_product_S_labelling_policy
         else:
             raise NotImplementedError(
                 f"No (S) labelling policy defined for Environment ID {self.env_name}"
             )
 
 
-def de_moor_perishable_S_labelling_policy(policy_params, obs, rng):
-    """(S) policy for DeMoorPerishable environment"""
+def single_product_S_labelling_policy(policy_params, obs, rng):
+    """(S) policy for SingleProductPerishable environments"""
     # policy_params = [[S]]
     return policy_params[0, 0]
 
 
-def rs_perishable_S_labelling_policy(policy_params, obs, rng):
-    """(S) policy for RSPerishable environment"""
+def multi_product_S_labelling_policy(policy_params, obs, rng):
+    """(S) policy for EightProductPerishable environment"""
     x = obs.stock.sum(axis=-1, keepdims=True) + obs.in_transit.sum(
         axis=-1, keepdims=True
     )

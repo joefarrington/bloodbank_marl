@@ -1,7 +1,3 @@
-from bloodbank_marl.scenarios.meneses_perishable.jax_env import (
-    MenesesPerishableEnv,
-    EnvObs,
-)
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
@@ -11,7 +7,7 @@ import numpy as np
 import chex
 from flax import struct
 from bloodbank_marl.utils.make_env import make
-from bloodbank_marl.scenarios.de_moor_perishable.jax_env import EnvObs
+from bloodbank_marl.scenarios.single_product_perishable.marl_env import EnvObs
 from bloodbank_marl.policies.common import FlaxStochasticMAPolicy, FlaxPolicy
 
 
