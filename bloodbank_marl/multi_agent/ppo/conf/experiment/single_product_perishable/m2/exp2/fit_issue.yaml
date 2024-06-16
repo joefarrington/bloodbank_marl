@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - override /policies/replenishment: value_iteration
+
+wandb:
+  init:
+    project: "de_moor_m2_exp2"
+    tags:
+      - "fit_issue"
+
+plot_policy: True
+
+training:
+  replenishment:
+    train: False
+
+policies:
+  replenishment:
+    fixed_policy_params:
+      _target_: bloodbank_marl.utils.load_save_policy_params.load_vi_policy_params
+      filepath: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/single_product_perishable/value_iteration_replenishment/m2_exp2.npy"
+      reshape_for_fitness: False
+

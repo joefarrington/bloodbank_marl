@@ -97,4 +97,4 @@ command:
   - ${interpreter}
   - ${program}
   - ${args_no_hyphens}
-  - +experiment=de_moor_perishable/m5_exp2
+  - +experiment=single_product_perishable/m5_exp2

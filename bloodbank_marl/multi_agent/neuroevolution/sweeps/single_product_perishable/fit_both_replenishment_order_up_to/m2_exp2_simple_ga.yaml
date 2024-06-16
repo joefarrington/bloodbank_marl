@@ -1,0 +1,30 @@
+program: ../run_evosax.py
+method: bayes
+metric:
+  name: eval/mean_params/return_mean
+  goal: maximize
+parameters:
+  evosax.strategy.sigma_init:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  evosax.strategy.elite_ratio:
+    distribution: q_uniform
+    min: 0.05
+    max: 0.6
+    q: 0.05
+  evosax.strategy.sigma_decay:
+    distribution: categorical
+    values:
+      - 1.0
+      - 0.999
+      - 0.995
+      - 0.99
+      - 0.95
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
+  - +experiment=single_product_perishable/m2/exp2/simple_ga_fit_both_replenishment_order_up_to

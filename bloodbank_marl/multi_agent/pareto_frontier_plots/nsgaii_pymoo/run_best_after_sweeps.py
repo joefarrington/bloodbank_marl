@@ -19,7 +19,7 @@ args = [
     "pymoo.algorithm.crossover.prob=0.9120554679475432",
     "pymoo.algorithm.mutation.sigma=0.03142191920494161",
     "pymoo.problem.xu=0.0254680086333281",
-    "+experiment=de_moor_perishable/m2/exp2/nsgaii_fit_both",
+    "+experiment=single_product_perishable/m2/exp2/nsgaii_fit_both",
 ]
 args = args + eval_args
 subprocess.call(basic_command + args)
@@ -31,7 +31,7 @@ args = [
     "pymoo.algorithm.crossover.prob=0.316139736464111",
     "pymoo.algorithm.mutation.sigma=0.1278544800008214",
     "pymoo.problem.xu=0.22873235988584265 ",
-    "+experiment=de_moor_perishable/m2/exp6/nsgaii_fit_both",
+    "+experiment=single_product_perishable/m2/exp6/nsgaii_fit_both",
 ]
 args = args + eval_args
 subprocess.call(basic_command + args)
@@ -43,7 +43,7 @@ args = [
     "pymoo.algorithm.crossover.prob=0.9765376699178122",
     "pymoo.algorithm.mutation.sigma=0.4789623467706654",
     "pymoo.problem.xu=0.6394452080807933",
-    "+experiment=de_moor_perishable/m5/exp2/nsgaii_fit_both",
+    "+experiment=single_product_perishable/m5/exp2/nsgaii_fit_both",
 ]
 args = args + eval_args
 subprocess.call(basic_command + args)
@@ -55,7 +55,7 @@ args = [
     "pymoo.algorithm.crossover.prob=0.29227397079952533",
     "pymoo.algorithm.mutation.sigma=0.17130810212777997",
     "pymoo.problem.xu=0.030461018956530195",
-    "+experiment=de_moor_perishable/m5/exp6/nsgaii_fit_both",
+    "+experiment=single_product_perishable/m5/exp6/nsgaii_fit_both",
 ]
 args = args + eval_args
 subprocess.call(basic_command + args)

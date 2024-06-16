@@ -1,0 +1,32 @@
+# @package _global_
+
+defaults:
+  - override /policies/issuing: multi_agent_single_product_mlp
+  - override /policies/replenishment: multi_agent_single_product_mlp
+
+wandb:
+  init:
+    project: "de_moor_perishable_evaluation"
+    tags:
+      - "fit_both"
+      - "m5_exp6"
+      - "simple_ga"
+      - "direct_action"
+      - "pretrained"
+
+environment:
+  env_kwargs:
+    max_useful_life: 5
+    lead_time: 2
+
+policies:
+  load_replenishment_policy_params:
+    param_key: rep_best_params
+    latest_checkpoint: True
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/single_product_perishable/fit_both_from_pretrained_replenishment_direct_action/m5/exp6/simple_ga"
+  load_issuing_policy_params:
+    param_key: issue_best_params
+    latest_checkpoint: True
+    checkpoint_manager:
+      directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/single_product_perishable/fit_both_from_pretrained_replenishment_direct_action/m5/exp6/simple_ga"
