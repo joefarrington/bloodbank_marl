@@ -191,6 +191,23 @@ class SRepPolicyExplore(SRepPolicy):
 class SRepPolicyExploreMA(SRepPolicyExplore):
     # For Multiagent evironment, using when collecting issuing observations
 
+    def _get_apply_method(self) -> callable:
+        """Get the forward method for the policy - this is the function that returns the action"""
+        if self.env_name in ["SingleProductPerishableMarl"]:
+            return single_product_marl_S_policy
+        elif self.env_name in ["SingleProductPerishableGymnax"]:
+            return single_product_gymnax_S_policy
+        elif self.env_name in [
+            "TwoProductPerishableAdapted",
+            "EightProductPerishableAdapted",
+            "EightProductPerishableMarl",
+        ]:
+            return multiproduct_S_policy
+        else:
+            raise NotImplementedError(
+                f"No (S) policy defined for Environment ID {self.env_name}"
+            )
+
     def apply_with_exploration_noise(self, policy_params, obs, rng):
         """Apply the policy to the observation, adding noise to the action"""
         rng, _rng = jax.random.split(rng)

@@ -22,9 +22,7 @@ from bloodbank_marl.utils.pretraining import (
     collate_fn_pytree,
     collate_fn_single_label,
     collate_fn_multi_label,
-    get_obs_de_moor_perishable,
-    get_obs_rs_multiproduct,
-    get_obs_rs_multiproduct_issuing,
+    get_obs_multiproduct_issuing,
 )
 from bloodbank_marl.utils.make_env import make
 from pathlib import Path
@@ -177,7 +175,7 @@ def main(cfg):
     wandb.log(log_to_wandb)
 
     # Get the observations for pretraining
-    all_obs = get_obs_rs_multiproduct_issuing(cfg)
+    all_obs = get_obs_multiproduct_issuing(cfg)
 
     # Label the obervations
     rng, _rng = jax.random.split(rng)

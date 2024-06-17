@@ -32,7 +32,7 @@ from bloodbank_marl.utils.pretraining import (
     collate_fn_single_label,
     collate_fn_multi_label,
     ordinal_categorical_cross_entropy_with_integer_labels,
-    get_obs_de_moor_perishable,
+    get_obs_single_product_perishable,
 )
 from bloodbank_marl.utils.make_env import make
 from pathlib import Path
@@ -155,7 +155,7 @@ def main(cfg):
     wandb.log(log_to_wandb)
 
     # Get the observations for pretraining
-    all_obs = get_obs_de_moor_perishable(cfg)
+    all_obs = get_obs_single_product_perishable(cfg)
 
     # Label the obervations
     # By default labelling policy == heuristic policy, but we can change this, for example

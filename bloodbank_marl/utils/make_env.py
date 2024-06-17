@@ -151,6 +151,9 @@ from bloodbank_marl.scenarios.single_product_perishable.marl_env import (
 from bloodbank_marl.scenarios.two_product_perishable.adapted_single_agent_env import (
     TwoProductPerishableAdaptedEnv,
 )
+from bloodbank_marl.scenarios.eight_product_perishable.marl_env import (
+    EightProductPerishableMarlEnv,
+)
 from bloodbank_marl.scenarios.eight_product_perishable.adapted_single_agent_env import (
     EightProductPerishableAdaptedEnv,
 )
@@ -171,6 +174,11 @@ def make(env_name, **env_kwargs):
         return (
             TwoProductPerishableAdaptedEnv(**env_kwargs),
             TwoProductPerishableAdaptedEnv().default_params,
+        )
+    elif env_name == "EightProductPerishableMarl":
+        return (
+            EightProductPerishableMarlEnv(**env_kwargs),
+            EightProductPerishableMarlEnv().default_params,
         )
     elif env_name == "EightProductPerishableAdapted":
         return (

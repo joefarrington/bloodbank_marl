@@ -1,10 +1,12 @@
 import jax
 import jax.numpy as jnp
 import torch
-from bloodbank_marl.scenarios.de_moor_perishable.gymnax_env import (
-    EnvObs as DeMoorEnvObs,
+from bloodbank_marl.scenarios.single_product_perishable.gymnax_env import (
+    EnvObs as GymnaxEnvObs,
 )
-from bloodbank_marl.scenarios.rs_perishable.gymnax_env import EnvObs as RSEnvObs
+from bloodbank_marl.scenarios.eight_product_perishable.marl_env import (
+    EnvObs as MarlEnvObs,
+)
 from bloodbank_marl.utils.make_env import make
 import itertools
 import chex
@@ -102,15 +104,15 @@ def ordinal_categorical_cross_entropy_with_integer_labels(
     return (1 + weighting) * ce_loss
 
 
-def get_obs_de_moor_perishable(cfg):
-    """Function to get states for pretraining for DeMoor perishable scenario. Function will calculate
+def get_obs_single_product_perishable(cfg):
+    """Function to get states for pretraining for single product perishable scenario. Function will calculate
     all possible states, and then filter out any with stock in transit and on hand greater than `stock_limit`
     if `stock_limit` is provided.
     """
     env_kwargs = cfg.environment.env_kwargs
     env_params = cfg.environment.env_params
     stock_limit = cfg.pretraining.stock_limit
-    env, default_env_params = make("DeMoorPerishableGymnax", **env_kwargs)
+    env, default_env_params = make("SingleProductPerishableGymnax", **env_kwargs)
     env_params = default_env_params.create_env_params(**env_params)
     max_order_quantity = env.max_order_quantity
     lead_time = env.lead_time
@@ -128,7 +130,7 @@ def get_obs_de_moor_perishable(cfg):
         filtered_state_tuples = state_tuples
 
     action_mask = jnp.ones((len(state_tuples), max_order_quantity + 1), dtype=jnp.int32)
-    all_obs = DeMoorEnvObs(
+    all_obs = GymnaxEnvObs(
         stock=state_tuples[:, lead_time - 1 :],
         action_mask=action_mask,
         in_transit=state_tuples[:, : lead_time - 1],
@@ -136,7 +138,7 @@ def get_obs_de_moor_perishable(cfg):
     action_mask = jnp.ones(
         (len(filtered_state_tuples), max_order_quantity + 1), dtype=jnp.int32
     )
-    filtered_obs = DeMoorEnvObs(
+    filtered_obs = GymnaxEnvObs(
         stock=filtered_state_tuples[:, lead_time - 1 :],
         action_mask=action_mask,
         in_transit=filtered_state_tuples[:, : lead_time - 1],
@@ -150,7 +152,7 @@ def collect_samples(
     n_samples: int,
     exploration_policy: SRepPolicyExplore,
     heuristic_policy_params: jnp.ndarray,
-    env: RSEnvObs,
+    env: GymnaxEnvObs,
     env_params: jnp.ndarray,
 ):
 
@@ -173,7 +175,7 @@ def reshape_obs_element(element):
     return jnp.reshape(element, new_shape)
 
 
-def get_obs_rs_multiproduct(cfg):
+def get_obs_multiproduct(cfg):
     rng = jax.random.PRNGKey(cfg.obs_collection.seed)
 
     exploration_policy = hydra.utils.instantiate(cfg.obs_collection.policy)
@@ -205,7 +207,7 @@ def collect_samples_multiagent_env(
     n_samples: int,
     collection_policy_manager: PolicyManager,
     heuristic_policy_params: jnp.ndarray,
-    env: RSEnvObs,
+    env: MarlEnvObs,
     env_params: jnp.ndarray,
 ):
 
@@ -224,7 +226,7 @@ def collect_samples_multiagent_env(
     return jax.lax.scan(one_step, (rng, state, obs), None, length=n_samples)
 
 
-def get_obs_rs_multiproduct_issuing(cfg):
+def get_obs_multiproduct_issuing(cfg):
     rng = jax.random.PRNGKey(cfg.obs_collection.seed)
 
     replenishment_collection_policy = hydra.utils.instantiate(
