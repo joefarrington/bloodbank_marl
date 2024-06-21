@@ -26,3 +26,7 @@ args_per_exp = [
     for s in scenario_settings
     for f in fit_method
 ]
+
+for args in args_per_exp:
+    command = ["python", "run_eval.py"] + args
+    subprocess.call(command)
