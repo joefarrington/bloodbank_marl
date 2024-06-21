@@ -10,7 +10,7 @@ wandb:
     project: "de_moor_perishable_evaluation"
     tags:
       - "fit_rep"
-      - "m2_ex6"
+      - "m2_exp6"
       - "open_es"
       - "order_up_to"
 
