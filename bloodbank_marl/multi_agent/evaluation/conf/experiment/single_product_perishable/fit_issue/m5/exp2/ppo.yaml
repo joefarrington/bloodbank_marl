@@ -25,6 +25,5 @@ policies:
       reshape_for_fitness: False
   load_issuing_policy_params:
     param_key: issue_best_params
-    checkpoint_id: 0
     checkpoint_manager:
       directory: "/home/joefarrington/CDT/bloodbank_marl/model_cpts/single_product_perishable/fit_issue/m5/exp2/ppo"

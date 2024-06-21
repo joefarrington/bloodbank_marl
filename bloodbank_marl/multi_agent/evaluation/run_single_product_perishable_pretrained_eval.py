@@ -17,3 +17,12 @@ args_per_exp = [
 for args in args_per_exp:
     command = ["python", "run_eval.py"] + args
     subprocess.call(command)
+
+# And, as comparisons used in this results table
+args_per_exp = [
+    [
+        f"+experiment=single_product_perishable/fit_both_replenishment_direct_action/{s}/{f}.yaml"
+    ]
+    for s in scenario_settings
+    for f in fit_method
+]

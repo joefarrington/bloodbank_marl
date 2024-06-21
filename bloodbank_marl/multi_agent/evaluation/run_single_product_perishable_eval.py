@@ -3,12 +3,10 @@ from typing import List
 
 scenario_settings = ["m2/exp2", "m2/exp6", "m5/exp2", "m5/exp6"]
 
-# Note fit_both_replenishment_direct_action used as comparison in pretraining experiments, rather than main results table
 policies_fit = [
     "fit_replenishment_order_up_to",
     "fit_issue",
     "fit_both_replenishment_order_up_to",
-    "fit_both_replenishment_direct_action",
 ]
 fit_method = ["simple_ga", "open_es", "ppo"]
 benchmark = ["value_iteration", "simopt"]
