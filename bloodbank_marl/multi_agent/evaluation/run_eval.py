@@ -85,6 +85,7 @@ def main(cfg):
         overall_metrics_per_eval_rollout_df = pd.DataFrame()
         for m in kpis.keys():
             overall_metrics_per_eval_rollout_df[m] = kpis[m][0]
+        overall_metrics_per_eval_rollout_df["return"] = fitness[0]
         wandb.log(
             {
                 f"eval/overall_metrics_per_eval_rollout": wandb.Table(
