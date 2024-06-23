@@ -3,18 +3,23 @@
 wandb:
   init:
     tags:
-      - m2_exp6
-      - raw_action_nn
+      - m5_exp6
+      - direct_action_nn
 
 environment:
   env_kwargs:
+    max_useful_life: 5
     lead_time: 2
 
 heuristic_policy:
   fixed_policy_params:
     _target_: jax.numpy.array
     object:
-      - [9]
+      - [10]
 
 pretraining:
-  num_epochs: 250
+  stock_limit: 15
+  num_epochs: 20
+  batch_size: 64
+  optimizer:
+    learning_rate: 0.01
