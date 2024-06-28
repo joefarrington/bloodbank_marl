@@ -89,6 +89,9 @@ def run_neuro_opt_one_kpi(
         strategy = hydra.utils.instantiate(
             cfg.evosax.strategy, num_dims=param_reshaper.total_params
         )
+        evo_params = strategy.params_strategy.replace(
+            **hydra.utils.instantiate(cfg.evosax.evo_params)
+        )
         fitness_shaper = hydra.utils.instantiate(cfg.evosax.fitness_shaper)
         rng, rng_state_init = jax.random.split(rng, 2)
 
@@ -105,6 +108,7 @@ def run_neuro_opt_one_kpi(
                 rng_state_init,
                 init_mean=param_reshaper.flatten_single(best_params_last_round),
                 init_fitness=best_fitness_last_round,
+                params=evo_params,
             )
             # We want to put this combination into the log
             es_log = es_logging.update(
@@ -113,7 +117,7 @@ def run_neuro_opt_one_kpi(
                 best_fitness_last_round,
             )
         else:
-            state = strategy.initialize(rng_state_init)
+            state = strategy.initialize(rng_state_init, params=evo_params)
 
         rng_eval = jax.random.PRNGKey(cfg.evaluation.seed)
 
