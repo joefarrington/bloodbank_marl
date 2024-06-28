@@ -1,7 +1,0 @@
-# @package _global_
-
-wandb:
-  init:
-    tags:
-      - "m2_exp2"
-      - "simple_ga"
