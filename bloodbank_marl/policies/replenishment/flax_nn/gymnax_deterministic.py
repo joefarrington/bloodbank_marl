@@ -88,7 +88,7 @@ class FlaxMultiProductCategoricalRepPolicy(FlaxPolicy):
         env, default_env_params = make(self.env_name, **self.env_kwargs)
         self.env_params = default_env_params.create_env_params(**env_params)
         self.obs, _ = env.reset(jax.random.PRNGKey(0), self.env_params)
-        # TODO: Note that this always takes the highest max order quantity
+        # NOTE: that this always takes the highest max order quantity
         # for now - could modify with some clipping etc if needed
         self.model = model_class(n_actions=env.num_actions, **model_kwargs)
 

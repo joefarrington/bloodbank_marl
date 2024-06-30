@@ -242,7 +242,6 @@ class SingleProductPerishableMarlEnv(MarlEnvironment):
         infos = infos.reset_infos_one_agent(state.agent_id)
         state = state.replace(infos=infos, cumulative_rewards=cumulative_rewards)
 
-        # TODO: Difference between truncation and termination
         state = jax.lax.switch(
             state.agent_id,
             [self._replenishment_step, self._issuing_step],
@@ -272,7 +271,7 @@ class SingleProductPerishableMarlEnv(MarlEnvironment):
 
         # Check for termination - for now we don't make a distinction between truncation and termination
         # And either both or noen of the agents are done
-        # TODO: Separate termination for each agent? Not necessary for what we're doing.
+        # NOTE: Could add separate termination for each agent. Not necessary for what we're doing.
         trunc = jax.lax.cond(
             jax.lax.bitwise_or(
                 state.day + day_increment >= params.max_days_in_episode,
@@ -332,7 +331,6 @@ class SingleProductPerishableMarlEnv(MarlEnvironment):
 
     def get_obs(self, state: EnvState, params: EnvParams, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
-        # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
         return EnvObs(
             state.agent_id,
             state.in_transit[1 : self.lead_time + 1],
@@ -420,7 +418,7 @@ class SingleProductPerishableMarlEnv(MarlEnvironment):
 
     def observation_space(self, params: EnvParams, agent_id: int = 1) -> spaces.Box:
         """Observation space of the agent with id `agent_id`. For now, both the same"""
-        # TODO: For not this is just the shape of the flat space, EnvObs.obs
+        # NOTE: For now this is just the shape of the flat space, EnvObs.obs
         return spaces.Box(
             low=0,
             high=self.max_order_quantity,
@@ -430,7 +428,7 @@ class SingleProductPerishableMarlEnv(MarlEnvironment):
 
     def state_space(self, params: EnvParams, agent_id: int) -> spaces.Dict:
         """State space of the environment."""
-        # TODO: Infos is currently wrong
+        # NOTE: Could refine infos, but not necessary for current experiments
         return spaces.Dict(
             {
                 "stock": spaces.Box(
@@ -567,7 +565,7 @@ class SingleProductPerishableMarlEnv(MarlEnvironment):
 
         # Idx action - 1 because action is 1-indexed; we use 0 to indicate no unit issued
         # Issue one unit if there's no shortage (which includes our choice not to issue from stock)
-        # TODO: i would rater use shortage in this cond, but getting an error
+        # NOTE: i would rather use shortage in this cond, but getting an error
         stock = jax.lax.cond(
             shortage < 1,
             lambda stock, action: self._issue_one_unit(stock, action),

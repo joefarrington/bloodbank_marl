@@ -9,11 +9,6 @@ from flax import struct
 from bloodbank_marl.utils.make_env import make
 
 
-# TODO: Preprocess Obs/Postprocess action
-# TODO: Should preprocess obs produce a flat representation?
-# TODO: Order of arguments to init
-
-
 class Policy:
     def __init__(
         self,

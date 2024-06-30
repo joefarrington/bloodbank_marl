@@ -21,7 +21,7 @@ from pymoo.indicators.hv import Hypervolume
 import pickle
 
 
-class DeMoorPerishableMultiAgentProbelem(Problem):
+class SingleProductPerishableMultiAgentProbelem(Problem):
     def __init__(
         self,
         train_evaluator,
@@ -110,8 +110,8 @@ def main(cfg: omegaconf.DictConfig):
     train_evaluator = hydra.utils.instantiate(cfg.train_evaluator)
     train_evaluator.set_apply_fn(policy_manager.apply)
 
-    # TODO: Enable specifying problem in cofig by defining in a separate file
-    problem = DeMoorPerishableMultiAgentProbelem(
+    # NOTE: Could enable specifying problem in cofig by defining in a separate file
+    problem = SingleProductPerishableMultiAgentProbelem(
         train_evaluator=train_evaluator,
         param_reshaper=param_reshaper,
         scenario_seed=cfg.pymoo.seed,

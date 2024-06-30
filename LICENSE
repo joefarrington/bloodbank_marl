@@ -191,13 +191,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
----
-# TODO
-Add license extracts for code that has been adapted from other repos as
-updated
-
----
-
 Code in bloodbank_mael.environments.marl_environment.py adapted from
 https://github.com/RobertTLange/gymnax/blob/main/gymnax/environments/environment.py
 
@@ -258,7 +251,7 @@ limitations under the License.
 Code in bloodbank_marl/utils/gymnax_wrappers.py adapted from
 https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/wrappers.py
 
-Code in bloodbank_marl/multi_agent/ppo/run_ppo.py adapted from 
+Code in bloodbank_marl/multi_agent/ppo/run_ppo.py adapted from
 https://github.com/luchris429/purejaxrl/blob/main/purejaxrl/ppo.py
 
 License: https://github.com/luchris429/purejaxrl/blob/main/LICENSE
@@ -279,16 +272,16 @@ limitations under the License.
 
 ---
 
-Code in bloodbank_marl/utils/yaml adapted from 
+Code in bloodbank_marl/utils/yaml adapted from
 https://github.com/joefarrington/viso_jax/utils/yaml.py
 
-Code in bloodbank_marl/utils/viso_jax/scenarios/de_moor_perishable adapted from 
+Code in bloodbank_marl/utils/viso_jax/scenarios/de_moor_perishable adapted from
 https://github.com/joefarrington/viso_jax/blob/main/viso_jax/scenarios/de_moor_perishable/vi_runner.py
 
-Code in bloodbank_marl/utils/value_iteration/base_vi_runner adapted from 
+Code in bloodbank_marl/utils/value_iteration/base_vi_runner adapted from
 https://github.com/joefarrington/viso_jax/blob/main/viso_jax/value_iteration/base_vi_runner.py
 
-Code in bloodbank_marl/utils/value_iteration/run_value_iteration.py adapted from 
+Code in bloodbank_marl/utils/value_iteration/run_value_iteration.py adapted from
 https://github.com/joefarrington/viso_jax/blob/main/viso_jax/value_iteration/run_value_iteration.py
 
 License: https://github.com/joefarrington/viso_jax/blob/main/LICENSE

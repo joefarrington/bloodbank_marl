@@ -144,7 +144,7 @@ def main(cfg: omegaconf.DictConfig):
     train_evaluator.set_apply_fn(policy_rep.apply)
     train_evaluator.set_issuing_fn(policy_issue.apply)
 
-    # TODO: Enable specifying problem in config by defining in a separate file
+    # NOTE: Could enable specifying problem in config by defining in a separate file
     problem = MultiProductPerishableMultiAgentProbelem(
         train_evaluator=train_evaluator,
         param_reshaper=param_reshaper,

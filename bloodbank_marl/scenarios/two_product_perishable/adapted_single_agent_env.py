@@ -13,8 +13,6 @@ import numpy as np
 
 # NOTE: KPIs talk about blood groups, but this is more generic.
 
-# TODO: Fill out missing methods (e.g. for action/obs/state spaces etc) if we end up using this for final results
-
 n_products = 2
 M = 1e10  # invalid substitution cost
 max_useful_life = 2
@@ -282,7 +280,7 @@ class TwoProductPerishableAdaptedEnv(environment.Environment):
         # Construct a demand info object
         allocations = jnp.zeros(
             (self.n_products, self.n_products, self.max_useful_life)
-        )  # TODO: Check dimensions
+        )
         shortages = jnp.zeros((self.n_products,))
         demand_info = DemandInfo(
             remaining_demand,
@@ -353,7 +351,7 @@ class TwoProductPerishableAdaptedEnv(environment.Environment):
             in_transit=in_transit,
             step=state.step + 1,
             issue_policy_params=state.issue_policy_params,
-        )  # TODO Add in the other elements
+        )
         done = self.is_terminal(state, params)
 
         info["day_counter"] = 1  # Used when we are accumulating infos for KPIs
@@ -627,7 +625,7 @@ class TwoProductPerishableAdaptedEnv(environment.Environment):
     def calculate_target_kpi_penalty(
         cls, kpis: Dict[str, Union[chex.Array, float]], params
     ):
-        # TODO Might want to do some rounding here/use jnp.close etc when aiming for
+        # NOTE: Might want to do some rounding here/use jnp.close etc when aiming for
         # 100% service level or 0% expriries for example to avoid issues with floating
         # point precision
         expiry_penalty = (

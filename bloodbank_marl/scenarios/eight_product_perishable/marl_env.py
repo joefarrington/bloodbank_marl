@@ -81,7 +81,6 @@ action_mask_per_request_type = jnp.where(
 )
 
 
-# TODO: Recheck all defaults
 @struct.dataclass
 class EnvParams:
     poisson_demand_mean: float
@@ -92,9 +91,6 @@ class EnvParams:
     shortage_costs: chex.Array
     wastage_costs: chex.Array
     holding_costs: chex.Array
-    # For now, we assume that subsitution cost increases by 1/8
-    # TODO: Check if this is what they meant (or whether, for example, if only one possible sub
-    # then it is the wost and so should be 7/8)
     substitution_costs: chex.Array
     action_mask_per_request_type: chex.Array
     initial_weekday: int  # 0 Monday, 6, Sunday, -1 random on each reset
@@ -238,7 +234,7 @@ class EnvInfo:
     def calculate_target_kpi_penalty(
         cls, kpis: Dict[str, Union[chex.Array, float]], params
     ):
-        # TODO Might want to do some rounding here/use jnp.close etc when aiming for
+        # NOTE: Might want to do some rounding here/use jnp.close etc when aiming for
         # 100% service level or 0% expriries for example to avoid issues with floating
         # point precision
         expiry_penalty = (
@@ -489,7 +485,6 @@ class EightProductPerishableMarlEnv(MarlEnvironment):
     ) -> Tuple[EnvObs, EnvState, float, bool, bool, EnvInfo]:
         pol_key, age_key = jax.random.split(key)
 
-        # TODO: Difference between truncation and termination
         state = jax.lax.switch(
             state.agent_id,
             [self._replenishment_step, self._issuing_step],
@@ -518,7 +513,7 @@ class EightProductPerishableMarlEnv(MarlEnvironment):
 
         # Check for termination - for now we don't make a distinction between truncation and termination
         # And either both or none of the agents are done
-        # TODO: Separate termination for each agent? Not necessary for what we're doing.
+        # NOTE: For more general case could add separate termination for each agent? Not necessary for what we're doing.
         trunc = jax.lax.cond(
             jax.lax.bitwise_or(
                 state.day
@@ -603,7 +598,7 @@ class EightProductPerishableMarlEnv(MarlEnvironment):
 
     def get_obs(self, state: EnvState, params: EnvParams, agent_id: int) -> EnvObs:
         """Applies observation function to state, in PettinZoo AECEnv the equivalent is .observe()"""
-        # TODO: For now, each agent gets the same observation and we'll deal with it at the agent level
+        # NOTE: For now, each agent gets the same observation and we'll deal with it at the agent level
 
         return EnvObs(
             state.agent_id,
@@ -696,15 +691,13 @@ class EightProductPerishableMarlEnv(MarlEnvironment):
             dtype=jnp.float32,
         )
 
-    # TODO: Double check. And think whether it might be better to have like a training-state thing
-    # that includes both state, info etc.
     def state_space(self, params: EnvParams, agent_id: int):
         """State space of the environment."""
         return spaces.Dict(
             {
                 "stock": spaces.Box(
                     low=0,
-                    # TODO: This is fine when all arrive fresh, but should probably be max storage etc otherwise
+                    # NOTE: This is fine when all arrive fresh, but should probably be max storage etc otherwise
                     high=jnp.array(
                         [self.max_order_quantities] * self.max_useful_life
                     ).transpose(),
@@ -773,13 +766,13 @@ class EightProductPerishableMarlEnv(MarlEnvironment):
                 ),
                 "truncations": spaces.Box(
                     low=0, high=1, shape=(self.num_agents,), dtype=jnp.bool
-                ),  # TODO: is this okay?
+                ),
                 "terminations": spaces.Box(
                     low=0, high=1, shape=(self.num_agents,), dtype=jnp.bool
-                ),  # TODO: is this okay?
+                ),
                 "live_agents": spaces.Box(
                     low=0, high=1, shape=(self.num_agents,), dtype=jnp.bool
-                ),  # TODO: is this okay?
+                ),
                 "day": spaces.Box(low=0, high=1e10, shape=(1,), dtype=jnp.int32),
                 "time": spaces.Box(low=0, high=1e10, shape=(1,), dtype=jnp.float32),
                 "step": spaces.Box(low=0, high=1e10, shape=(1,), dtype=jnp.int32),
@@ -950,7 +943,7 @@ class EightProductPerishableMarlEnv(MarlEnvironment):
             infos.allocations.at[:, state.request_type, :].add(issued),
             infos.allocations,
         )
-        # TODO: Works here because dealing with one demand at a time
+        # NOTE: Works here because dealing with one demand at a time
         substitution_cost = jax.lax.select(
             shortage < 1,
             -params.substitution_costs[state.request_type, product_idx],

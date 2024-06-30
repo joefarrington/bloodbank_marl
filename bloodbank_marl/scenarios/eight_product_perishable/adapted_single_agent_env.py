@@ -14,8 +14,6 @@ from bloodbank_marl.scenarios.two_product_perishable.adapted_single_agent_env im
     TwoProductPerishableAdaptedEnv,
 )
 
-# TODO: Fill out missing methods (e.g. for action/obs/state spaces etc) if we end up using this for final results
-
 n_products = 8
 M = 1e10  # invalid substitution cost
 max_useful_life = 3
@@ -333,7 +331,7 @@ class EightProductPerishableAdaptedEnv(TwoProductPerishableAdaptedEnv):
         # Construct a demand info object
         allocations = jnp.zeros(
             (self.n_products, self.n_products, self.max_useful_life)
-        )  # TODO: Check dimensions
+        )
         shortages = jnp.zeros((self.n_products,))
         demand_info = DemandInfo(
             remaining_demand,
@@ -406,7 +404,7 @@ class EightProductPerishableAdaptedEnv(TwoProductPerishableAdaptedEnv):
             weekday=(state.weekday + 1) % 7,
             step=state.step + 1,
             issue_policy_params=state.issue_policy_params,
-        )  # TODO Add in the other elements
+        )
         done = self.is_terminal(state, params)
 
         info["day_counter"] = 1  # Used when we are accumulating infos for KPIs

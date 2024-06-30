@@ -92,7 +92,6 @@ class ContinuousActorCritic(nn.Module):
         return pi, jnp.squeeze(critic, axis=-1)
 
 
-# # TODO MAybe rename this multiproduct?
 class DiscreteIssuingActorCritic(nn.Module):
     n_hidden: Union[int, list]
     n_actions: int

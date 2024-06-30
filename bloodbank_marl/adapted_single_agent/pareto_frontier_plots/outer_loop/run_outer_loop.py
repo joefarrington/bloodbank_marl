@@ -182,7 +182,7 @@ def run_neuro_opt_one_kpi(
         for k, v in test_kpis.items():
             store[f"eval/{k}_mean"] = v[0]
 
-        # TODO: Consider if we need to hardcode the names of the KPIs
+        # NOTE: Could generalize to avoid hard-coding KPIs
         row = [
             penalty_kpi_threshold,
             float(store["eval/wastage_%_mean"]),
