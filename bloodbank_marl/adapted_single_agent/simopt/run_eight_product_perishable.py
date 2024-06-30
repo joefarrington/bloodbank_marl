@@ -12,5 +12,5 @@ args_per_exp = [
 ]
 
 for args in args_per_exp:
-    command = ["python", "run_eval.py"] + args
+    command = ["python", "run_simopt.py"] + args
     subprocess.call(command)
